@@ -320,6 +320,36 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    // Choose AI Provider & Model
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                showProviderSheet = true
+                            }
+                            .testTag("drawer_change_provider_button"),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("AI Provider & Model", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "${selectedProvider.displayName} • ${selectedModel.name}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Text("Switch", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+
                     // Artifacts Menu
                     Surface(
                         shape = RoundedCornerShape(10.dp),

@@ -141,7 +141,7 @@ fun ProviderSelectorSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                items(ProviderType.values()) { provider ->
+                items(ProviderType.entries) { provider ->
                     val isSelected = activeFilterProvider == provider
                     val hasKey = isKeyConfigured(provider)
                     FilterChip(

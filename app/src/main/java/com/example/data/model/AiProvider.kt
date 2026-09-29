@@ -115,36 +115,63 @@ object AvailableModels {
             tag = "🧠 Reasoning"
         ),
 
-        // Google Gemini - Latest 3.x Models
+        // Google Gemini - Verified production & latest preview models
         AiModel(
-            id = "gemini-3.8-flash",
-            name = "Gemini 3.8 Flash",
+            id = "gemini-2.5-flash",
+            name = "Gemini 2.5 Flash",
             provider = ProviderType.GEMINI,
-            description = "Google's latest flagship multimodal model, ultra-fast and precise",
+            description = "Google's ultra-fast flagship multimodal model with superior efficiency",
             supportsVision = true,
             isFree = false,
             tag = "⚡ Recommended"
         ),
         AiModel(
+            id = "gemini-2.5-pro",
+            name = "Gemini 2.5 Pro",
+            provider = ProviderType.GEMINI,
+            description = "Google's premier model for coding, STEM, and complex reasoning",
+            supportsVision = true,
+            isFree = false,
+            tag = "🧠 Pro Coding"
+        ),
+        AiModel(
+            id = "gemini-2.0-flash",
+            name = "Gemini 2.0 Flash",
+            provider = ProviderType.GEMINI,
+            description = "Next-generation multimodal performance with ultra-low latency",
+            supportsVision = true,
+            isFree = false,
+            tag = "🚀 Low Latency"
+        ),
+        AiModel(
+            id = "gemini-3.8-flash",
+            name = "Gemini 3.8 Flash",
+            provider = ProviderType.GEMINI,
+            description = "Google AI Studio 3.8 Flash architecture with high throughput",
+            supportsVision = true,
+            isFree = false,
+            tag = "⚡ 3.8 Series"
+        ),
+        AiModel(
             id = "gemini-3.8-pro",
             name = "Gemini 3.8 Pro",
             provider = ProviderType.GEMINI,
-            description = "State-of-the-art complex reasoning and multi-turn STEM logic",
+            description = "Extended thinking and advanced multi-turn agent capabilities",
             supportsVision = true,
             isFree = false,
-            tag = "🧠 Pro Reasoning"
+            tag = "🧠 3.8 Pro"
         ),
         AiModel(
             id = "gemini-3.1-flash-lite",
             name = "Gemini 3.1 Flash Lite",
             provider = ProviderType.GEMINI,
-            description = "Ultra low latency variant engineered for rapid conversation",
+            description = "Compact low latency variant engineered for instant replies",
             supportsVision = true,
             isFree = false,
-            tag = "🚀 Ultra Fast"
+            tag = "🚀 Flash Lite"
         ),
 
-        // Groq Cloud - Verified live
+        // Groq Cloud - Verified live models
         AiModel(
             id = "llama-3.3-70b-versatile",
             name = "Llama 3.3 70B (Groq)",
@@ -162,6 +189,24 @@ object AvailableModels {
             supportsVision = false,
             isFree = true,
             tag = "🚀 Instant"
+        ),
+        AiModel(
+            id = "qwen/qwen3.8-27b",
+            name = "Qwen 3.8 27B Vision (Groq)",
+            provider = ProviderType.GROQ,
+            description = "Multimodal 27B model for OCR, images, and instruct reasoning",
+            supportsVision = true,
+            isFree = true,
+            tag = "👁️ Vision & Chat"
+        ),
+        AiModel(
+            id = "openai/gpt-oss-120b",
+            name = "GPT-OSS 120B (Groq)",
+            provider = ProviderType.GROQ,
+            description = "Flagship open-weight 120B language model with deep reasoning",
+            supportsVision = false,
+            isFree = true,
+            tag = "🧠 120B Reasoning"
         ),
         AiModel(
             id = "gemma2-9b-it",
