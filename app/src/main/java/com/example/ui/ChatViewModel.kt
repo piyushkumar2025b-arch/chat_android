@@ -12,6 +12,8 @@ import com.example.data.local.PreferencesManager
 import com.example.data.local.UsageStats
 import com.example.data.local.UsageTracker
 import com.example.data.model.AiModel
+import com.example.data.model.ArtifactExtractor
+import com.example.data.model.ArtifactItem
 import com.example.data.model.AttachmentInfo
 import com.example.data.model.AvailableModels
 import com.example.data.model.ChatMessageEntity
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -54,6 +57,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             if (id != null) repository.getMessagesForSession(id) else flowOf(emptyList())
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val currentSessionArtifacts: StateFlow<List<ArtifactItem>> = currentMessages
+        .map { list -> list.flatMap { ArtifactExtractor.extractFromMessage(it) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allArtifacts: StateFlow<List<ArtifactItem>> = repository.allMessages
+        .map { list -> list.flatMap { ArtifactExtractor.extractFromMessage(it) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _selectedArtifact = MutableStateFlow<ArtifactItem?>(null)
+    val selectedArtifact: StateFlow<ArtifactItem?> = _selectedArtifact.asStateFlow()
+
+    fun selectArtifact(artifact: ArtifactItem?) {
+        _selectedArtifact.value = artifact
+    }
 
     private val _pendingAttachments = MutableStateFlow<List<AttachmentInfo>>(emptyList())
     val pendingAttachments: StateFlow<List<AttachmentInfo>> = _pendingAttachments.asStateFlow()

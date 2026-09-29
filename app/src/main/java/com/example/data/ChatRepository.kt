@@ -16,6 +16,7 @@ class ChatRepository(private val chatDao: ChatDao) {
     private val attachmentAdapter = moshi.adapter<List<AttachmentInfo>>(attachmentListType)
 
     val allSessions: Flow<List<ChatSessionEntity>> = chatDao.getAllSessions()
+    val allMessages: Flow<List<ChatMessageEntity>> = chatDao.getAllMessages()
 
     fun getMessagesForSession(sessionId: String): Flow<List<ChatMessageEntity>> {
         return chatDao.getMessagesForSession(sessionId)

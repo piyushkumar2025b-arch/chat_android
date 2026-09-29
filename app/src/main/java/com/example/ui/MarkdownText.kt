@@ -28,10 +28,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -117,7 +119,8 @@ fun MarkdownText(
     text: String,
     modifier: Modifier = Modifier,
     textColor: Color = MaterialTheme.colorScheme.onSurface,
-    style: TextStyle = MaterialTheme.typography.bodyMedium
+    style: TextStyle = MaterialTheme.typography.bodyMedium,
+    onOpenArtifact: ((title: String, language: String, code: String) -> Unit)? = null
 ) {
     if (text.isBlank()) return
 
@@ -136,7 +139,8 @@ fun MarkdownText(
                 node = child,
                 textColor = textColor,
                 baseStyle = style,
-                modifier = Modifier.testTag("md_block_$blockIndex")
+                modifier = Modifier.testTag("md_block_$blockIndex"),
+                onOpenArtifact = onOpenArtifact
             )
             blockIndex++
             child = child.next
@@ -149,7 +153,8 @@ private fun RenderMarkdownBlock(
     node: Node,
     textColor: Color,
     baseStyle: TextStyle,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenArtifact: ((title: String, language: String, code: String) -> Unit)? = null
 ) {
     when (node) {
         is Paragraph -> {
@@ -210,7 +215,8 @@ private fun RenderMarkdownBlock(
             MarkdownCodeBlock(
                 language = if (lang.isBlank()) "code" else lang,
                 code = node.literal?.trimEnd() ?: "",
-                modifier = modifier
+                modifier = modifier,
+                onOpenArtifact = onOpenArtifact
             )
         }
 
@@ -218,7 +224,8 @@ private fun RenderMarkdownBlock(
             MarkdownCodeBlock(
                 language = "code",
                 code = node.literal?.trimEnd() ?: "",
-                modifier = modifier
+                modifier = modifier,
+                onOpenArtifact = onOpenArtifact
             )
         }
 
@@ -515,7 +522,8 @@ private fun RenderMarkdownTable(
 fun MarkdownCodeBlock(
     language: String,
     code: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenArtifact: ((title: String, language: String, code: String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     var isCopied by remember { mutableStateOf(false) }
@@ -588,59 +596,100 @@ fun MarkdownCodeBlock(
                     )
                 }
 
-                // Copy Code Button with Animated Feedback
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("Code", code))
-                            Toast.makeText(context, "Copied $displayLang code to clipboard", Toast.LENGTH_SHORT).show()
-                            isCopied = true
-                            coroutineScope.launch {
-                                delay(2000)
-                                isCopied = false
-                            }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (onOpenArtifact != null) {
+                        val isWeb = displayLang in listOf("HTML", "SVG")
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable {
+                                    val defaultName = when {
+                                        displayLang == "HTML" -> "index.html"
+                                        displayLang == "SVG" -> "vector.svg"
+                                        displayLang in listOf("BASH", "SHELL", "SH") -> "script.sh"
+                                        displayLang == "PYTHON" -> "script.py"
+                                        displayLang == "KOTLIN" -> "Main.kt"
+                                        displayLang == "JSON" -> "data.json"
+                                        else -> "snippet.${language.lowercase()}"
+                                    }
+                                    onOpenArtifact(defaultName, language, code)
+                                }
+                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                                .testTag("code_block_artifact_button"),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (isWeb) Icons.Default.Visibility else Icons.AutoMirrored.Filled.OpenInNew,
+                                contentDescription = if (isWeb) "Preview Web App" else "Open Artifact",
+                                tint = if (isWeb) Color(0xFFA6E3A1) else headerTextColor,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isWeb) "Live Preview" else "Artifact",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isWeb) Color(0xFFA6E3A1) else headerTextColor,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                        .testTag("copy_code_button"),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    AnimatedContent(
-                        targetState = isCopied,
-                        transitionSpec = { fadeIn() togetherWith fadeOut() },
-                        label = "copy_icon"
-                    ) { copied ->
-                        if (copied) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "Copied",
-                                    tint = Color(0xFFA6E3A1),
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "Copied!",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFA6E3A1),
-                                    fontWeight = FontWeight.SemiBold
-                                )
+
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+
+                    // Copy Code Button with Animated Feedback
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("Code", code))
+                                Toast.makeText(context, "Copied $displayLang code to clipboard", Toast.LENGTH_SHORT).show()
+                                isCopied = true
+                                coroutineScope.launch {
+                                    delay(2000)
+                                    isCopied = false
+                                }
                             }
-                        } else {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.ContentCopy,
-                                    contentDescription = "Copy code",
-                                    tint = headerTextColor,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "Copy",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = headerTextColor
-                                )
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .testTag("copy_code_button"),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AnimatedContent(
+                            targetState = isCopied,
+                            transitionSpec = { fadeIn() togetherWith fadeOut() },
+                            label = "copy_icon"
+                        ) { copied ->
+                            if (copied) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Copied",
+                                        tint = Color(0xFFA6E3A1),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Copied!",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFFA6E3A1),
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            } else {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = "Copy code",
+                                        tint = headerTextColor,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Copy",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = headerTextColor
+                                    )
+                                }
                             }
                         }
                     }

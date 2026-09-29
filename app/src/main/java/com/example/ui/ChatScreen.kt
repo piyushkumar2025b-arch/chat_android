@@ -47,6 +47,9 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -111,6 +114,9 @@ fun ChatScreen(viewModel: ChatViewModel) {
     val currentThemeMode by viewModel.themeMode.collectAsState()
     val keysRevision by viewModel.keysRevision.collectAsState()
     val usageStats by viewModel.usageStats.collectAsState()
+    val currentSessionArtifacts by viewModel.currentSessionArtifacts.collectAsState()
+    val allArtifacts by viewModel.allArtifacts.collectAsState()
+    val selectedArtifact by viewModel.selectedArtifact.collectAsState()
 
     var inputText by remember { mutableStateOf("") }
     var showProviderSheet by remember { mutableStateOf(false) }
@@ -118,6 +124,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
     var showQuickKeyDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showUsageLimitsSheet by remember { mutableStateOf(false) }
+    var showArtifactsSheet by remember { mutableStateOf(false) }
     var showAttachmentMenu by remember { mutableStateOf(false) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -313,6 +320,48 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    // Artifacts Menu
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                showArtifactsSheet = true
+                            }
+                            .testTag("drawer_artifacts_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Widgets, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Artifacts Menu", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    text = if (allArtifacts.isEmpty()) "No artifacts yet" else "${allArtifacts.size} artifacts generated",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (allArtifacts.isNotEmpty()) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primaryContainer
+                                ) {
+                                    Text(
+                                        text = "${allArtifacts.size}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // Usage & Rate Limits
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -492,6 +541,31 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             }
                         },
                         actions = {
+                            // Artifacts Menu Button with Dynamic Counter Badge
+                            IconButton(
+                                onClick = { showArtifactsSheet = true },
+                                modifier = Modifier.testTag("top_bar_artifacts_button")
+                            ) {
+                                BadgedBox(
+                                    badge = {
+                                        if (currentSessionArtifacts.isNotEmpty()) {
+                                            Badge(
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                            ) {
+                                                Text("${currentSessionArtifacts.size}")
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Widgets,
+                                        contentDescription = "Artifacts Menu (${currentSessionArtifacts.size})",
+                                        tint = if (currentSessionArtifacts.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
                             // Direct Usage & Limits Button
                             IconButton(
                                 onClick = { showUsageLimitsSheet = true },
@@ -758,7 +832,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                 isSpeaking = isSpeaking,
                                 onSpeakToggle = { viewModel.toggleSpeech(msg.id, msg.content) },
                                 onRegenerate = { viewModel.regenerateMessage(msg) },
-                                onOpenSettings = { showQuickKeyDialog = true }
+                                onOpenSettings = { showQuickKeyDialog = true },
+                                onOpenArtifact = { art -> viewModel.selectArtifact(art) }
                             )
                         }
 
@@ -854,6 +929,33 @@ fun ChatScreen(viewModel: ChatViewModel) {
             onSetDailyLimit = { viewModel.setDailyLimit(it) },
             onResetTodayStats = { viewModel.resetTodayUsage() },
             onDismiss = { showUsageLimitsSheet = false }
+        )
+    }
+
+    // Artifacts Menu Bottom Sheet
+    if (showArtifactsSheet) {
+        val artifactsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ArtifactsSheet(
+            sheetState = artifactsSheetState,
+            currentSessionArtifacts = currentSessionArtifacts,
+            allArtifacts = allArtifacts,
+            onSelectArtifact = { art ->
+                showArtifactsSheet = false
+                viewModel.selectArtifact(art)
+            },
+            onPromptSuggestion = { suggestion ->
+                showArtifactsSheet = false
+                viewModel.sendMessage(suggestion)
+            },
+            onDismiss = { showArtifactsSheet = false }
+        )
+    }
+
+    // Full Artifact Viewer & Interactive Live Preview Dialog
+    selectedArtifact?.let { artifact ->
+        ArtifactViewerDialog(
+            artifact = artifact,
+            onDismiss = { viewModel.selectArtifact(null) }
         )
     }
 }

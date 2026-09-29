@@ -41,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,6 +54,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.data.model.ArtifactExtractor
+import com.example.data.model.ArtifactItem
+import com.example.data.model.ArtifactType
 import com.example.data.model.AttachmentInfo
 import com.example.data.model.ChatMessageEntity
 import com.example.data.remote.FileUtils
@@ -67,6 +71,7 @@ fun ChatMessageItem(
     onSpeakToggle: () -> Unit,
     onRegenerate: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenArtifact: ((ArtifactItem) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -156,6 +161,10 @@ fun ChatMessageItem(
                         }
                     }
 
+                    val messageArtifacts = remember(message.content) {
+                        if (!isUser && !message.isError) ArtifactExtractor.extractFromMessage(message) else emptyList()
+                    }
+
                     if (isUser) {
                         Text(
                             text = message.content,
@@ -201,9 +210,65 @@ fun ChatMessageItem(
                                 }
                             }
                         } else {
+                            if (messageArtifacts.isNotEmpty()) {
+                                FlowRow(
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    for (art in messageArtifacts) {
+                                        val isWeb = art.type == ArtifactType.HTML_WEB || art.type == ArtifactType.SVG
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (isWeb) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
+                                            modifier = Modifier
+                                                .clickable { onOpenArtifact?.invoke(art) }
+                                                .testTag("message_artifact_chip_${art.id}")
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    imageVector = art.type.getIcon(),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(13.dp),
+                                                    tint = if (isWeb) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = "${art.title} • ${if (isWeb) "Preview" else "Artifact"}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = if (isWeb) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             MarkdownText(
                                 text = message.content,
-                                textColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                onOpenArtifact = { title, lang, code ->
+                                    val matched = messageArtifacts.firstOrNull { it.content == code }
+                                        ?: ArtifactItem(
+                                            id = "${message.id}_dyn",
+                                            messageId = message.id,
+                                            sessionId = message.sessionId,
+                                            title = title,
+                                            type = if (lang in listOf("html", "htm") || code.contains("<html", ignoreCase = true)) ArtifactType.HTML_WEB
+                                            else if (lang == "svg" || code.trimStart().startsWith("<svg", ignoreCase = true)) ArtifactType.SVG
+                                            else ArtifactType.CODE,
+                                            language = lang,
+                                            content = code,
+                                            timestamp = message.timestamp,
+                                            lineCount = code.lines().size,
+                                            charCount = code.length
+                                        )
+                                    onOpenArtifact?.invoke(matched)
+                                }
                             )
                         }
                     }
