@@ -78,6 +78,28 @@ object AiService {
                     systemPrompt = systemPrompt,
                     temperature = temperature
                 )
+                ProviderType.CEREBRAS -> callOpenAiCompatible(
+                    endpointUrl = provider.defaultBaseUrl,
+                    modelId = modelId,
+                    prompt = prompt,
+                    attachments = attachments,
+                    history = history,
+                    apiKey = apiKey,
+                    systemPrompt = systemPrompt,
+                    temperature = temperature,
+                    extraHeaders = emptyMap()
+                )
+                ProviderType.HUGGINGFACE -> callOpenAiCompatible(
+                    endpointUrl = provider.defaultBaseUrl,
+                    modelId = modelId,
+                    prompt = prompt,
+                    attachments = attachments,
+                    history = history,
+                    apiKey = apiKey,
+                    systemPrompt = systemPrompt,
+                    temperature = temperature,
+                    extraHeaders = emptyMap()
+                )
                 ProviderType.CUSTOM -> {
                     val url = if (customBaseUrl.isNotBlank()) customBaseUrl else "https://api.openai.com/v1/chat/completions"
                     callOpenAiCompatible(
@@ -302,6 +324,10 @@ object AiService {
             if (!content.isNullOrBlank()) {
                 return Result.success(content)
             }
+            val reasoning = msg?.optString("reasoning")
+            if (!reasoning.isNullOrBlank()) {
+                return Result.success(reasoning)
+            }
         }
 
         return Result.success("No response content received.")
@@ -315,10 +341,15 @@ object AiService {
         systemPrompt: String,
         temperature: Float
     ): Result<String> {
+        val effectiveModel = when (modelId) {
+            "openai", "gpt-oss-20b", "openai-fast" -> modelId
+            else -> "openai-fast"
+        }
+
         // First try the OpenAI-compatible endpoint
         val openAiRes = callOpenAiCompatible(
             endpointUrl = "https://text.pollinations.ai/openai/chat/completions",
-            modelId = modelId,
+            modelId = effectiveModel,
             prompt = prompt,
             attachments = attachments,
             history = history,
@@ -345,7 +376,7 @@ object AiService {
             val queryPrompt = if (fileContext.isNotEmpty()) "$prompt $fileContext" else prompt
             val encodedPrompt = java.net.URLEncoder.encode(queryPrompt, "UTF-8")
             val encodedSystem = java.net.URLEncoder.encode(systemPrompt, "UTF-8")
-            val url = "https://text.pollinations.ai/$encodedPrompt?model=$modelId&system=$encodedSystem"
+            val url = "https://text.pollinations.ai/$encodedPrompt?model=$effectiveModel&system=$encodedSystem"
 
             val req = Request.Builder().url(url).get().build()
             val resp = httpClient.newCall(req).execute()

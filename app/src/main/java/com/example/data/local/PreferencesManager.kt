@@ -21,10 +21,21 @@ class PreferencesManager(context: Context) {
         private const val KEY_LAST_MODEL = "last_model"
         private const val KEY_SELECTED_THEME = "selected_theme"
         private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_DAILY_LIMIT = "daily_limit"
+        private const val KEY_HUGGINGFACE_API_KEY = "huggingface_api_key"
+        private const val KEY_CEREBRAS_API_KEY = "cerebras_api_key"
 
         const val DEFAULT_SYSTEM_PROMPT =
             "You are a friendly, highly intelligent AI assistant. Provide helpful, accurate, well-formatted, and concise answers with markdown and code snippets when needed."
     }
+
+    var dailyLimit: Int
+        get() = prefs.getInt(KEY_DAILY_LIMIT, 50)
+        set(value) = prefs.edit().putInt(KEY_DAILY_LIMIT, value).apply()
+
+    var huggingFaceApiKey: String
+        get() = prefs.getString(KEY_HUGGINGFACE_API_KEY, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_HUGGINGFACE_API_KEY, value.trim()).apply()
 
     var selectedTheme: String
         get() = prefs.getString(KEY_SELECTED_THEME, "indigo") ?: "indigo"
@@ -34,11 +45,17 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString(KEY_THEME_MODE, "system") ?: "system"
         set(value) = prefs.edit().putString(KEY_THEME_MODE, value).apply()
 
+    var cerebrasApiKey: String
+        get() = prefs.getString(KEY_CEREBRAS_API_KEY, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_CEREBRAS_API_KEY, value.trim()).apply()
+
     fun exportKeysJson(): String {
         val obj = org.json.JSONObject().apply {
             put("gemini", geminiApiKey)
             put("groq", groqApiKey)
             put("openrouter", openRouterApiKey)
+            put("huggingface", huggingFaceApiKey)
+            put("cerebras", cerebrasApiKey)
             put("customUrl", customBaseUrl)
             put("customKey", customApiKey)
             put("customModel", customModel)
@@ -52,6 +69,8 @@ class PreferencesManager(context: Context) {
             if (obj.has("gemini")) geminiApiKey = obj.optString("gemini", "")
             if (obj.has("groq")) groqApiKey = obj.optString("groq", "")
             if (obj.has("openrouter")) openRouterApiKey = obj.optString("openrouter", "")
+            if (obj.has("huggingface")) huggingFaceApiKey = obj.optString("huggingface", "")
+            if (obj.has("cerebras")) cerebrasApiKey = obj.optString("cerebras", "")
             if (obj.has("customUrl")) customBaseUrl = obj.optString("customUrl", "")
             if (obj.has("customKey")) customApiKey = obj.optString("customKey", "")
             if (obj.has("customModel")) customModel = obj.optString("customModel", "")

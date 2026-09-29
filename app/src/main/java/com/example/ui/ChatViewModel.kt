@@ -9,6 +9,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.ChatRepository
 import com.example.data.local.AppDatabase
 import com.example.data.local.PreferencesManager
+import com.example.data.local.UsageStats
+import com.example.data.local.UsageTracker
 import com.example.data.model.AiModel
 import com.example.data.model.AttachmentInfo
 import com.example.data.model.AvailableModels
@@ -33,6 +35,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val preferencesManager = PreferencesManager(application)
     private val database = AppDatabase.getInstance(application)
     val repository = ChatRepository(database.chatDao())
+    val usageTracker = UsageTracker(application, preferencesManager)
+
+    val usageStats: StateFlow<UsageStats> = usageTracker.usageStats
 
     val sessions: StateFlow<List<ChatSessionEntity>> = repository.allSessions
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -97,10 +102,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             ProviderType.GEMINI -> preferencesManager.geminiApiKey = key
             ProviderType.GROQ -> preferencesManager.groqApiKey = key
             ProviderType.OPENROUTER -> preferencesManager.openRouterApiKey = key
+            ProviderType.CEREBRAS -> preferencesManager.cerebrasApiKey = key
+            ProviderType.HUGGINGFACE -> preferencesManager.huggingFaceApiKey = key
             ProviderType.CUSTOM -> preferencesManager.customApiKey = key
             ProviderType.POLLINATIONS -> {}
         }
         _keysRevision.value += 1
+    }
+
+    fun setDailyLimit(limit: Int) {
+        usageTracker.setDailyLimit(limit)
+    }
+
+    fun resetTodayUsage() {
+        usageTracker.resetTodayStats()
     }
 
     fun exportKeys(): String = preferencesManager.exportKeysJson()
@@ -212,7 +227,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             ProviderType.POLLINATIONS -> true
             ProviderType.GEMINI -> preferencesManager.geminiApiKey.isNotBlank()
             ProviderType.GROQ -> preferencesManager.groqApiKey.isNotBlank()
+            ProviderType.CEREBRAS -> preferencesManager.cerebrasApiKey.isNotBlank()
             ProviderType.OPENROUTER -> preferencesManager.openRouterApiKey.isNotBlank()
+            ProviderType.HUGGINGFACE -> preferencesManager.huggingFaceApiKey.isNotBlank()
             ProviderType.CUSTOM -> true
         }
     }
@@ -222,7 +239,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             ProviderType.POLLINATIONS -> ""
             ProviderType.GEMINI -> preferencesManager.geminiApiKey
             ProviderType.GROQ -> preferencesManager.groqApiKey
+            ProviderType.CEREBRAS -> preferencesManager.cerebrasApiKey
             ProviderType.OPENROUTER -> preferencesManager.openRouterApiKey
+            ProviderType.HUGGINGFACE -> preferencesManager.huggingFaceApiKey
             ProviderType.CUSTOM -> preferencesManager.customApiKey
         }
     }
@@ -265,6 +284,30 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     sessionId = sessionId,
                     role = "assistant",
                     content = "⚠️ ${provider.displayName} requires an API key to run. Please tap below to add your free key in Settings, or switch to Pollinations AI (Free) in the model picker!",
+                    providerId = provider.id,
+                    modelId = model.id,
+                    isError = true
+                )
+                _pendingAttachments.value = emptyList()
+            }
+            return
+        }
+
+        // Check if daily request budget is reached
+        if (usageTracker.isLimitReached()) {
+            viewModelScope.launch {
+                repository.addMessage(
+                    sessionId = sessionId,
+                    role = "user",
+                    content = trimmed.ifEmpty { "Uploaded ${attachments.size} file(s)" },
+                    providerId = provider.id,
+                    modelId = model.id,
+                    attachments = attachments
+                )
+                repository.addMessage(
+                    sessionId = sessionId,
+                    role = "assistant",
+                    content = "⚠️ You have reached your daily budget of ${preferencesManager.dailyLimit} requests today. Tap the limit badge in the top bar to increase your limit or switch to Unlimited.",
                     providerId = provider.id,
                     modelId = model.id,
                     isError = true
@@ -324,6 +367,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     modelId = model.id,
                     isError = false
                 )
+                val estTokens = (displayPrompt.length + responseText.length) / 4
+                usageTracker.recordRequest(provider.id, maxOf(50, estTokens))
             }.onFailure { error ->
                 repository.addMessage(
                     sessionId = sessionId,

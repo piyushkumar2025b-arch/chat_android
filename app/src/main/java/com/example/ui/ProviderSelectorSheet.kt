@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,6 +27,10 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
@@ -92,6 +97,7 @@ fun ProviderSelectorSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .imePadding()
                 .padding(horizontal = 20.dp, vertical = 8.dp)
         ) {
             // Header
@@ -265,7 +271,19 @@ fun ProviderSelectorSheet(
                                     onValueChange = { inlineKeyInput = it },
                                     label = { Text("Enter API Key") },
                                     modifier = Modifier.weight(1f).testTag("inline_key_field"),
-                                    singleLine = true
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Text,
+                                        autoCorrectEnabled = false,
+                                        imeAction = ImeAction.Done
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onDone = {
+                                            onUpdateKey(activeFilterProvider, inlineKeyInput.trim())
+                                            isInlineEditingKey = false
+                                            Toast.makeText(context, "Key updated!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 TextButton(

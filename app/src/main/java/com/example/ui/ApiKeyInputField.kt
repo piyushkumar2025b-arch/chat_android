@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -27,7 +28,6 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,8 +43,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -62,7 +64,9 @@ fun ApiKeyInputField(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var isVisible by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    // Default to visible so user can clearly see what they are entering
+    var isVisible by remember { mutableStateOf(true) }
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
@@ -111,7 +115,15 @@ fun ApiKeyInputField(
             placeholder = { Text(placeholder) },
             singleLine = true,
             visualTransformation = if (isVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            // Use KeyboardType.Text so Android OS does NOT disable clipboard, suggestions, mic, or keyboard features!
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Text,
+                autoCorrectEnabled = false,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { focusManager.clearFocus() }
+            ),
             trailingIcon = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (key.isNotEmpty()) {
@@ -132,7 +144,7 @@ fun ApiKeyInputField(
                     ) {
                         Icon(
                             imageVector = if (isVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = "Toggle visibility",
+                            contentDescription = if (isVisible) "Hide key" else "Show key",
                             modifier = Modifier.size(18.dp)
                         )
                     }

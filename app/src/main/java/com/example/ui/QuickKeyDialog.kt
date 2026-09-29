@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -62,6 +63,8 @@ fun QuickKeyDialog(
     var geminiKey by remember { mutableStateOf(preferencesManager.geminiApiKey) }
     var groqKey by remember { mutableStateOf(preferencesManager.groqApiKey) }
     var openRouterKey by remember { mutableStateOf(preferencesManager.openRouterApiKey) }
+    var cerebrasKey by remember { mutableStateOf(preferencesManager.cerebrasApiKey) }
+    var huggingFaceKey by remember { mutableStateOf(preferencesManager.huggingFaceApiKey) }
     var customKey by remember { mutableStateOf(preferencesManager.customApiKey) }
 
     AlertDialog(
@@ -70,6 +73,7 @@ fun QuickKeyDialog(
         modifier = Modifier
             .padding(16.dp)
             .fillMaxWidth()
+            .imePadding()
             .testTag("quick_key_dialog"),
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -200,6 +204,30 @@ fun QuickKeyDialog(
 
                 HorizontalDivider()
 
+                // Cerebras Cloud Key (1M Free Tokens/day)
+                ApiKeyInputField(
+                    title = "Cerebras Cloud Free Key (1M Tokens/Day)",
+                    key = cerebrasKey,
+                    onKeyChange = { cerebrasKey = it },
+                    placeholder = "csk-...",
+                    helpUrl = "https://cloud.cerebras.ai/",
+                    testTagPrefix = "quick_cerebras_key"
+                )
+
+                HorizontalDivider()
+
+                // Hugging Face Token
+                ApiKeyInputField(
+                    title = "Hugging Face Free User Token",
+                    key = huggingFaceKey,
+                    onKeyChange = { huggingFaceKey = it },
+                    placeholder = "hf_...",
+                    helpUrl = "https://huggingface.co/settings/tokens",
+                    testTagPrefix = "quick_huggingface_key"
+                )
+
+                HorizontalDivider()
+
                 // Security Note
                 Surface(
                     shape = RoundedCornerShape(8.dp),
@@ -232,6 +260,8 @@ fun QuickKeyDialog(
                     preferencesManager.geminiApiKey = geminiKey
                     preferencesManager.groqApiKey = groqKey
                     preferencesManager.openRouterApiKey = openRouterKey
+                    preferencesManager.cerebrasApiKey = cerebrasKey
+                    preferencesManager.huggingFaceApiKey = huggingFaceKey
                     preferencesManager.customApiKey = customKey
                     onKeyUpdated()
                     Toast.makeText(context, "API Keys saved!", Toast.LENGTH_SHORT).show()

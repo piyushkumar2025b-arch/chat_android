@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -58,6 +60,7 @@ import com.example.data.local.PreferencesManager
 fun SettingsDialog(
     preferencesManager: PreferencesManager,
     onOpenThemePicker: () -> Unit,
+    onOpenUsageLimits: () -> Unit,
     onDismiss: () -> Unit,
     onClearAllChats: () -> Unit
 ) {
@@ -66,6 +69,8 @@ fun SettingsDialog(
     var geminiKey by remember { mutableStateOf(preferencesManager.geminiApiKey) }
     var groqKey by remember { mutableStateOf(preferencesManager.groqApiKey) }
     var openRouterKey by remember { mutableStateOf(preferencesManager.openRouterApiKey) }
+    var cerebrasKey by remember { mutableStateOf(preferencesManager.cerebrasApiKey) }
+    var huggingFaceKey by remember { mutableStateOf(preferencesManager.huggingFaceApiKey) }
     var customUrl by remember { mutableStateOf(preferencesManager.customBaseUrl) }
     var customKey by remember { mutableStateOf(preferencesManager.customApiKey) }
     var customModel by remember { mutableStateOf(preferencesManager.customModel) }
@@ -80,6 +85,7 @@ fun SettingsDialog(
         modifier = Modifier
             .padding(16.dp)
             .fillMaxWidth()
+            .imePadding()
             .testTag("settings_dialog"),
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -132,6 +138,50 @@ fun SettingsDialog(
                             modifier = Modifier.testTag("open_theme_picker_button")
                         ) {
                             Text("Change Theme", fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                // Daily Limits & Usage Budget Action Card
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Speed,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(26.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Daily Request Budget",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Text(
+                                    text = if (preferencesManager.dailyLimit <= 0) "Unlimited requests/day" else "Cap: ${preferencesManager.dailyLimit} requests/day",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = onOpenUsageLimits,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.testTag("open_usage_limits_button")
+                        ) {
+                            Text("Set Limit", fontSize = 12.sp)
                         }
                     }
                 }
@@ -262,6 +312,30 @@ fun SettingsDialog(
 
                 HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.4f))
 
+                // Cerebras Cloud Key (1M Free Tokens/day)
+                ApiKeyInputField(
+                    title = "Cerebras Cloud Free Key (1M Tokens/Day)",
+                    key = cerebrasKey,
+                    onKeyChange = { cerebrasKey = it },
+                    placeholder = "csk-...",
+                    helpUrl = "https://cloud.cerebras.ai/",
+                    testTagPrefix = "cerebras_key"
+                )
+
+                HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.4f))
+
+                // Hugging Face Token with Copy / Paste
+                ApiKeyInputField(
+                    title = "Hugging Face Free Token",
+                    key = huggingFaceKey,
+                    onKeyChange = { huggingFaceKey = it },
+                    placeholder = "hf_...",
+                    helpUrl = "https://huggingface.co/settings/tokens",
+                    testTagPrefix = "huggingface_key"
+                )
+
+                HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.4f))
+
                 // Custom Endpoint Options
                 Text("Custom OpenAI Endpoint (Optional)", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                 OutlinedTextField(
@@ -337,6 +411,8 @@ fun SettingsDialog(
                     preferencesManager.geminiApiKey = geminiKey
                     preferencesManager.groqApiKey = groqKey
                     preferencesManager.openRouterApiKey = openRouterKey
+                    preferencesManager.cerebrasApiKey = cerebrasKey
+                    preferencesManager.huggingFaceApiKey = huggingFaceKey
                     preferencesManager.customBaseUrl = customUrl
                     preferencesManager.customApiKey = customKey
                     preferencesManager.customModel = customModel

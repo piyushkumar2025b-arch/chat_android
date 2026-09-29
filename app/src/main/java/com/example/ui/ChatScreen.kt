@@ -36,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
@@ -44,6 +45,7 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -108,12 +110,14 @@ fun ChatScreen(viewModel: ChatViewModel) {
     val currentTheme by viewModel.selectedTheme.collectAsState()
     val currentThemeMode by viewModel.themeMode.collectAsState()
     val keysRevision by viewModel.keysRevision.collectAsState()
+    val usageStats by viewModel.usageStats.collectAsState()
 
     var inputText by remember { mutableStateOf("") }
     var showProviderSheet by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showQuickKeyDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showUsageLimitsSheet by remember { mutableStateOf(false) }
     var showAttachmentMenu by remember { mutableStateOf(false) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -309,6 +313,34 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    // Usage & Rate Limits
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                showUsageLimitsSheet = true
+                            }
+                            .testTag("drawer_limits_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.tertiary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Usage & Limits", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    text = if (usageStats.dailyLimit <= 0) "${usageStats.requestsToday} sent today • Unlimited" else "${usageStats.requestsToday}/${usageStats.dailyLimit} today (${usageStats.remainingToday} left)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
                     // API Keys & Backup
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -380,37 +412,74 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 Column {
                     TopAppBar(
                         title = {
-                            // Quick Model Switcher Button in Header
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier
-                                    .clickable { showProviderSheet = true }
-                                    .testTag("provider_dropdown_trigger")
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // Quick Model Switcher Button in Header
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier
+                                        .weight(1f, fill = false)
+                                        .clickable { showProviderSheet = true }
+                                        .testTag("provider_dropdown_trigger")
                                 ) {
-                                    Text(
-                                        text = when (selectedProvider) {
-                                            ProviderType.POLLINATIONS -> "🆓 ${selectedModel.name}"
-                                            ProviderType.GEMINI -> "⚡ ${selectedModel.name}"
-                                            ProviderType.GROQ -> "🚀 ${selectedModel.name}"
-                                            ProviderType.OPENROUTER -> "🌐 ${selectedModel.name}"
-                                            ProviderType.CUSTOM -> "⚙️ ${selectedModel.name}"
-                                        },
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Icon(
-                                        imageVector = Icons.Default.KeyboardArrowDown,
-                                        contentDescription = "Switch provider",
-                                        modifier = Modifier.size(18.dp)
-                                    )
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = when (selectedProvider) {
+                                                ProviderType.POLLINATIONS -> "🆓 ${selectedModel.name}"
+                                                ProviderType.GEMINI -> "⚡ ${selectedModel.name}"
+                                                ProviderType.GROQ -> "🚀 ${selectedModel.name}"
+                                                ProviderType.CEREBRAS -> "⚡ ${selectedModel.name}"
+                                                ProviderType.OPENROUTER -> "🌐 ${selectedModel.name}"
+                                                ProviderType.HUGGINGFACE -> "🤗 ${selectedModel.name}"
+                                                ProviderType.CUSTOM -> "⚙️ ${selectedModel.name}"
+                                            },
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.KeyboardArrowDown,
+                                            contentDescription = "Switch provider",
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(6.dp))
+
+                                // Realtime Limit Pill Badge
+                                val isUnlimited = usageStats.dailyLimit <= 0
+                                val isNearCap = !isUnlimited && usageStats.remainingToday <= 5
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isNearCap) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    modifier = Modifier
+                                        .clickable { showUsageLimitsSheet = true }
+                                        .testTag("top_bar_limit_chip")
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Speed,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(13.dp),
+                                            tint = if (isNearCap) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text(
+                                            text = if (isUnlimited) "∞" else "${usageStats.remainingToday} left",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isNearCap) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
                         },
@@ -423,6 +492,14 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             }
                         },
                         actions = {
+                            // Direct Usage & Limits Button
+                            IconButton(
+                                onClick = { showUsageLimitsSheet = true },
+                                modifier = Modifier.testTag("top_bar_limits_button")
+                            ) {
+                                Icon(imageVector = Icons.Default.BarChart, contentDescription = "Usage Limits")
+                            }
+
                             // Direct Theme Selector Button in Top Bar
                             IconButton(
                                 onClick = { showThemeDialog = true },
@@ -738,6 +815,10 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 showSettingsDialog = false
                 showThemeDialog = true
             },
+            onOpenUsageLimits = {
+                showSettingsDialog = false
+                showUsageLimitsSheet = true
+            },
             onDismiss = { showSettingsDialog = false },
             onClearAllChats = { viewModel.clearAllChats() }
         )
@@ -761,6 +842,18 @@ fun ChatScreen(viewModel: ChatViewModel) {
             onThemeSelected = { viewModel.setTheme(it) },
             onThemeModeSelected = { viewModel.setThemeMode(it) },
             onDismiss = { showThemeDialog = false }
+        )
+    }
+
+    // Usage & Rate Limits Sheet
+    if (showUsageLimitsSheet) {
+        val limitsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        UsageLimitsSheet(
+            sheetState = limitsSheetState,
+            usageStats = usageStats,
+            onSetDailyLimit = { viewModel.setDailyLimit(it) },
+            onResetTodayStats = { viewModel.resetTodayUsage() },
+            onDismiss = { showUsageLimitsSheet = false }
         )
     }
 }

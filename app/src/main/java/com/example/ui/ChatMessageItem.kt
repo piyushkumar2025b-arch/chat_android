@@ -100,7 +100,11 @@ fun ChatMessageItem(
         }
 
         Column(
-            modifier = Modifier.widthIn(max = 340.dp),
+            modifier = if (isUser) {
+                Modifier.widthIn(max = 320.dp)
+            } else {
+                Modifier.weight(1f, fill = false).widthIn(max = 700.dp)
+            },
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
         ) {
             // Attachments previews if present
