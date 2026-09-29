@@ -129,6 +129,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        // Auto-migrate any deprecated model stored in preferences (e.g. gemini-2.0-flash -> gemini-3.8-flash)
+        if (preferencesManager.lastProviderId == ProviderType.GEMINI.id) {
+            val mappedModel = AvailableModels.findModel(preferencesManager.lastModelId, ProviderType.GEMINI.id)
+            if (mappedModel.id != preferencesManager.lastModelId) {
+                preferencesManager.lastModelId = mappedModel.id
+                _selectedModel.value = mappedModel
+            }
+        }
+
         initTts(application)
         viewModelScope.launch {
             // Observe sessions and pick the most recent one or create one

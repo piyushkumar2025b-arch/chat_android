@@ -185,7 +185,14 @@ object AiService {
             put("generationConfig", JSONObject().put("temperature", temperature))
         }
 
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelId:generateContent?key=$apiKey"
+        val effectiveModel = when (modelId) {
+            "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-exp" -> "gemini-3.8-flash"
+            "gemini-2.0-flash-lite" -> "gemini-3.1-flash-lite"
+            "gemini-1.5-pro", "gemini-2.0-pro-exp-02-05" -> "gemini-3.8-pro"
+            else -> modelId
+        }
+
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$effectiveModel:generateContent?key=$apiKey"
         val request = Request.Builder()
             .url(url)
             .post(rootJson.toString().toRequestBody(jsonMediaType))

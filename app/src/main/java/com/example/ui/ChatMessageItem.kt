@@ -178,7 +178,14 @@ fun ChatMessageItem(
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
-                            if (message.content.contains("key", ignoreCase = true) || message.content.contains("api", ignoreCase = true)) {
+                            val isAuthIssue = message.content.contains("key is required", ignoreCase = true) ||
+                                    message.content.contains("invalid api key", ignoreCase = true) ||
+                                    message.content.contains("API_KEY_INVALID", ignoreCase = true) ||
+                                    message.content.contains("unauthorized", ignoreCase = true) ||
+                                    message.content.contains("401", ignoreCase = true) ||
+                                    message.content.contains("requires an API key", ignoreCase = true)
+
+                            if (isAuthIssue) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 FilledTonalButton(
                                     onClick = onOpenSettings,

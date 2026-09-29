@@ -115,37 +115,28 @@ object AvailableModels {
             tag = "🧠 Reasoning"
         ),
 
-        // Google Gemini - Verified live
+        // Google Gemini - Latest 3.x Models
         AiModel(
-            id = "gemini-2.0-flash",
-            name = "Gemini 2.0 Flash",
+            id = "gemini-3.8-flash",
+            name = "Gemini 3.8 Flash",
             provider = ProviderType.GEMINI,
-            description = "Google's next-gen multimodal flagship, ultra-fast and precise",
+            description = "Google's latest flagship multimodal model, ultra-fast and precise",
             supportsVision = true,
             isFree = false,
             tag = "⚡ Recommended"
         ),
         AiModel(
-            id = "gemini-1.5-flash",
-            name = "Gemini 1.5 Flash",
+            id = "gemini-3.8-pro",
+            name = "Gemini 3.8 Pro",
             provider = ProviderType.GEMINI,
-            description = "Stable high-volume workhorse with 1,500 free requests per day",
-            supportsVision = true,
-            isFree = false,
-            tag = "⚡ Stable Free"
-        ),
-        AiModel(
-            id = "gemini-1.5-pro",
-            name = "Gemini 1.5 Pro",
-            provider = ProviderType.GEMINI,
-            description = "State-of-the-art complex reasoning and multi-turn logic",
+            description = "State-of-the-art complex reasoning and multi-turn STEM logic",
             supportsVision = true,
             isFree = false,
             tag = "🧠 Pro Reasoning"
         ),
         AiModel(
-            id = "gemini-2.0-flash-lite",
-            name = "Gemini 2.0 Flash Lite",
+            id = "gemini-3.1-flash-lite",
+            name = "Gemini 3.1 Flash Lite",
             provider = ProviderType.GEMINI,
             description = "Ultra low latency variant engineered for rapid conversation",
             supportsVision = true,
@@ -293,7 +284,18 @@ object AvailableModels {
     val defaultModel: AiModel = models.first { it.id == "openai-fast" } // Verified Pollinations default
 
     fun findModel(modelId: String, providerId: String): AiModel {
-        return models.firstOrNull { it.id == modelId && it.provider.id == providerId }
+        val resolvedModelId = if (providerId == ProviderType.GEMINI.id) {
+            when (modelId) {
+                "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-exp" -> "gemini-3.8-flash"
+                "gemini-2.0-flash-lite" -> "gemini-3.1-flash-lite"
+                "gemini-1.5-pro", "gemini-2.0-pro-exp-02-05" -> "gemini-3.8-pro"
+                else -> modelId
+            }
+        } else {
+            modelId
+        }
+
+        return models.firstOrNull { it.id == resolvedModelId && it.provider.id == providerId }
             ?: models.firstOrNull { it.provider.id == providerId }
             ?: defaultModel
     }
