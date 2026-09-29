@@ -1,0 +1,6 @@
+{
+  "name": "OmniChat",
+  "description": "Simple multi-provider AI chatbot with Gemini, Groq, OpenRouter, and free providers with file uploads.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
