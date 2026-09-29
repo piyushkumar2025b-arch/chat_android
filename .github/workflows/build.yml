@@ -26,26 +26,28 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-          cache: 'gradle'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Prepare Environment & Keystore
         run: |
-          # 1. Setup .env file for Secrets Gradle plugin
+          # 1. Accept Android SDK licenses if needed
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+          # 2. Setup .env file for Secrets Gradle plugin
           if [ ! -f .env ]; then
             cp .env.example .env
           fi
 
-          # 2. Decode debug keystore if present, or create default Android debug keystore
+          # 3. Decode debug keystore if present, or create default Android debug keystore
           if [ -f debug.keystore.base64 ] && [ ! -f debug.keystore ]; then
             base64 -d debug.keystore.base64 > debug.keystore
           elif [ ! -f debug.keystore ]; then
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-          # 3. Ensure gradlew has execute permission
+          # 4. Ensure gradlew has execute permission
           chmod +x gradlew
 
       - name: Run Unit Tests
