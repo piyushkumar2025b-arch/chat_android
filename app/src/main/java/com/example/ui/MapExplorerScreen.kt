@@ -2,9 +2,6 @@ package com.example.ui
 
 import android.content.Intent
 import android.net.Uri
-import android.view.View
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,9 +10,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -48,6 +47,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,12 +56,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -111,7 +112,7 @@ fun MapExplorerScreen(
     }
 
     val searchResults = remember { mutableStateListOf<MapLocation>() }
-    var webViewInstance by remember { mutableStateOf<WebView?>(null) }
+    var currentZoom by remember { mutableIntStateOf(14) }
 
     val quickDestinations = listOf(
         Pair("Tokyo", Pair(35.6762, 139.6503)),
@@ -122,39 +123,6 @@ fun MapExplorerScreen(
         Pair("Sydney", Pair(-33.8688, 151.2093)),
         Pair("Rome", Pair(41.9028, 12.4964))
     )
-
-    fun updateMapHtml(lat: Double, lon: Double, zoom: Int = 13) {
-        val wv = webViewInstance ?: return
-        val tileUrl = selectedLayer.tileUrl.replace("{s}", "a")
-        val html = """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-                <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-                <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-                <style>
-                    body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; background: #121212; }
-                    .leaflet-control-attribution { font-size: 8px !important; }
-                </style>
-            </head>
-            <body>
-                <div id="map"></div>
-                <script>
-                    var map = L.map('map', { zoomControl: true }).setView([$lat, $lon], $zoom);
-                    L.tileLayer('$tileUrl', {
-                        maxZoom: ${selectedLayer.maxZoom},
-                        attribution: '&copy; OpenStreetMap contributors'
-                    }).addTo(map);
-                    var marker = L.marker([$lat, $lon]).addTo(map)
-                        .bindPopup("<b>${currentLocation.name.replace("\"", "\\\"")}</b><br>${String.format(Locale.US, "%.4f, %.4f", lat, lon)}")
-                        .openPopup();
-                </script>
-            </body>
-            </html>
-        """.trimIndent()
-        wv.loadDataWithBaseURL("https://openstreetmap.org", html, "text/html", "UTF-8", null)
-    }
 
     fun searchLocations() {
         val q = searchQuery.trim()
@@ -298,7 +266,7 @@ fun MapExplorerScreen(
                                 displayName = "$cityName, Coordinates: ${coords.first}, ${coords.second}",
                                 type = "City"
                             )
-                            updateMapHtml(coords.first, coords.second, 12)
+                            currentZoom = 13
                         },
                         label = { Text(cityName) },
                         leadingIcon = {
@@ -323,7 +291,7 @@ fun MapExplorerScreen(
                         .clickable {
                             currentLocation = loc
                             searchResults.clear()
-                            updateMapHtml(loc.lat, loc.lon, 14)
+                            currentZoom = 14
                         }
                 ) {
                     Row(
@@ -357,7 +325,6 @@ fun MapExplorerScreen(
                         selected = selectedLayer == layer,
                         onClick = {
                             selectedLayer = layer
-                            updateMapHtml(currentLocation.lat, currentLocation.lon)
                         },
                         label = { Text(layer.label) },
                         leadingIcon = if (selectedLayer == layer) {
@@ -381,31 +348,122 @@ fun MapExplorerScreen(
                             .fillMaxWidth()
                             .height(280.dp)
                             .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                            .background(MaterialTheme.colorScheme.surface)
                     ) {
-                        AndroidView(
-                            factory = { ctx ->
-                                WebView(ctx).apply {
-                                    // Software layer avoids MESA rendernode lookup in container environments
-                                    setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-                                    settings.javaScriptEnabled = true
-                                    settings.domStorageEnabled = true
-                                    webViewClient = WebViewClient()
-                                    webViewInstance = this
-                                    updateMapHtml(currentLocation.lat, currentLocation.lon, 13)
+                        // 3x3 Tile Grid for seamless high-resolution map rendering
+                        val n = 1 shl currentZoom
+                        val centerTileX = ((currentLocation.lon + 180.0) / 360.0 * n).toInt().coerceIn(0, n - 1)
+                        val latRad = Math.toRadians(currentLocation.lat.coerceIn(-85.0511, 85.0511))
+                        val centerTileY = ((1.0 - Math.log(Math.tan(latRad) + 1.0 / Math.cos(latRad)) / Math.PI) / 2.0 * n).toInt().coerceIn(0, n - 1)
+
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            for (dy in -1..1) {
+                                Row(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxWidth()
+                                ) {
+                                    for (dx in -1..1) {
+                                        val tileX = (centerTileX + dx).mod(n)
+                                        val tileY = (centerTileY + dy).coerceIn(0, n - 1)
+                                        val tileUrl = selectedLayer.tileUrl
+                                            .replace("{s}", "a")
+                                            .replace("{z}", currentZoom.toString())
+                                            .replace("{x}", tileX.toString())
+                                            .replace("{y}", tileY.toString())
+
+                                        AsyncImage(
+                                            model = tileUrl,
+                                            contentDescription = "Map Tile",
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight(),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    }
                                 }
-                            },
-                            update = { wv ->
-                                webViewInstance = wv
-                            },
-                            onRelease = { wv ->
-                                try {
-                                    wv.stopLoading()
-                                    wv.loadUrl("about:blank")
-                                    wv.destroy()
-                                } catch (_: Exception) {}
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
+                            }
+                        }
+
+                        // Center Pin Marker with Location Name Pill
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.offset(y = (-14).dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                                    shadowElevation = 4.dp
+                                ) {
+                                    Text(
+                                        text = currentLocation.name,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = "Marker",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                        }
+
+                        // Zoom Controls (+ / -) in Top-Right
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                shadowElevation = 3.dp
+                            ) {
+                                IconButton(
+                                    onClick = { if (currentZoom < selectedLayer.maxZoom) currentZoom++ },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Text("+", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                                }
+                            }
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                shadowElevation = 3.dp
+                            ) {
+                                IconButton(
+                                    onClick = { if (currentZoom > 2) currentZoom-- },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Text("−", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                                }
+                            }
+                        }
+
+                        // Zoom & Layer Badge in Top-Left
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(8.dp)
+                        ) {
+                            Text(
+                                text = "Zoom ${currentZoom}x • ${selectedLayer.label}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
                     }
 
                     // Location Information Bar & AI Actions

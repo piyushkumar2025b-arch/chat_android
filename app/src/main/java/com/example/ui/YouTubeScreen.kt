@@ -3,6 +3,8 @@ package com.example.ui
 import android.content.Intent
 import android.net.Uri
 import android.view.View
+import android.view.ViewGroup
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
@@ -281,7 +283,20 @@ fun YouTubeScreen(
                                             settings.javaScriptEnabled = true
                                             settings.domStorageEnabled = true
                                             settings.mediaPlaybackRequiresUserGesture = false
-                                            webViewClient = WebViewClient()
+                                            webViewClient = object : WebViewClient() {
+                                                override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+                                                    try {
+                                                        view?.let {
+                                                            (it.parent as? ViewGroup)?.removeView(it)
+                                                            it.destroy()
+                                                        }
+                                                    } catch (_: Exception) {}
+                                                    isPlayingInline = false
+                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://youtube.com/watch?v=${vid.videoId}"))
+                                                    try { context.startActivity(intent) } catch (_: Exception) {}
+                                                    return true
+                                                }
+                                            }
                                             val embedHtml = """
                                                 <!DOCTYPE html>
                                                 <html>

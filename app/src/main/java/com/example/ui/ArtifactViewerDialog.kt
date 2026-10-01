@@ -6,6 +6,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.view.View
+import android.view.ViewGroup
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
@@ -319,7 +321,17 @@ private fun LiveWebPreview(content: String, isSvg: Boolean) {
                 settings.useWideViewPort = true
                 settings.builtInZoomControls = true
                 settings.displayZoomControls = false
-                webViewClient = WebViewClient()
+                webViewClient = object : WebViewClient() {
+                    override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+                        try {
+                            view?.let {
+                                (it.parent as? ViewGroup)?.removeView(it)
+                                it.destroy()
+                            }
+                        } catch (_: Exception) {}
+                        return true
+                    }
+                }
                 loadDataWithBaseURL(null, htmlToLoad, "text/html", "UTF-8", null)
             }
         },
