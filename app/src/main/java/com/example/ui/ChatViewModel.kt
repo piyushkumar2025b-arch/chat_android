@@ -21,6 +21,7 @@ import com.example.data.model.ChatSessionEntity
 import com.example.data.model.ProviderType
 import com.example.data.remote.AiService
 import com.example.data.remote.FileUtils
+import com.example.data.remote.WebSearchService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,12 +34,34 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+enum class AppSection(val label: String) {
+    CHAT("Chat"),
+    STUDIO("Studio"),
+    NEWS("News"),
+    SEARCH("Search"),
+    READ_ALOUD("Read Aloud")
+}
+
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     val preferencesManager = PreferencesManager(application)
     private val database = AppDatabase.getInstance(application)
     val repository = ChatRepository(database.chatDao())
     val usageTracker = UsageTracker(application, preferencesManager)
+
+    private val _currentSection = MutableStateFlow(AppSection.CHAT)
+    val currentSection: StateFlow<AppSection> = _currentSection.asStateFlow()
+
+    fun navigateToSection(section: AppSection) {
+        _currentSection.value = section
+    }
+
+    private val _isWebSearchEnabled = MutableStateFlow(false)
+    val isWebSearchEnabled: StateFlow<Boolean> = _isWebSearchEnabled.asStateFlow()
+
+    fun toggleWebSearch() {
+        _isWebSearchEnabled.value = !_isWebSearchEnabled.value
+    }
 
     val usageStats: StateFlow<UsageStats> = usageTracker.usageStats
 
@@ -369,14 +392,26 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             // Clear pending attachments for next message
             _pendingAttachments.value = emptyList()
 
-            // Call AI Service
+            // Call AI Service with optional live web grounding
             val apiKey = getApiKeyForProvider(provider)
             val history = currentMessages.value
+
+            val webContext = if (_isWebSearchEnabled.value && trimmed.isNotBlank()) {
+                try {
+                    val searchResults = WebSearchService.search(trimmed).getOrNull()
+                    if (!searchResults.isNullOrEmpty()) {
+                        "\n\n[Live Web Search Context for '$trimmed']:\n" +
+                                searchResults.take(4).joinToString("\n") { "• ${it.title}: ${it.snippet} (${it.url})" }
+                    } else ""
+                } catch (_: Exception) { "" }
+            } else ""
+
+            val promptWithGrounding = displayPrompt + webContext
 
             val result = AiService.sendMessage(
                 provider = provider,
                 modelId = model.id,
-                prompt = displayPrompt,
+                prompt = promptWithGrounding,
                 attachments = attachments,
                 history = history,
                 apiKey = apiKey,

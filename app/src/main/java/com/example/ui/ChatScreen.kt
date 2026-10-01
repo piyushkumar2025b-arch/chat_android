@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
@@ -43,7 +44,11 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Newspaper
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
@@ -57,12 +62,16 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -117,6 +126,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
     val currentSessionArtifacts by viewModel.currentSessionArtifacts.collectAsState()
     val allArtifacts by viewModel.allArtifacts.collectAsState()
     val selectedArtifact by viewModel.selectedArtifact.collectAsState()
+    val currentSection by viewModel.currentSection.collectAsState()
+    val isWebSearchEnabled by viewModel.isWebSearchEnabled.collectAsState()
 
     var inputText by remember { mutableStateOf("") }
     var showProviderSheet by remember { mutableStateOf(false) }
@@ -156,6 +167,10 @@ fun ChatScreen(viewModel: ChatViewModel) {
 
     BackHandler(enabled = drawerState.isOpen) {
         coroutineScope.launch { drawerState.close() }
+    }
+
+    BackHandler(enabled = !drawerState.isOpen && currentSection != AppSection.CHAT) {
+        viewModel.navigateToSection(AppSection.CHAT)
     }
 
     val isCurrentKeyConfigured = remember(selectedProvider, keysRevision) {
@@ -350,6 +365,102 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         }
                     }
 
+                    // AI Studio (Image, Video, Sound)
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.STUDIO)
+                            }
+                            .testTag("drawer_studio_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Palette, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.tertiary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("AI Creation Studio", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Images, Video Motion & SFX", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // Live News
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.NEWS)
+                            }
+                            .testTag("drawer_news_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Newspaper, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Live News & Feed", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Realtime global news & AI summaries", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // Web Search
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.SEARCH)
+                            }
+                            .testTag("drawer_search_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Language, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.secondary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Live Web Search", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Instant search & grounded AI answers", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // Read Aloud
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.READ_ALOUD)
+                            }
+                            .testTag("drawer_read_aloud_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Read Aloud Narrator", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Voice synthesis for any text or file", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
                     // Artifacts Menu
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -491,83 +602,106 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 Column {
                     TopAppBar(
                         title = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                // Quick Model Switcher Button in Header
-                                Surface(
-                                    shape = RoundedCornerShape(20.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    modifier = Modifier
-                                        .weight(1f, fill = false)
-                                        .clickable { showProviderSheet = true }
-                                        .testTag("provider_dropdown_trigger")
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                            if (currentSection == AppSection.CHAT) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // Quick Model Switcher Button in Header
+                                    Surface(
+                                        shape = RoundedCornerShape(20.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        modifier = Modifier
+                                            .weight(1f, fill = false)
+                                            .clickable { showProviderSheet = true }
+                                            .testTag("provider_dropdown_trigger")
                                     ) {
-                                        Text(
-                                            text = when (selectedProvider) {
-                                                ProviderType.POLLINATIONS -> "🆓 ${selectedModel.name}"
-                                                ProviderType.GEMINI -> "⚡ ${selectedModel.name}"
-                                                ProviderType.GROQ -> "🚀 ${selectedModel.name}"
-                                                ProviderType.CEREBRAS -> "⚡ ${selectedModel.name}"
-                                                ProviderType.OPENROUTER -> "🌐 ${selectedModel.name}"
-                                                ProviderType.HUGGINGFACE -> "🤗 ${selectedModel.name}"
-                                                ProviderType.CUSTOM -> "⚙️ ${selectedModel.name}"
-                                            },
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Spacer(modifier = Modifier.width(2.dp))
-                                        Icon(
-                                            imageVector = Icons.Default.KeyboardArrowDown,
-                                            contentDescription = "Switch provider",
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = when (selectedProvider) {
+                                                    ProviderType.POLLINATIONS -> "🆓 ${selectedModel.name}"
+                                                    ProviderType.GEMINI -> "⚡ ${selectedModel.name}"
+                                                    ProviderType.GROQ -> "🚀 ${selectedModel.name}"
+                                                    ProviderType.CEREBRAS -> "⚡ ${selectedModel.name}"
+                                                    ProviderType.OPENROUTER -> "🌐 ${selectedModel.name}"
+                                                    ProviderType.HUGGINGFACE -> "🤗 ${selectedModel.name}"
+                                                    ProviderType.CUSTOM -> "⚙️ ${selectedModel.name}"
+                                                },
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Spacer(modifier = Modifier.width(2.dp))
+                                            Icon(
+                                                imageVector = Icons.Default.KeyboardArrowDown,
+                                                contentDescription = "Switch provider",
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.width(6.dp))
+
+                                    // Realtime Limit Pill Badge
+                                    val isUnlimited = usageStats.dailyLimit <= 0
+                                    val isNearCap = !isUnlimited && usageStats.remainingToday <= 5
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (isNearCap) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        modifier = Modifier
+                                            .clickable { showUsageLimitsSheet = true }
+                                            .testTag("top_bar_limit_chip")
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Speed,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(13.dp),
+                                                tint = if (isNearCap) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                            )
+                                            Spacer(modifier = Modifier.width(3.dp))
+                                            Text(
+                                                text = if (isUnlimited) "∞" else "${usageStats.remainingToday} left",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isNearCap) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                 }
-
-                                Spacer(modifier = Modifier.width(6.dp))
-
-                                // Realtime Limit Pill Badge
-                                val isUnlimited = usageStats.dailyLimit <= 0
-                                val isNearCap = !isUnlimited && usageStats.remainingToday <= 5
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (isNearCap) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    modifier = Modifier
-                                        .clickable { showUsageLimitsSheet = true }
-                                        .testTag("top_bar_limit_chip")
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Speed,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(13.dp),
-                                            tint = if (isNearCap) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                                        )
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text(
-                                            text = if (isUnlimited) "∞" else "${usageStats.remainingToday} left",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isNearCap) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
+                            } else {
+                                Text(
+                                    text = when (currentSection) {
+                                        AppSection.STUDIO -> "AI Creation Studio"
+                                        AppSection.NEWS -> "Live News & Intelligence"
+                                        AppSection.SEARCH -> "Live Web Search"
+                                        AppSection.READ_ALOUD -> "Read Aloud Narrator"
+                                        else -> "OmniChat AI"
+                                    },
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         },
                         navigationIcon = {
-                            IconButton(
-                                onClick = { coroutineScope.launch { drawerState.open() } },
-                                modifier = Modifier.testTag("open_drawer_button")
-                            ) {
-                                Icon(imageVector = Icons.Default.Menu, contentDescription = "Open chat history")
+                            if (currentSection == AppSection.CHAT) {
+                                IconButton(
+                                    onClick = { coroutineScope.launch { drawerState.open() } },
+                                    modifier = Modifier.testTag("open_drawer_button")
+                                ) {
+                                    Icon(imageVector = Icons.Default.Menu, contentDescription = "Open chat history")
+                                }
+                            } else {
+                                IconButton(
+                                    onClick = { viewModel.navigateToSection(AppSection.CHAT) },
+                                    modifier = Modifier.testTag("back_to_chat_button")
+                                ) {
+                                    Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Chat")
+                                }
                             }
                         },
                         actions = {
@@ -671,155 +805,246 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 }
             },
             bottomBar = {
-                // Bottom Chat Input Area
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .imePadding()
                         .background(MaterialTheme.colorScheme.surface)
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    // Pending Attachments Strip
-                    AnimatedVisibility(
-                        visible = pendingAttachments.isNotEmpty(),
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
-                    ) {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    if (currentSection == AppSection.CHAT) {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 8.dp)
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
                         ) {
-                            items(pendingAttachments) { att ->
-                                AttachmentBadge(
-                                    attachment = att,
-                                    onRemove = { viewModel.removePendingAttachment(att.id) }
+                            // Quick Web Search Grounding toggle chip & Active Model
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                FilterChip(
+                                    selected = isWebSearchEnabled,
+                                    onClick = { viewModel.toggleWebSearch() },
+                                    label = {
+                                        Text(
+                                            if (isWebSearchEnabled) "🌐 Web Search: ON" else "🌐 Search Web",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (isWebSearchEnabled) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    ),
+                                    modifier = Modifier.testTag("toggle_web_search_button")
                                 )
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.clickable { showProviderSheet = true }
+                                ) {
+                                    Text(
+                                        text = "${selectedProvider.displayName} • ${selectedModel.name}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+
+                            // Pending Attachments Strip
+                            AnimatedVisibility(
+                                visible = pendingAttachments.isNotEmpty(),
+                                enter = fadeIn() + expandVertically(),
+                                exit = fadeOut() + shrinkVertically()
+                            ) {
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp)
+                                ) {
+                                    items(pendingAttachments) { att ->
+                                        AttachmentBadge(
+                                            attachment = att,
+                                            onRemove = { viewModel.removePendingAttachment(att.id) }
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Input Text Field & Action Buttons
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                // Attachment Plus Button with Dropdown
+                                Box {
+                                    IconButton(
+                                        onClick = { showAttachmentMenu = true },
+                                        modifier = Modifier
+                                            .padding(bottom = 4.dp)
+                                            .size(44.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                            .testTag("attach_file_button")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.AttachFile,
+                                            contentDescription = "Attach file",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    DropdownMenu(
+                                        expanded = showAttachmentMenu,
+                                        onDismissRequest = { showAttachmentMenu = false }
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text("Upload Images / Photos") },
+                                            leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
+                                            onClick = {
+                                                showAttachmentMenu = false
+                                                photoPickerLauncher.launch(
+                                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                                )
+                                            },
+                                            modifier = Modifier.testTag("pick_images_option")
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Upload Document / Code / PDF") },
+                                            leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
+                                            onClick = {
+                                                showAttachmentMenu = false
+                                                documentPickerLauncher.launch(arrayOf("*/*"))
+                                            },
+                                            modifier = Modifier.testTag("pick_documents_option")
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                // Text input field
+                                OutlinedTextField(
+                                    value = inputText,
+                                    onValueChange = { inputText = it },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("chat_input_field"),
+                                    placeholder = {
+                                        Text(
+                                            text = if (pendingAttachments.isEmpty()) "Ask anything or upload a file..." else "Add a message or query...",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(24.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                                    ),
+                                    maxLines = 5
+                                )
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                // Send or Stop Button
+                                if (isGenerating) {
+                                    IconButton(
+                                        onClick = { viewModel.stopGeneration() },
+                                        modifier = Modifier
+                                            .padding(bottom = 4.dp)
+                                            .size(44.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.errorContainer)
+                                            .testTag("stop_generation_button")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Stop,
+                                            contentDescription = "Stop generating",
+                                            tint = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    }
+                                } else {
+                                    val canSend = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
+                                    IconButton(
+                                        onClick = {
+                                            val text = inputText
+                                            inputText = ""
+                                            viewModel.sendMessage(text)
+                                        },
+                                        enabled = canSend,
+                                        modifier = Modifier
+                                            .padding(bottom = 4.dp)
+                                            .size(44.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                                            )
+                                            .testTag("send_message_button")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.Send,
+                                            contentDescription = "Send message",
+                                            tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
 
-                    // Input Text Field & Action Buttons
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.Bottom
+                    // Global Navigation Bar across all sections
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        tonalElevation = 6.dp,
+                        modifier = Modifier.testTag("global_bottom_navigation")
                     ) {
-                        // Attachment Plus Button with Dropdown
-                        Box {
-                            IconButton(
-                                onClick = { showAttachmentMenu = true },
-                                modifier = Modifier
-                                    .padding(bottom = 4.dp)
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                                    .testTag("attach_file_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AttachFile,
-                                    contentDescription = "Attach file",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            DropdownMenu(
-                                expanded = showAttachmentMenu,
-                                onDismissRequest = { showAttachmentMenu = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Upload Images / Photos") },
-                                    leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
-                                    onClick = {
-                                        showAttachmentMenu = false
-                                        photoPickerLauncher.launch(
-                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                        )
-                                    },
-                                    modifier = Modifier.testTag("pick_images_option")
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Upload Document / Code / PDF") },
-                                    leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
-                                    onClick = {
-                                        showAttachmentMenu = false
-                                        documentPickerLauncher.launch(arrayOf("*/*"))
-                                    },
-                                    modifier = Modifier.testTag("pick_documents_option")
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        // Text input field
-                        OutlinedTextField(
-                            value = inputText,
-                            onValueChange = { inputText = it },
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("chat_input_field"),
-                            placeholder = {
-                                Text(
-                                    text = if (pendingAttachments.isEmpty()) "Ask anything or upload a file..." else "Add a message or query...",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                )
-                            },
-                            shape = RoundedCornerShape(24.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                            ),
-                            maxLines = 5
+                        NavigationBarItem(
+                            selected = currentSection == AppSection.CHAT,
+                            onClick = { viewModel.navigateToSection(AppSection.CHAT) },
+                            icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Chat") },
+                            label = { Text("Chat") },
+                            modifier = Modifier.testTag("nav_item_chat")
                         )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        // Send or Stop Button
-                        if (isGenerating) {
-                            IconButton(
-                                onClick = { viewModel.stopGeneration() },
-                                modifier = Modifier
-                                    .padding(bottom = 4.dp)
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.errorContainer)
-                                    .testTag("stop_generation_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Stop,
-                                    contentDescription = "Stop generating",
-                                    tint = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            }
-                        } else {
-                            val canSend = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
-                            IconButton(
-                                onClick = {
-                                    val text = inputText
-                                    inputText = ""
-                                    viewModel.sendMessage(text)
-                                },
-                                enabled = canSend,
-                                modifier = Modifier
-                                    .padding(bottom = 4.dp)
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                    .testTag("send_message_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = "Send message",
-                                    tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
+                        NavigationBarItem(
+                            selected = currentSection == AppSection.STUDIO,
+                            onClick = { viewModel.navigateToSection(AppSection.STUDIO) },
+                            icon = { Icon(Icons.Default.Palette, contentDescription = "Studio") },
+                            label = { Text("Studio") },
+                            modifier = Modifier.testTag("nav_item_studio")
+                        )
+                        NavigationBarItem(
+                            selected = currentSection == AppSection.NEWS,
+                            onClick = { viewModel.navigateToSection(AppSection.NEWS) },
+                            icon = { Icon(Icons.Default.Newspaper, contentDescription = "News") },
+                            label = { Text("News") },
+                            modifier = Modifier.testTag("nav_item_news")
+                        )
+                        NavigationBarItem(
+                            selected = currentSection == AppSection.SEARCH,
+                            onClick = { viewModel.navigateToSection(AppSection.SEARCH) },
+                            icon = { Icon(Icons.Default.Language, contentDescription = "Search") },
+                            label = { Text("Search") },
+                            modifier = Modifier.testTag("nav_item_search")
+                        )
+                        NavigationBarItem(
+                            selected = currentSection == AppSection.READ_ALOUD,
+                            onClick = { viewModel.navigateToSection(AppSection.READ_ALOUD) },
+                            icon = { Icon(Icons.Default.RecordVoiceOver, contentDescription = "Voice") },
+                            label = { Text("Voice") },
+                            modifier = Modifier.testTag("nav_item_read_aloud")
+                        )
                     }
                 }
             }
@@ -829,66 +1054,106 @@ fun ChatScreen(viewModel: ChatViewModel) {
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                if (messages.isEmpty()) {
-                    // Empty State Screen
-                    EmptyChatGreeting(
-                        selectedModelName = selectedModel.name,
-                        providerName = selectedProvider.displayName,
-                        onSuggestionClick = { prompt ->
-                            viewModel.sendMessage(prompt)
-                        },
-                        onUploadClick = {
-                            documentPickerLauncher.launch(arrayOf("*/*"))
-                        }
-                    )
-                } else {
-                    // Chat Messages LazyColumn
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .testTag("messages_list"),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        items(messages, key = { it.id }) { msg ->
-                            val attList = remember(msg.attachmentsJson) {
-                                viewModel.repository.parseAttachments(msg.attachmentsJson)
-                            }
-                            val isSpeaking = speakingMessageId == msg.id
-
-                            ChatMessageItem(
-                                message = msg,
-                                attachments = attList,
-                                isSpeaking = isSpeaking,
-                                onSpeakToggle = { viewModel.toggleSpeech(msg.id, msg.content) },
-                                onRegenerate = { viewModel.regenerateMessage(msg) },
-                                onOpenSettings = { showQuickKeyDialog = true },
-                                onOpenArtifact = { art -> viewModel.selectArtifact(art) }
+                when (currentSection) {
+                    AppSection.CHAT -> {
+                        if (messages.isEmpty()) {
+                            // Empty State Screen
+                            EmptyChatGreeting(
+                                selectedModelName = selectedModel.name,
+                                providerName = selectedProvider.displayName,
+                                onSuggestionClick = { prompt ->
+                                    viewModel.sendMessage(prompt)
+                                },
+                                onUploadClick = {
+                                    documentPickerLauncher.launch(arrayOf("*/*"))
+                                }
                             )
-                        }
+                        } else {
+                            // Chat Messages LazyColumn
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .testTag("messages_list"),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                items(messages, key = { it.id }) { msg ->
+                                    val attList = remember(msg.attachmentsJson) {
+                                        viewModel.repository.parseAttachments(msg.attachmentsJson)
+                                    }
+                                    val isSpeaking = speakingMessageId == msg.id
 
-                        if (isGenerating) {
-                            item {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.primary
+                                    ChatMessageItem(
+                                        message = msg,
+                                        attachments = attList,
+                                        isSpeaking = isSpeaking,
+                                        onSpeakToggle = { viewModel.toggleSpeech(msg.id, msg.content) },
+                                        onRegenerate = { viewModel.regenerateMessage(msg) },
+                                        onOpenSettings = { showQuickKeyDialog = true },
+                                        onOpenArtifact = { art -> viewModel.selectArtifact(art) }
                                     )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text(
-                                        text = "${selectedProvider.displayName} is thinking...",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
+                                }
+
+                                if (isGenerating) {
+                                    item {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 20.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(18.dp),
+                                                strokeWidth = 2.dp,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Text(
+                                                text = "${selectedProvider.displayName} is thinking...",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
+                    }
+
+                    AppSection.STUDIO -> {
+                        StudioScreen(
+                            onSendPromptToChat = { prompt ->
+                                viewModel.sendMessage(prompt)
+                                viewModel.navigateToSection(AppSection.CHAT)
+                            }
+                        )
+                    }
+
+                    AppSection.NEWS -> {
+                        NewsScreen(
+                            onSummarizeArticleInChat = { prompt ->
+                                viewModel.sendMessage(prompt)
+                                viewModel.navigateToSection(AppSection.CHAT)
+                            }
+                        )
+                    }
+
+                    AppSection.SEARCH -> {
+                        WebSearchScreen(
+                            onSendSearchToChat = { prompt ->
+                                viewModel.sendMessage(prompt)
+                                viewModel.navigateToSection(AppSection.CHAT)
+                            }
+                        )
+                    }
+
+                    AppSection.READ_ALOUD -> {
+                        ReadAloudScreen(
+                            onSendTextToChat = { prompt ->
+                                viewModel.sendMessage(prompt)
+                                viewModel.navigateToSection(AppSection.CHAT)
+                            }
+                        )
                     }
                 }
             }
