@@ -13,6 +13,15 @@ import com.example.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Pre-create WebView cache directories to prevent Chromium simple_file_enumerator
+        // and index reconstruction errors in Android virtualized environments
+        try {
+            val httpCache = java.io.File(cacheDir, "WebView/Default/HTTP Cache")
+            java.io.File(httpCache, "Code Cache/js").mkdirs()
+            java.io.File(httpCache, "Code Cache/wasm").mkdirs()
+            java.io.File(httpCache, "index-dir").mkdirs()
+        } catch (_: Exception) {}
+
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {

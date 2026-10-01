@@ -37,6 +37,11 @@ import java.util.Locale
 enum class AppSection(val label: String) {
     CHAT("Chat"),
     STUDIO("Studio"),
+    MAPS("Maps"),
+    YOUTUBE("YouTube"),
+    INTEL_HUB("Hub"),
+    PERSONA("Persona"),
+    LEARN("Learn AI"),
     NEWS("News"),
     SEARCH("Search"),
     READ_ALOUD("Read Aloud")
@@ -148,6 +153,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             ProviderType.CUSTOM -> preferencesManager.customApiKey = key
             ProviderType.POLLINATIONS -> {}
         }
+        _keysRevision.value += 1
+    }
+
+    fun updateYouTubeApiKey(key: String) {
+        preferencesManager.youtubeApiKey = key
         _keysRevision.value += 1
     }
 

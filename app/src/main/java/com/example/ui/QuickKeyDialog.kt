@@ -65,6 +65,7 @@ fun QuickKeyDialog(
     var openRouterKey by remember { mutableStateOf(preferencesManager.openRouterApiKey) }
     var cerebrasKey by remember { mutableStateOf(preferencesManager.cerebrasApiKey) }
     var huggingFaceKey by remember { mutableStateOf(preferencesManager.huggingFaceApiKey) }
+    var youtubeKey by remember { mutableStateOf(preferencesManager.youtubeApiKey) }
     var customKey by remember { mutableStateOf(preferencesManager.customApiKey) }
 
     AlertDialog(
@@ -228,6 +229,18 @@ fun QuickKeyDialog(
 
                 HorizontalDivider()
 
+                // YouTube Data API v3 Key
+                ApiKeyInputField(
+                    title = "YouTube Data API v3 Key",
+                    key = youtubeKey,
+                    onKeyChange = { youtubeKey = it },
+                    placeholder = "AIzaSy...",
+                    helpUrl = "https://console.cloud.google.com/apis/credentials",
+                    testTagPrefix = "quick_youtube_key"
+                )
+
+                HorizontalDivider()
+
                 // Security Note
                 Surface(
                     shape = RoundedCornerShape(8.dp),
@@ -262,6 +275,7 @@ fun QuickKeyDialog(
                     preferencesManager.openRouterApiKey = openRouterKey
                     preferencesManager.cerebrasApiKey = cerebrasKey
                     preferencesManager.huggingFaceApiKey = huggingFaceKey
+                    preferencesManager.youtubeApiKey = youtubeKey
                     preferencesManager.customApiKey = customKey
                     onKeyUpdated()
                     Toast.makeText(context, "API Keys saved!", Toast.LENGTH_SHORT).show()

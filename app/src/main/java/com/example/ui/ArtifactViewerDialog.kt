@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.view.View
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
@@ -310,6 +311,8 @@ private fun LiveWebPreview(content: String, isSvg: Boolean) {
             .testTag("artifact_webview_preview"),
         factory = { ctx ->
             WebView(ctx).apply {
+                // Software layer avoids MESA rendernode lookup in container environments
+                setLayerType(View.LAYER_TYPE_SOFTWARE, null)
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.loadWithOverviewMode = true
@@ -322,6 +325,13 @@ private fun LiveWebPreview(content: String, isSvg: Boolean) {
         },
         update = { webView ->
             webView.loadDataWithBaseURL(null, htmlToLoad, "text/html", "UTF-8", null)
+        },
+        onRelease = { webView ->
+            try {
+                webView.stopLoading()
+                webView.loadUrl("about:blank")
+                webView.destroy()
+            } catch (_: Exception) {}
         }
     )
 }

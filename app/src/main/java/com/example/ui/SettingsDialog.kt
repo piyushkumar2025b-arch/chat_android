@@ -71,6 +71,7 @@ fun SettingsDialog(
     var openRouterKey by remember { mutableStateOf(preferencesManager.openRouterApiKey) }
     var cerebrasKey by remember { mutableStateOf(preferencesManager.cerebrasApiKey) }
     var huggingFaceKey by remember { mutableStateOf(preferencesManager.huggingFaceApiKey) }
+    var youtubeKey by remember { mutableStateOf(preferencesManager.youtubeApiKey) }
     var customUrl by remember { mutableStateOf(preferencesManager.customBaseUrl) }
     var customKey by remember { mutableStateOf(preferencesManager.customApiKey) }
     var customModel by remember { mutableStateOf(preferencesManager.customModel) }
@@ -336,6 +337,18 @@ fun SettingsDialog(
 
                 HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.4f))
 
+                // YouTube Data API v3 Key
+                ApiKeyInputField(
+                    title = "YouTube Data API v3 Key",
+                    key = youtubeKey,
+                    onKeyChange = { youtubeKey = it },
+                    placeholder = "AIzaSy...",
+                    helpUrl = "https://console.cloud.google.com/apis/credentials",
+                    testTagPrefix = "youtube_key"
+                )
+
+                HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.4f))
+
                 // Custom Endpoint Options
                 Text("Custom OpenAI Endpoint (Optional)", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                 OutlinedTextField(
@@ -413,6 +426,7 @@ fun SettingsDialog(
                     preferencesManager.openRouterApiKey = openRouterKey
                     preferencesManager.cerebrasApiKey = cerebrasKey
                     preferencesManager.huggingFaceApiKey = huggingFaceKey
+                    preferencesManager.youtubeApiKey = youtubeKey
                     preferencesManager.customBaseUrl = customUrl
                     preferencesManager.customApiKey = customKey
                     preferencesManager.customModel = customModel

@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -48,10 +49,13 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -365,6 +369,102 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         }
                     }
 
+                    // Free Maps & Travel
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.MAPS)
+                            }
+                            .testTag("drawer_maps_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Explore, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Free Maps & Travel", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("OpenStreetMap & AI itineraries", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // YouTube Player & Search
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.YOUTUBE)
+                            }
+                            .testTag("drawer_youtube_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.VideoLibrary, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("YouTube Search & Player", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Play videos & AI summaries", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // AI Persona (Feed AI How To Act)
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.PERSONA)
+                            }
+                            .testTag("drawer_persona_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Psychology, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.tertiary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("AI Persona & Behavior", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Feed AI how to act & talk only to you", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // AI Learning Academy
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.LEARN)
+                            }
+                            .testTag("drawer_learn_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.School, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.secondary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("AI Learning Academy", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Master LLMs, Prompting & Agents", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
                     // AI Studio (Image, Video, Sound)
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -380,7 +480,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Palette, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.tertiary)
+                            Icon(Icons.Default.Palette, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("AI Creation Studio", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
@@ -677,6 +777,10 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                 Text(
                                     text = when (currentSection) {
                                         AppSection.STUDIO -> "AI Creation Studio"
+                                        AppSection.MAPS -> "Free Maps & Travel"
+                                        AppSection.YOUTUBE -> "YouTube Search & Player"
+                                        AppSection.INTEL_HUB, AppSection.PERSONA -> "AI Persona & Behavior"
+                                        AppSection.LEARN -> "AI Learning Academy"
                                         AppSection.NEWS -> "Live News & Intelligence"
                                         AppSection.SEARCH -> "Live Web Search"
                                         AppSection.READ_ALOUD -> "Read Aloud Narrator"
@@ -1025,25 +1129,31 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             modifier = Modifier.testTag("nav_item_studio")
                         )
                         NavigationBarItem(
-                            selected = currentSection == AppSection.NEWS,
-                            onClick = { viewModel.navigateToSection(AppSection.NEWS) },
-                            icon = { Icon(Icons.Default.Newspaper, contentDescription = "News") },
-                            label = { Text("News") },
-                            modifier = Modifier.testTag("nav_item_news")
+                            selected = currentSection == AppSection.MAPS,
+                            onClick = { viewModel.navigateToSection(AppSection.MAPS) },
+                            icon = { Icon(Icons.Default.Explore, contentDescription = "Maps") },
+                            label = { Text("Maps") },
+                            modifier = Modifier.testTag("nav_item_maps")
                         )
                         NavigationBarItem(
-                            selected = currentSection == AppSection.SEARCH,
-                            onClick = { viewModel.navigateToSection(AppSection.SEARCH) },
-                            icon = { Icon(Icons.Default.Language, contentDescription = "Search") },
-                            label = { Text("Search") },
-                            modifier = Modifier.testTag("nav_item_search")
+                            selected = currentSection == AppSection.YOUTUBE,
+                            onClick = { viewModel.navigateToSection(AppSection.YOUTUBE) },
+                            icon = { Icon(Icons.Default.VideoLibrary, contentDescription = "YouTube") },
+                            label = { Text("YouTube") },
+                            modifier = Modifier.testTag("nav_item_youtube")
                         )
+                        val isHubSelected = currentSection == AppSection.INTEL_HUB ||
+                                currentSection == AppSection.PERSONA ||
+                                currentSection == AppSection.LEARN ||
+                                currentSection == AppSection.NEWS ||
+                                currentSection == AppSection.SEARCH ||
+                                currentSection == AppSection.READ_ALOUD
                         NavigationBarItem(
-                            selected = currentSection == AppSection.READ_ALOUD,
-                            onClick = { viewModel.navigateToSection(AppSection.READ_ALOUD) },
-                            icon = { Icon(Icons.Default.RecordVoiceOver, contentDescription = "Voice") },
-                            label = { Text("Voice") },
-                            modifier = Modifier.testTag("nav_item_read_aloud")
+                            selected = isHubSelected,
+                            onClick = { viewModel.navigateToSection(AppSection.INTEL_HUB) },
+                            icon = { Icon(Icons.Default.Psychology, contentDescription = "Hub") },
+                            label = { Text("Hub") },
+                            modifier = Modifier.testTag("nav_item_hub")
                         )
                     }
                 }
@@ -1129,27 +1239,39 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         )
                     }
 
-                    AppSection.NEWS -> {
-                        NewsScreen(
-                            onSummarizeArticleInChat = { prompt ->
+                    AppSection.MAPS -> {
+                        MapExplorerScreen(
+                            onSendLocationToChat = { prompt ->
                                 viewModel.sendMessage(prompt)
                                 viewModel.navigateToSection(AppSection.CHAT)
                             }
                         )
                     }
 
-                    AppSection.SEARCH -> {
-                        WebSearchScreen(
-                            onSendSearchToChat = { prompt ->
+                    AppSection.YOUTUBE -> {
+                        YouTubeScreen(
+                            preferencesManager = viewModel.preferencesManager,
+                            onOpenSettings = { showQuickKeyDialog = true },
+                            onSummarizeVideoInChat = { prompt ->
                                 viewModel.sendMessage(prompt)
                                 viewModel.navigateToSection(AppSection.CHAT)
                             }
                         )
                     }
 
-                    AppSection.READ_ALOUD -> {
-                        ReadAloudScreen(
-                            onSendTextToChat = { prompt ->
+                    AppSection.INTEL_HUB, AppSection.PERSONA, AppSection.LEARN, AppSection.NEWS, AppSection.SEARCH, AppSection.READ_ALOUD -> {
+                        val initialTab = when (currentSection) {
+                            AppSection.PERSONA -> 0
+                            AppSection.LEARN -> 1
+                            AppSection.NEWS -> 2
+                            AppSection.SEARCH -> 3
+                            AppSection.READ_ALOUD -> 4
+                            else -> 0
+                        }
+                        IntelHubScreen(
+                            initialTab = initialTab,
+                            preferencesManager = viewModel.preferencesManager,
+                            onSendPromptToChat = { prompt ->
                                 viewModel.sendMessage(prompt)
                                 viewModel.navigateToSection(AppSection.CHAT)
                             }
