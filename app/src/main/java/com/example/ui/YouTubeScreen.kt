@@ -1,12 +1,9 @@
 package com.example.ui
 
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.view.View
-import android.view.ViewGroup
-import android.webkit.RenderProcessGoneDetail
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,7 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.PlayArrow
@@ -57,13 +54,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import com.example.data.local.PreferencesManager
 import kotlinx.coroutines.Dispatchers
@@ -120,7 +117,6 @@ fun YouTubeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var isSearching by remember { mutableStateOf(false) }
     var activeVideo by remember { mutableStateOf<YouTubeVideoItem?>(FEATURED_VIDEOS.first()) }
-    var isPlayingInline by remember { mutableStateOf(false) }
     val searchResults = remember { mutableStateListOf<YouTubeVideoItem>() }
 
     val hasKey = preferencesManager.youtubeApiKey.isNotBlank()
@@ -266,120 +262,96 @@ fun YouTubeScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column {
-                        // Embedded HTML5 YouTube Player or Thumbnail Preview
+                        // Native YouTube Video Card with 1-Tap Official Player Launch
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(16f / 9f)
                                 .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                                 .background(MaterialTheme.colorScheme.surface)
+                                .clickable {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${vid.videoId}"))
+                                    try {
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {
+                                        Toast.makeText(context, "Opening video...", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
-                            if (isPlayingInline) {
-                                AndroidView(
-                                    factory = { ctx ->
-                                        WebView(ctx).apply {
-                                            // Software layer avoids MESA rendernode lookup in container environments
-                                            setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-                                            settings.javaScriptEnabled = true
-                                            settings.domStorageEnabled = true
-                                            settings.mediaPlaybackRequiresUserGesture = false
-                                            webViewClient = object : WebViewClient() {
-                                                override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-                                                    try {
-                                                        view?.let {
-                                                            (it.parent as? ViewGroup)?.removeView(it)
-                                                            it.destroy()
-                                                        }
-                                                    } catch (_: Exception) {}
-                                                    isPlayingInline = false
-                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://youtube.com/watch?v=${vid.videoId}"))
-                                                    try { context.startActivity(intent) } catch (_: Exception) {}
-                                                    return true
-                                                }
-                                            }
-                                            val embedHtml = """
-                                                <!DOCTYPE html>
-                                                <html>
-                                                <head>
-                                                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-                                                    <style>body,html,iframe { margin:0; padding:0; width:100%; height:100%; background:#000; }</style>
-                                                </head>
-                                                <body>
-                                                    <iframe src="https://www.youtube.com/embed/${vid.videoId}?autoplay=1&playsinline=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-                                                </body>
-                                                </html>
-                                            """.trimIndent()
-                                            loadDataWithBaseURL("https://www.youtube.com", embedHtml, "text/html", "UTF-8", null)
-                                        }
-                                    },
-                                    update = { wv ->
-                                        val embedHtml = """
-                                            <!DOCTYPE html>
-                                            <html>
-                                            <head>
-                                                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-                                                <style>body,html,iframe { margin:0; padding:0; width:100%; height:100%; background:#000; }</style>
-                                            </head>
-                                            <body>
-                                                <iframe src="https://www.youtube.com/embed/${vid.videoId}?autoplay=1&playsinline=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-                                            </body>
-                                            </html>
-                                        """.trimIndent()
-                                        wv.loadDataWithBaseURL("https://www.youtube.com", embedHtml, "text/html", "UTF-8", null)
-                                    },
-                                    onRelease = { wv ->
-                                        try {
-                                            wv.stopLoading()
-                                            wv.loadUrl("about:blank")
-                                            wv.destroy()
-                                        } catch (_: Exception) {}
-                                    },
-                                    modifier = Modifier.fillMaxSize()
-                                )
+                            AsyncImage(
+                                model = vid.thumbnailUrl,
+                                contentDescription = vid.title,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
 
-                                IconButton(
-                                    onClick = { isPlayingInline = false },
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(8.dp)
-                                        .size(36.dp)
-                                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), CircleShape)
-                                ) {
+                            // Dark overlay for contrast
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.28f))
+                            )
+
+                            // Glowing YouTube Play Button
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.error,
+                                shadowElevation = 8.dp,
+                                modifier = Modifier.size(64.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Stop playback",
-                                        modifier = Modifier.size(20.dp)
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = "Watch video",
+                                        tint = MaterialTheme.colorScheme.onError,
+                                        modifier = Modifier.size(40.dp)
                                     )
                                 }
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clickable { isPlayingInline = true },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    AsyncImage(
-                                        model = vid.thumbnailUrl,
-                                        contentDescription = vid.title,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
+                            }
 
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.error,
-                                        shadowElevation = 6.dp,
-                                        modifier = Modifier.size(56.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = Icons.Default.PlayArrow,
-                                                contentDescription = "Play video",
-                                                tint = MaterialTheme.colorScheme.onError,
-                                                modifier = Modifier.size(36.dp)
-                                            )
-                                        }
-                                    }
+                            // HD & Quality Badge in Top-Right
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color.Black.copy(alpha = 0.75f),
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(10.dp)
+                            ) {
+                                Text(
+                                    text = "HD • Official Player",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+
+                            // Watch prompt pill in Bottom-Center
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = Color.Black.copy(alpha = 0.85f),
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = 12.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.OpenInBrowser,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Tap to Play in YouTube (1080p • 0 Lag)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
                             }
                         }
@@ -401,23 +373,51 @@ fun YouTubeScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Button(
-                                    onClick = {
-                                        val prompt = "Please summarize the core ideas and key takeaways of this YouTube video:\n\nTitle: ${vid.title}\nChannel: ${vid.channelTitle}\nDescription: ${vid.description}\nLink: https://youtube.com/watch?v=${vid.videoId}"
-                                        onSummarizeVideoInChat(prompt)
-                                    },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary,
-                                        contentColor = MaterialTheme.colorScheme.onPrimary
-                                    ),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Summarize with AI", style = MaterialTheme.typography.labelSmall)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = {
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${vid.videoId}"))
+                                            context.startActivity(intent)
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.error,
+                                            contentColor = MaterialTheme.colorScheme.onError
+                                        ),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Watch Video", style = MaterialTheme.typography.labelSmall)
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            val prompt = "Please summarize the core ideas and key takeaways of this YouTube video:\n\nTitle: ${vid.title}\nChannel: ${vid.channelTitle}\nDescription: ${vid.description}\nLink: https://youtube.com/watch?v=${vid.videoId}"
+                                            onSummarizeVideoInChat(prompt)
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        ),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Summarize with AI", style = MaterialTheme.typography.labelSmall)
+                                    }
                                 }
 
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    IconButton(
+                                        onClick = {
+                                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            cm.setPrimaryClip(android.content.ClipData.newPlainText("YouTube Link", "https://youtube.com/watch?v=${vid.videoId}"))
+                                            Toast.makeText(context, "Link copied to clipboard!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy link")
+                                    }
+
                                     IconButton(
                                         onClick = {
                                             val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -428,15 +428,6 @@ fun YouTubeScreen(
                                         }
                                     ) {
                                         Icon(Icons.Default.Share, contentDescription = "Share Video")
-                                    }
-
-                                    IconButton(
-                                        onClick = {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://youtube.com/watch?v=${vid.videoId}"))
-                                            context.startActivity(intent)
-                                        }
-                                    ) {
-                                        Icon(Icons.Default.OpenInBrowser, contentDescription = "Open in YouTube App")
                                     }
                                 }
                             }

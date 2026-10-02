@@ -349,12 +349,15 @@ fun ChatMessageItem(
 fun AttachmentBadge(
     attachment: AttachmentInfo,
     onRemove: (() -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = modifier.testTag("attachment_${attachment.name}")
+        modifier = modifier
+            .testTag("attachment_${attachment.name}")
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),

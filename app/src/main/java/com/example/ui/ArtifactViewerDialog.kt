@@ -5,11 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.view.View
-import android.view.ViewGroup
-import android.webkit.RenderProcessGoneDetail
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -37,6 +33,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -68,7 +65,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.ArtifactItem
@@ -267,85 +263,101 @@ fun ArtifactViewerDialog(
     }
 }
 
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 private fun LiveWebPreview(content: String, isSvg: Boolean) {
-    val htmlToLoad = remember(content, isSvg) {
-        if (isSvg) {
-            """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <style>
-                    body {
-                        margin: 0;
-                        padding: 16px;
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        min-height: 90vh;
-                        background: #f8f9fa;
-                        font-family: sans-serif;
-                    }
-                    svg {
-                        max-width: 100%;
-                        height: auto;
-                        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                        border-radius: 8px;
-                        background: #ffffff;
-                    }
-                </style>
-            </head>
-            <body>
-                $content
-            </body>
-            </html>
-            """.trimIndent()
-        } else {
-            content
-        }
+    val context = LocalContext.current
+    val strippedText = remember(content) {
+        content.replace(Regex("<style[\\s\\S]*?</style>"), "")
+            .replace(Regex("<script[\\s\\S]*?</script>"), "")
+            .replace(Regex("<[^>]+>"), " ")
+            .replace(Regex("&nbsp;"), " ")
+            .replace(Regex("&amp;"), "&")
+            .replace(Regex("&lt;"), "<")
+            .replace(Regex("&gt;"), ">")
+            .replace(Regex("\\s+"), " ")
+            .trim()
     }
 
-    AndroidView(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .testTag("artifact_webview_preview"),
-        factory = { ctx ->
-            WebView(ctx).apply {
-                // Software layer avoids MESA rendernode lookup in container environments
-                setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = true
-                settings.loadWithOverviewMode = true
-                settings.useWideViewPort = true
-                settings.builtInZoomControls = true
-                settings.displayZoomControls = false
-                webViewClient = object : WebViewClient() {
-                    override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-                        try {
-                            view?.let {
-                                (it.parent as? ViewGroup)?.removeView(it)
-                                it.destroy()
-                            }
-                        } catch (_: Exception) {}
-                        return true
-                    }
+            .padding(16.dp)
+            .testTag("artifact_web_preview")
+    ) {
+        Card(
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Code,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (isSvg) "SVG Vector Artifact" else "Interactive Web Artifact",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = "Structure parsed • Tap copy to save or run",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    )
                 }
-                loadDataWithBaseURL(null, htmlToLoad, "text/html", "UTF-8", null)
+                Button(
+                    onClick = {
+                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("HTML Code", content))
+                        Toast.makeText(context, "Code copied to clipboard!", Toast.LENGTH_SHORT).show()
+                    },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Copy Code")
+                }
             }
-        },
-        update = { webView ->
-            webView.loadDataWithBaseURL(null, htmlToLoad, "text/html", "UTF-8", null)
-        },
-        onRelease = { webView ->
-            try {
-                webView.stopLoading()
-                webView.loadUrl("about:blank")
-                webView.destroy()
-            } catch (_: Exception) {}
         }
-    )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF1E1E2E),
+            modifier = Modifier
+                .fillMaxSize()
+                .weight(1f)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(14.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "Extracted Content & Preview:",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFFA6ADC8),
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = if (strippedText.length > 20) strippedText.take(4000) else content.take(4000),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 13.sp,
+                    color = Color(0xFFCDD6F4),
+                    lineHeight = 18.sp
+                )
+            }
+        }
+    }
 }
 
 @Composable

@@ -51,6 +51,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,7 +60,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.data.remote.FileUtils
+import kotlinx.coroutines.launch
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
 import java.util.Locale
 
@@ -69,6 +73,7 @@ fun ReadAloudScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var inputText by remember { mutableStateOf("") }
     var loadedFileName by remember { mutableStateOf<String?>(null) }
     var isReading by remember { mutableStateOf(false) }
@@ -119,18 +124,21 @@ fun ReadAloudScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
-            try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val reader = BufferedReader(InputStreamReader(inputStream))
-                val content = reader.readText()
-                reader.close()
-                inputStream?.close()
-
-                inputText = content
-                loadedFileName = uri.lastPathSegment?.substringAfterLast('/') ?: "imported_document"
-                Toast.makeText(context, "Loaded file (${content.length} chars)", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Toast.makeText(context, "Failed to read file: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            coroutineScope.launch {
+                try {
+                    val att = FileUtils.processPickedUri(context, uri)
+                    if (att != null) {
+                        val file = File(att.localUri)
+                        val content = FileUtils.readFullTextContent(file)
+                        inputText = content
+                        loadedFileName = att.name
+                        Toast.makeText(context, "Loaded ${att.name} (${content.length} chars)", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Unable to read file", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Failed to read file: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }

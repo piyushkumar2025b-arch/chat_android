@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.Locale
 
 enum class AppSection(val label: String) {
@@ -311,6 +312,32 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val app = getApplication<Application>()
             val processed = uris.mapNotNull { FileUtils.processPickedUri(app, it) }
             _pendingAttachments.value = _pendingAttachments.value + processed
+        }
+    }
+
+    fun addCachedFileAttachment(file: File) {
+        viewModelScope.launch {
+            val mime = FileUtils.resolveMimeType(file.name, null, null)
+            val isImage = mime.startsWith("image/") || FileUtils.isImageExtension(file.name)
+            val snippet = if (!isImage) FileUtils.readFullTextContent(file, 240).take(200) + "..." else null
+            val att = AttachmentInfo(
+                id = java.util.UUID.randomUUID().toString(),
+                name = file.name,
+                mimeType = mime,
+                sizeBytes = file.length(),
+                localUri = file.absolutePath,
+                isImage = isImage,
+                previewSnippet = snippet
+            )
+            _pendingAttachments.value = _pendingAttachments.value + att
+        }
+    }
+
+    fun addSampleAttachment(sampleType: String) {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val sample = FileUtils.createSampleAttachment(app, sampleType)
+            _pendingAttachments.value = _pendingAttachments.value + sample
         }
     }
 

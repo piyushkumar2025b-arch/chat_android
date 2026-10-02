@@ -152,12 +152,24 @@ object AiService {
         var textContextFromFiles = ""
         for (att in attachments) {
             val file = File(att.localUri)
+            val isPdf = att.mimeType == "application/pdf" || att.name.endsWith(".pdf", true)
             if (att.isImage) {
                 val base64Data = FileUtils.convertImageToBase64(file)
                 if (base64Data != null) {
                     val inlineData = JSONObject().apply {
                         put("mimeType", if (att.mimeType.isNotBlank()) att.mimeType else "image/jpeg")
                         put("data", base64Data)
+                    }
+                    currentParts.put(JSONObject().put("inlineData", inlineData))
+                }
+            } else if (isPdf) {
+                val docText = FileUtils.readFullTextContent(file)
+                textContextFromFiles += "\n\n--- Attached Document: ${att.name} (PDF) ---\n$docText\n--- End of Document ---\n"
+                val pdfImgBase64 = FileUtils.convertPdfPageToBase64(file, 0)
+                if (pdfImgBase64 != null) {
+                    val inlineData = JSONObject().apply {
+                        put("mimeType", "image/jpeg")
+                        put("data", pdfImgBase64)
                     }
                     currentParts.put(JSONObject().put("inlineData", inlineData))
                 }
@@ -257,10 +269,18 @@ object AiService {
 
         for (att in attachments) {
             val file = File(att.localUri)
+            val isPdf = att.mimeType == "application/pdf" || att.name.endsWith(".pdf", true)
             if (att.isImage) {
                 val b64 = FileUtils.convertImageToBase64(file)
                 if (b64 != null) {
                     imageBase64List.add(b64)
+                }
+            } else if (isPdf) {
+                val text = FileUtils.readFullTextContent(file)
+                fileTextAppendix += "\n\n--- [Attached Document: ${att.name} (PDF)] ---\n$text\n--- [End of Document] ---\n"
+                val pdfImgB64 = FileUtils.convertPdfPageToBase64(file, 0)
+                if (pdfImgB64 != null) {
+                    imageBase64List.add(pdfImgB64)
                 }
             } else {
                 val text = FileUtils.readFullTextContent(file)

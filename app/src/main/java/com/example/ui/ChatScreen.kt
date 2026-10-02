@@ -28,8 +28,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -42,6 +44,7 @@ import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -52,11 +55,14 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
@@ -81,6 +87,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
@@ -96,12 +103,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.AttachmentInfo
 import com.example.data.model.ProviderType
+import com.example.data.remote.FileUtils
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -110,6 +120,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(viewModel: ChatViewModel) {
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val listState = rememberLazyListState()
@@ -140,7 +151,9 @@ fun ChatScreen(viewModel: ChatViewModel) {
     var showThemeDialog by remember { mutableStateOf(false) }
     var showUsageLimitsSheet by remember { mutableStateOf(false) }
     var showArtifactsSheet by remember { mutableStateOf(false) }
+    var showDeviceStorageSheet by remember { mutableStateOf(false) }
     var showAttachmentMenu by remember { mutableStateOf(false) }
+    var inspectingAttachment by remember { mutableStateOf<AttachmentInfo?>(null) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -153,11 +166,19 @@ fun ChatScreen(viewModel: ChatViewModel) {
         }
     }
 
-    // Activity result launcher for Documents / Code / PDF
+    // Activity result launcher for Documents / Code / PDF with persistable permissions
     val documentPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
         if (uris.isNotEmpty()) {
+            for (uri in uris) {
+                try {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (_: Exception) {}
+            }
             viewModel.addAttachments(uris)
         }
     }
@@ -366,6 +387,31 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                 )
                             }
                             Text("Switch", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+
+                    // Phone Storage & File Hub
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                showDeviceStorageSheet = true
+                            }
+                            .testTag("drawer_storage_hub_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.SdStorage, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Phone Storage & Files", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                Text("All formats: PDF, Word, Excel, Code, Images", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
 
@@ -979,7 +1025,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                     items(pendingAttachments) { att ->
                                         AttachmentBadge(
                                             attachment = att,
-                                            onRemove = { viewModel.removePendingAttachment(att.id) }
+                                            onRemove = { viewModel.removePendingAttachment(att.id) },
+                                            onClick = { inspectingAttachment = att }
                                         )
                                     }
                                 }
@@ -990,10 +1037,10 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.Bottom
                             ) {
-                                // Attachment Plus Button with Dropdown
+                                // Attachment Hub Button with Direct Storage Access
                                 Box {
                                     IconButton(
-                                        onClick = { showAttachmentMenu = true },
+                                        onClick = { showDeviceStorageSheet = true },
                                         modifier = Modifier
                                             .padding(bottom = 4.dp)
                                             .size(44.dp)
@@ -1003,34 +1050,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.AttachFile,
-                                            contentDescription = "Attach file",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-
-                                    DropdownMenu(
-                                        expanded = showAttachmentMenu,
-                                        onDismissRequest = { showAttachmentMenu = false }
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text("Upload Images / Photos") },
-                                            leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
-                                            onClick = {
-                                                showAttachmentMenu = false
-                                                photoPickerLauncher.launch(
-                                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                                )
-                                            },
-                                            modifier = Modifier.testTag("pick_images_option")
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Upload Document / Code / PDF") },
-                                            leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
-                                            onClick = {
-                                                showAttachmentMenu = false
-                                                documentPickerLauncher.launch(arrayOf("*/*"))
-                                            },
-                                            modifier = Modifier.testTag("pick_documents_option")
+                                            contentDescription = "Attach file from Phone Storage",
+                                            tint = MaterialTheme.colorScheme.primary
                                         )
                                     }
                                 }
@@ -1373,6 +1394,121 @@ fun ChatScreen(viewModel: ChatViewModel) {
         ArtifactViewerDialog(
             artifact = artifact,
             onDismiss = { viewModel.selectArtifact(null) }
+        )
+    }
+
+    // Phone Storage & File Hub Bottom Sheet
+    if (showDeviceStorageSheet) {
+        val storageSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        DeviceStorageSheet(
+            sheetState = storageSheetState,
+            onDismiss = { showDeviceStorageSheet = false },
+            onBrowsePhoneStorage = {
+                documentPickerLauncher.launch(arrayOf("*/*"))
+            },
+            onPickDocuments = {
+                documentPickerLauncher.launch(
+                    arrayOf(
+                        "application/pdf",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "application/msword",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "application/vnd.ms-excel",
+                        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "text/csv",
+                        "text/plain",
+                        "application/rtf",
+                        "*/*"
+                    )
+                )
+            },
+            onPickPhotos = {
+                photoPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            },
+            onPickCode = {
+                documentPickerLauncher.launch(
+                    arrayOf(
+                        "text/*",
+                        "application/json",
+                        "application/xml",
+                        "application/javascript",
+                        "text/x-python",
+                        "text/x-kotlin",
+                        "text/x-java",
+                        "text/x-sql",
+                        "*/*"
+                    )
+                )
+            },
+            onAddSampleFile = { sampleType ->
+                viewModel.addSampleAttachment(sampleType)
+            },
+            onAttachCachedFile = { file ->
+                viewModel.addCachedFileAttachment(file)
+            }
+        )
+    }
+
+    // Inspect Extracted Data Dialog
+    inspectingAttachment?.let { att ->
+        AlertDialog(
+            onDismissRequest = { inspectingAttachment = null },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Description,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Retrieved File Data",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text(
+                        text = att.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Format: ${att.mimeType} • Size: ${FileUtils.formatFileSize(att.sizeBytes)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Extracted Content Preview:",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = att.previewSnippet ?: if (att.isImage) "Image data prepared for multimodal vision analysis." else "Binary data indexed and linked.",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { inspectingAttachment = null }) {
+                    Text("Close")
+                }
+            }
         )
     }
 }
