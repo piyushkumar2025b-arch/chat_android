@@ -18,6 +18,8 @@ class ChatRepository(private val chatDao: ChatDao) {
     val allSessions: Flow<List<ChatSessionEntity>> = chatDao.getAllSessions()
     val allMessages: Flow<List<ChatMessageEntity>> = chatDao.getAllMessages()
 
+    suspend fun getAllSessionsOnce(): List<ChatSessionEntity> = chatDao.getAllSessionsOnce()
+
     fun getMessagesForSession(sessionId: String): Flow<List<ChatMessageEntity>> {
         return chatDao.getMessagesForSession(sessionId)
     }

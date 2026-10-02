@@ -192,19 +192,22 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         initTts(application)
         viewModelScope.launch {
-            // Observe sessions and pick the most recent one or create one
+            // Query DB once first to prevent empty session flash
+            val initialList = repository.getAllSessionsOnce()
+            if (initialList.isNotEmpty()) {
+                val first = initialList.first()
+                _currentSessionId.value = first.id
+                _currentSession.value = first
+                syncSessionModel(first)
+            } else {
+                createNewSession()
+            }
+
+            // Observe subsequent session changes
             sessions.collect { list ->
-                if (_currentSessionId.value == null) {
-                    if (list.isNotEmpty()) {
-                        val first = list.first()
-                        _currentSessionId.value = first.id
-                        _currentSession.value = first
-                        syncSessionModel(first)
-                    } else {
-                        createNewSession()
-                    }
-                } else {
-                    val matching = list.firstOrNull { it.id == _currentSessionId.value }
+                val currentId = _currentSessionId.value
+                if (currentId != null) {
+                    val matching = list.firstOrNull { it.id == currentId }
                     if (matching != null) {
                         _currentSession.value = matching
                     } else if (list.isNotEmpty()) {
@@ -409,6 +412,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             _isGenerating.value = true
             val displayPrompt = trimmed.ifEmpty { "Analyze the attached file(s)" }
 
+            // Snapshot history BEFORE inserting the new user message (excludes errors & placeholders)
+            val historySnapshot = currentMessages.value.filter {
+                !it.isError && it.content.isNotBlank() && it.content != "Regenerating response..."
+            }
+
             // Insert user message in database
             repository.addMessage(
                 sessionId = sessionId,
@@ -431,7 +439,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
             // Call AI Service with optional live web grounding
             val apiKey = getApiKeyForProvider(provider)
-            val history = currentMessages.value
 
             val webContext = if (_isWebSearchEnabled.value && trimmed.isNotBlank()) {
                 try {
@@ -444,13 +451,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             } else ""
 
             val promptWithGrounding = displayPrompt + webContext
+            val effectiveModelId = if (provider == ProviderType.CUSTOM) {
+                preferencesManager.customModel.trim().ifEmpty { "gpt-4o-mini" }
+            } else {
+                model.id
+            }
 
             val result = AiService.sendMessage(
                 provider = provider,
-                modelId = model.id,
+                modelId = effectiveModelId,
                 prompt = promptWithGrounding,
                 attachments = attachments,
-                history = history,
+                history = historySnapshot,
                 apiKey = apiKey,
                 systemPrompt = preferencesManager.systemPrompt,
                 temperature = preferencesManager.temperature,
@@ -494,17 +506,49 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val provider = _selectedProvider.value
         val model = _selectedModel.value
 
+        // Pre-flight key and limits checks
+        if (provider.requiresApiKey && !isKeyConfigured(provider)) {
+            viewModelScope.launch {
+                repository.updateMessageContent(
+                    assistantMessage.id,
+                    "⚠️ ${provider.displayName} requires an API key to run. Please add your key in Settings or switch to Pollinations AI (Free).",
+                    isError = true
+                )
+            }
+            return
+        }
+
+        if (usageTracker.isLimitReached()) {
+            viewModelScope.launch {
+                repository.updateMessageContent(
+                    assistantMessage.id,
+                    "⚠️ Daily budget of ${preferencesManager.dailyLimit} requests reached today.",
+                    isError = true
+                )
+            }
+            return
+        }
+
+        val originalContent = assistantMessage.content
+
         activeJob?.cancel()
         activeJob = viewModelScope.launch {
             _isGenerating.value = true
             repository.updateMessageContent(assistantMessage.id, "Regenerating response...")
 
             val apiKey = getApiKeyForProvider(provider)
-            val history = allMsgs.take(msgIndex - 1)
+            val history = allMsgs.take(msgIndex).filter {
+                !it.isError && it.id != assistantMessage.id && it.content != "Regenerating response..."
+            }
+            val effectiveModelId = if (provider == ProviderType.CUSTOM) {
+                preferencesManager.customModel.trim().ifEmpty { "gpt-4o-mini" }
+            } else {
+                model.id
+            }
 
             val result = AiService.sendMessage(
                 provider = provider,
-                modelId = model.id,
+                modelId = effectiveModelId,
                 prompt = userMessage.content,
                 attachments = attachments,
                 history = history,
@@ -516,11 +560,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
             result.onSuccess { responseText ->
                 repository.updateMessageContent(assistantMessage.id, responseText, isError = false)
+                val estTokens = (userMessage.content.length + responseText.length) / 4
+                usageTracker.recordRequest(provider.id, maxOf(50, estTokens))
             }.onFailure { error ->
                 repository.updateMessageContent(
                     assistantMessage.id,
-                    "Error: ${error.localizedMessage ?: "Failed to regenerate"}",
-                    isError = true
+                    if (error is java.util.concurrent.CancellationException) originalContent else "Error: ${error.localizedMessage ?: "Failed to regenerate"}",
+                    isError = error !is java.util.concurrent.CancellationException
                 )
             }
 
@@ -530,7 +576,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopGeneration() {
         activeJob?.cancel()
+        AiService.cancelActiveRequest()
         _isGenerating.value = false
+    }
+
+    fun onKeysUpdated() {
+        _keysRevision.value += 1
     }
 
     private fun initTts(application: Application) {
