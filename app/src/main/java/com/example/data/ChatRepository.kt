@@ -50,11 +50,35 @@ class ChatRepository(private val chatDao: ChatDao) {
     }
 
     suspend fun deleteSession(sessionId: String) {
+        try {
+            val messages = chatDao.getMessagesListForSession(sessionId)
+            for (msg in messages) {
+                val attachments = parseAttachments(msg.attachmentsJson)
+                for (att in attachments) {
+                    try {
+                        val f = java.io.File(att.localUri)
+                        if (f.exists()) f.delete()
+                    } catch (_: Exception) {}
+                }
+            }
+        } catch (_: Exception) {}
         chatDao.deleteMessagesForSession(sessionId)
         chatDao.deleteSession(sessionId)
     }
 
     suspend fun clearAll() {
+        try {
+            val allMsgs = chatDao.getAllMessagesOnce()
+            for (msg in allMsgs) {
+                val attachments = parseAttachments(msg.attachmentsJson)
+                for (att in attachments) {
+                    try {
+                        val f = java.io.File(att.localUri)
+                        if (f.exists()) f.delete()
+                    } catch (_: Exception) {}
+                }
+            }
+        } catch (_: Exception) {}
         chatDao.clearAllMessages()
         chatDao.clearAllSessions()
     }

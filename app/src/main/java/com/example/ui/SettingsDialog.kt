@@ -62,7 +62,8 @@ fun SettingsDialog(
     onOpenThemePicker: () -> Unit,
     onOpenUsageLimits: () -> Unit,
     onDismiss: () -> Unit,
-    onClearAllChats: () -> Unit
+    onClearAllChats: () -> Unit,
+    onKeyUpdated: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -213,7 +214,13 @@ fun SettingsDialog(
                                 onClick = {
                                     val backupJson = preferencesManager.exportKeysJson()
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    clipboard.setPrimaryClip(ClipData.newPlainText("OmniChat Keys Backup", backupJson))
+                                    val clipData = ClipData.newPlainText("OmniChat Keys Backup", backupJson)
+                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                        clipData.description.extras = android.os.PersistableBundle().apply {
+                                            putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+                                        }
+                                    }
+                                    clipboard.setPrimaryClip(clipData)
                                     Toast.makeText(context, "All keys copied to clipboard for backup!", Toast.LENGTH_SHORT).show()
                                 },
                                 modifier = Modifier.weight(1f).testTag("settings_export_keys_button")
@@ -233,7 +240,13 @@ fun SettingsDialog(
                                             geminiKey = preferencesManager.geminiApiKey
                                             groqKey = preferencesManager.groqApiKey
                                             openRouterKey = preferencesManager.openRouterApiKey
+                                            cerebrasKey = preferencesManager.cerebrasApiKey
+                                            huggingFaceKey = preferencesManager.huggingFaceApiKey
+                                            youtubeKey = preferencesManager.youtubeApiKey
+                                            customUrl = preferencesManager.customBaseUrl
                                             customKey = preferencesManager.customApiKey
+                                            customModel = preferencesManager.customModel
+                                            onKeyUpdated?.invoke()
                                             Toast.makeText(context, "Keys restored from backup successfully!", Toast.LENGTH_SHORT).show()
                                         } else {
                                             Toast.makeText(context, "Invalid backup format in clipboard", Toast.LENGTH_SHORT).show()
@@ -432,6 +445,7 @@ fun SettingsDialog(
                     preferencesManager.customModel = customModel
                     preferencesManager.systemPrompt = systemPrompt
                     preferencesManager.temperature = temperature
+                    onKeyUpdated?.invoke()
                     Toast.makeText(context, "Settings saved!", Toast.LENGTH_SHORT).show()
                     onDismiss()
                 },

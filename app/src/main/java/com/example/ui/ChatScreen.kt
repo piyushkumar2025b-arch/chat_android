@@ -1333,7 +1333,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 showUsageLimitsSheet = true
             },
             onDismiss = { showSettingsDialog = false },
-            onClearAllChats = { viewModel.clearAllChats() }
+            onClearAllChats = { viewModel.clearAllChats() },
+            onKeyUpdated = { viewModel.onKeysUpdated() }
         )
     }
 
@@ -1342,7 +1343,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
         QuickKeyDialog(
             preferencesManager = viewModel.preferencesManager,
             initialTargetProvider = selectedProvider,
-            onKeyUpdated = { /* viewModel state automatically triggers recomposition */ },
+            onKeyUpdated = { viewModel.onKeysUpdated() },
             onDismiss = { showQuickKeyDialog = false }
         )
     }

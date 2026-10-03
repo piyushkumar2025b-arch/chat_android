@@ -60,8 +60,9 @@ object ArtifactExtractor {
             )
         }
 
-        // 2. Check for Markdown fenced code blocks
-        val codeMatches = CODE_BLOCK_REGEX.findAll(content).toList()
+        // 2. Check for Markdown fenced code blocks (stripping XML artifacts to avoid duplicates)
+        val contentWithoutClaude = CLAUDE_ARTIFACT_REGEX.replace(content, "\n\n")
+        val codeMatches = CODE_BLOCK_REGEX.findAll(contentWithoutClaude).toList()
         for ((idx, match) in codeMatches.withIndex()) {
             val rawLang = match.groupValues[1].trim().lowercase()
             val explicitFilename = match.groupValues[2].trim()
@@ -136,6 +137,20 @@ object ArtifactExtractor {
             if (name.isNotEmpty()) return name
         }
 
+        // Check for HTML document title
+        if (lang in listOf("html", "htm") || code.contains("<html", ignoreCase = true)) {
+            val titleMatch = Regex("""<title>(.*?)</title>""", RegexOption.IGNORE_CASE).find(code)
+            if (titleMatch != null) {
+                val t = titleMatch.groupValues[1].trim()
+                if (t.isNotBlank()) return "$t (index.html)"
+            }
+            return "index.html"
+        }
+
+        if (lang == "svg" || code.trimStart().startsWith("<svg", ignoreCase = true)) {
+            return "vector_graphic.svg"
+        }
+
         // Check for class declaration
         val classMatch = Regex("""(?:class|interface|object)\s+([a-zA-Z0-9_]+)""").find(code)
         if (classMatch != null) {
@@ -149,20 +164,6 @@ object ArtifactExtractor {
                 else -> ""
             }
             return "$className$ext"
-        }
-
-        // Check for HTML document title
-        if (lang in listOf("html", "htm") || code.contains("<html", ignoreCase = true)) {
-            val titleMatch = Regex("""<title>(.*?)</title>""", RegexOption.IGNORE_CASE).find(code)
-            if (titleMatch != null) {
-                val t = titleMatch.groupValues[1].trim()
-                if (t.isNotBlank()) return "$t (index.html)"
-            }
-            return "index.html"
-        }
-
-        if (lang == "svg" || code.trimStart().startsWith("<svg", ignoreCase = true)) {
-            return "vector_graphic.svg"
         }
 
         if (lang in listOf("bash", "sh", "shell")) {

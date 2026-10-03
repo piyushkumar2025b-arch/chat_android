@@ -28,8 +28,13 @@ enum class SoundPreset(
 object AudioSynthesizer {
     private const val SAMPLE_RATE = 44100
     private var currentTrack: AudioTrack? = null
+
+    @Volatile
     var isPlaying: Boolean = false
         private set
+
+    @Volatile
+    private var currentPlayId: Long = 0L
 
     suspend fun playSound(preset: SoundPreset, volume: Float = 0.8f, onComplete: () -> Unit = {}): Unit = withContext(Dispatchers.Default) {
         stopSound()
@@ -37,18 +42,20 @@ object AudioSynthesizer {
             val samples = generateSamples(preset)
             playSamples(samples, volume, onComplete)
         } catch (e: Exception) {
-            e.printStackTrace()
             withContext(Dispatchers.Main) { onComplete() }
         }
     }
 
     fun stopSound() {
-        try {
+        synchronized(this) {
+            currentPlayId++
             isPlaying = false
-            currentTrack?.stop()
-            currentTrack?.release()
+            try {
+                currentTrack?.stop()
+                currentTrack?.release()
+            } catch (_: Exception) {}
             currentTrack = null
-        } catch (_: Exception) {}
+        }
     }
 
     private fun generateSamples(preset: SoundPreset): ShortArray {
@@ -151,6 +158,11 @@ object AudioSynthesizer {
     }
 
     private suspend fun playSamples(samples: ShortArray, volume: Float, onComplete: () -> Unit) = withContext(Dispatchers.IO) {
+        val playId = synchronized(this@AudioSynthesizer) {
+            currentPlayId++
+            currentPlayId
+        }
+
         val minBufferSize = AudioTrack.getMinBufferSize(
             SAMPLE_RATE,
             AudioFormat.CHANNEL_OUT_MONO,
@@ -158,35 +170,64 @@ object AudioSynthesizer {
         )
         val bufferSize = maxOf(minBufferSize, samples.size * 2)
 
-        val track = AudioTrack.Builder()
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build()
-            )
-            .setAudioFormat(
-                AudioFormat.Builder()
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .setSampleRate(SAMPLE_RATE)
-                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                    .build()
-            )
-            .setBufferSizeInBytes(bufferSize)
-            .setTransferMode(AudioTrack.MODE_STREAM)
-            .build()
+        val track = try {
+            AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(SAMPLE_RATE)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build()
+                )
+                .setBufferSizeInBytes(bufferSize)
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .build()
+        } catch (_: Exception) {
+            withContext(Dispatchers.Main) { onComplete() }
+            return@withContext
+        }
 
-        track.setVolume(volume.coerceIn(0.0f, 1.0f))
-        currentTrack = track
-        isPlaying = true
+        synchronized(this@AudioSynthesizer) {
+            if (currentPlayId != playId) {
+                try { track.release() } catch (_: Exception) {}
+                return@withContext
+            }
+            track.setVolume(volume.coerceIn(0.0f, 1.0f))
+            currentTrack = track
+            isPlaying = true
+        }
 
-        track.play()
-        track.write(samples, 0, samples.size)
-
-        // Wait until playback completes or stopped
-        val durationMs = (samples.size.toDouble() / SAMPLE_RATE * 1000).toLong()
-        kotlinx.coroutines.delay(durationMs + 100)
-        isPlaying = false
-        withContext(Dispatchers.Main) { onComplete() }
+        var shouldCallComplete = false
+        try {
+            track.play()
+            track.write(samples, 0, samples.size)
+            val durationMs = (samples.size.toDouble() / SAMPLE_RATE * 1000).toLong()
+            kotlinx.coroutines.delay(durationMs + 100)
+        } finally {
+            synchronized(this@AudioSynthesizer) {
+                if (currentPlayId == playId) {
+                    isPlaying = false
+                    try {
+                        track.stop()
+                        track.release()
+                    } catch (_: Exception) {}
+                    if (currentTrack === track) {
+                        currentTrack = null
+                    }
+                    shouldCallComplete = true
+                } else {
+                    try { track.release() } catch (_: Exception) {}
+                }
+            }
+            if (shouldCallComplete) {
+                withContext(Dispatchers.Main) { onComplete() }
+            }
+        }
     }
 }

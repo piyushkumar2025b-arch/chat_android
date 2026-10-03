@@ -65,10 +65,16 @@ object FileUtils {
             val originalExt = displayName.substringAfterLast('.', "").lowercase()
 
             val tempFile = File(cacheFolder, "${UUID.randomUUID()}_temp")
-            contentResolver.openInputStream(uri)?.use { input ->
+            val inputStream = contentResolver.openInputStream(uri) ?: return@withContext null
+            inputStream.use { input ->
                 FileOutputStream(tempFile).use { output ->
                     input.copyTo(output)
                 }
+            }
+
+            if (!tempFile.exists() || tempFile.length() <= 0L) {
+                try { tempFile.delete() } catch (_: Exception) {}
+                return@withContext null
             }
 
             if (sizeBytes <= 0) {
@@ -77,7 +83,7 @@ object FileUtils {
 
             val rawMime = contentResolver.getType(uri)
             val detectedType = detectFileType(tempFile, displayName, rawMime)
-            val finalExt = if (originalExt.isNotEmpty()) originalExt else detectedType.extension
+            val finalExt = (if (originalExt.isNotEmpty()) originalExt else detectedType.extension).filter { it.isLetterOrDigit() }
             val localFileName = "${UUID.randomUUID()}${if (finalExt.isNotEmpty()) ".$finalExt" else ""}"
             val targetFile = File(cacheFolder, localFileName)
             tempFile.renameTo(targetFile)
@@ -985,11 +991,11 @@ object FileUtils {
         if (bytes <= 0) return "0 B"
         if (bytes < 1024) return "$bytes B"
         val kb = bytes / 1024.0
-        if (kb < 1024) return String.format("%.1f KB", kb)
+        if (kb < 1024) return String.format(java.util.Locale.US, "%.1f KB", kb)
         val mb = kb / 1024.0
-        if (mb < 1024) return String.format("%.1f MB", mb)
+        if (mb < 1024) return String.format(java.util.Locale.US, "%.1f MB", mb)
         val gb = mb / 1024.0
-        return String.format("%.2f GB", gb)
+        return String.format(java.util.Locale.US, "%.2f GB", gb)
     }
 
     /**

@@ -129,7 +129,13 @@ fun QuickKeyDialog(
                                 onClick = {
                                     val backupJson = preferencesManager.exportKeysJson()
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    clipboard.setPrimaryClip(ClipData.newPlainText("OmniChat Keys Backup", backupJson))
+                                    val clipData = ClipData.newPlainText("OmniChat Keys Backup", backupJson)
+                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                        clipData.description.extras = android.os.PersistableBundle().apply {
+                                            putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+                                        }
+                                    }
+                                    clipboard.setPrimaryClip(clipData)
                                     Toast.makeText(context, "All keys copied to clipboard for backup!", Toast.LENGTH_SHORT).show()
                                 },
                                 modifier = Modifier.weight(1f).testTag("export_keys_backup_button")
@@ -149,6 +155,9 @@ fun QuickKeyDialog(
                                             geminiKey = preferencesManager.geminiApiKey
                                             groqKey = preferencesManager.groqApiKey
                                             openRouterKey = preferencesManager.openRouterApiKey
+                                            cerebrasKey = preferencesManager.cerebrasApiKey
+                                            huggingFaceKey = preferencesManager.huggingFaceApiKey
+                                            youtubeKey = preferencesManager.youtubeApiKey
                                             customKey = preferencesManager.customApiKey
                                             onKeyUpdated()
                                             Toast.makeText(context, "Keys restored from backup successfully!", Toast.LENGTH_SHORT).show()

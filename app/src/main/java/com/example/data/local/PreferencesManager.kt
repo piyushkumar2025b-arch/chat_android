@@ -161,6 +161,6 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putString(KEY_LAST_PROVIDER, value).apply()
 
     var lastModelId: String
-        get() = prefs.getString(KEY_LAST_MODEL, "openai") ?: "openai"
+        get() = prefs.getString(KEY_LAST_MODEL, "openai-fast") ?: "openai-fast"
         set(value) = prefs.edit().putString(KEY_LAST_MODEL, value).apply()
 }
