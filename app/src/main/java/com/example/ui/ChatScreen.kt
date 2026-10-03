@@ -99,6 +99,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -144,7 +145,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
     val currentSection by viewModel.currentSection.collectAsState()
     val isWebSearchEnabled by viewModel.isWebSearchEnabled.collectAsState()
 
-    var inputText by remember { mutableStateOf("") }
+    var inputText by rememberSaveable { mutableStateOf("") }
     var showProviderSheet by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showQuickKeyDialog by remember { mutableStateOf(false) }
@@ -1104,8 +1105,10 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                     IconButton(
                                         onClick = {
                                             val text = inputText
-                                            inputText = ""
-                                            viewModel.sendMessage(text)
+                                            val sent = viewModel.sendMessage(text)
+                                            if (sent) {
+                                                inputText = ""
+                                            }
                                         },
                                         enabled = canSend,
                                         modifier = Modifier
@@ -1263,7 +1266,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                     AppSection.MAPS -> {
                         MapExplorerScreen(
                             onSendLocationToChat = { prompt ->
-                                viewModel.sendMessage(prompt)
+                                viewModel.sendMessage(prompt, explicitAttachments = emptyList())
                                 viewModel.navigateToSection(AppSection.CHAT)
                             }
                         )
@@ -1274,7 +1277,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             preferencesManager = viewModel.preferencesManager,
                             onOpenSettings = { showQuickKeyDialog = true },
                             onSummarizeVideoInChat = { prompt ->
-                                viewModel.sendMessage(prompt)
+                                viewModel.sendMessage(prompt, explicitAttachments = emptyList())
                                 viewModel.navigateToSection(AppSection.CHAT)
                             }
                         )
@@ -1293,7 +1296,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             initialTab = initialTab,
                             preferencesManager = viewModel.preferencesManager,
                             onSendPromptToChat = { prompt ->
-                                viewModel.sendMessage(prompt)
+                                viewModel.sendMessage(prompt, explicitAttachments = emptyList())
                                 viewModel.navigateToSection(AppSection.CHAT)
                             }
                         )

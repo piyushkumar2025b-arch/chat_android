@@ -188,7 +188,9 @@ fun ArtifactViewerDialog(
                                 putExtra(Intent.EXTRA_TEXT, artifact.content)
                                 type = "text/plain"
                             }
-                            context.startActivity(Intent.createChooser(sendIntent, "Share Artifact"))
+                            try {
+                                context.startActivity(Intent.createChooser(sendIntent, "Share Artifact"))
+                            } catch (_: Exception) {}
                         },
                         modifier = Modifier.testTag("share_artifact_button")
                     ) {

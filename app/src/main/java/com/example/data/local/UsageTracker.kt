@@ -33,19 +33,16 @@ class UsageTracker(private val context: Context, private val preferencesManager:
         return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
     }
 
+    @Synchronized
     private fun ensureCurrentDay() {
         val today = getTodayDateString()
         val savedDay = prefs.getString("last_usage_day", "")
         if (savedDay != today) {
-            // New day: reset daily counters
-            prefs.edit()
+            // New day: atomically reset daily counters and remove previous provider counters
+            val editor = prefs.edit()
                 .putString("last_usage_day", today)
                 .putInt("requests_today", 0)
                 .putInt("tokens_today", 0)
-                // Clear provider counters
-                .apply()
-            // Remove previous provider counters
-            val editor = prefs.edit()
             for (key in prefs.all.keys) {
                 if (key.startsWith("provider_req_")) {
                     editor.remove(key)
@@ -55,6 +52,7 @@ class UsageTracker(private val context: Context, private val preferencesManager:
         }
     }
 
+    @Synchronized
     private fun loadStats(): UsageStats {
         ensureCurrentDay()
         cleanOldTimestamps()
@@ -116,6 +114,7 @@ class UsageTracker(private val context: Context, private val preferencesManager:
         _usageStats.value = loadStats()
     }
 
+    @Synchronized
     fun isLimitReached(): Boolean {
         ensureCurrentDay()
         val limit = preferencesManager.dailyLimit
@@ -124,17 +123,17 @@ class UsageTracker(private val context: Context, private val preferencesManager:
         return current >= limit
     }
 
+    @Synchronized
     fun setDailyLimit(newLimit: Int) {
         preferencesManager.dailyLimit = newLimit
         _usageStats.value = loadStats()
     }
 
+    @Synchronized
     fun resetTodayStats() {
-        prefs.edit()
+        val editor = prefs.edit()
             .putInt("requests_today", 0)
             .putInt("tokens_today", 0)
-            .apply()
-        val editor = prefs.edit()
         for (key in prefs.all.keys) {
             if (key.startsWith("provider_req_")) {
                 editor.remove(key)

@@ -23,6 +23,7 @@ import com.example.data.remote.AiService
 import com.example.data.remote.FileUtils
 import com.example.data.remote.WebSearchService
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -348,12 +349,23 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         _pendingAttachments.value = _pendingAttachments.value.filterNot { it.id == attachmentId }
     }
 
-    fun sendMessage(userText: String) {
+    fun sendMessage(userText: String, explicitAttachments: List<AttachmentInfo>? = null): Boolean {
         val trimmed = userText.trim()
-        val attachments = _pendingAttachments.value
-        if (trimmed.isEmpty() && attachments.isEmpty()) return
+        val attachments = explicitAttachments ?: _pendingAttachments.value
+        if (trimmed.isEmpty() && attachments.isEmpty()) return false
 
-        val sessionId = _currentSessionId.value ?: return
+        val sessionId = _currentSessionId.value
+        if (sessionId == null) {
+            viewModelScope.launch {
+                val prov = _selectedProvider.value
+                val mod = _selectedModel.value
+                val session = repository.createNewSession(prov.id, mod.id, "New Chat")
+                _currentSessionId.value = session.id
+                _currentSession.value = session
+                sendMessage(userText, explicitAttachments)
+            }
+            return true
+        }
         val provider = _selectedProvider.value
         val model = _selectedModel.value
 
@@ -378,9 +390,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     modelId = model.id,
                     isError = true
                 )
-                _pendingAttachments.value = emptyList()
+                if (explicitAttachments == null) _pendingAttachments.value = emptyList()
             }
-            return
+            return true
         }
 
         // Check if daily request budget is reached
@@ -402,9 +414,33 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     modelId = model.id,
                     isError = true
                 )
-                _pendingAttachments.value = emptyList()
+                if (explicitAttachments == null) _pendingAttachments.value = emptyList()
             }
-            return
+            return true
+        }
+
+        // Check if user uploaded images to a model that does not support vision
+        if (attachments.any { it.isImage } && !model.supportsVision && provider != ProviderType.CUSTOM) {
+            viewModelScope.launch {
+                repository.addMessage(
+                    sessionId = sessionId,
+                    role = "user",
+                    content = trimmed.ifEmpty { "Uploaded ${attachments.size} image(s)" },
+                    providerId = provider.id,
+                    modelId = model.id,
+                    attachments = attachments
+                )
+                repository.addMessage(
+                    sessionId = sessionId,
+                    role = "assistant",
+                    content = "⚠️ The selected model (${model.name}) does not support vision. Please switch to a vision-capable model (like Google Gemini 2.5 Flash / Pro) in the model selector to analyze images.",
+                    providerId = provider.id,
+                    modelId = model.id,
+                    isError = true
+                )
+                if (explicitAttachments == null) _pendingAttachments.value = emptyList()
+            }
+            return true
         }
 
         activeJob?.cancel()
@@ -435,7 +471,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             // Clear pending attachments for next message
-            _pendingAttachments.value = emptyList()
+            if (explicitAttachments == null) {
+                _pendingAttachments.value = emptyList()
+            }
 
             // Call AI Service with optional live web grounding
             val apiKey = getApiKeyForProvider(provider)
@@ -481,6 +519,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val estTokens = (displayPrompt.length + responseText.length) / 4
                 usageTracker.recordRequest(provider.id, maxOf(50, estTokens))
             }.onFailure { error ->
+                val isCancelled = !isActive || error is kotlinx.coroutines.CancellationException || error.message?.contains("Canceled", ignoreCase = true) == true
+                if (isCancelled) {
+                    return@onFailure
+                }
                 repository.addMessage(
                     sessionId = sessionId,
                     role = "assistant",
@@ -493,6 +535,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
             _isGenerating.value = false
         }
+        return true
     }
 
     fun regenerateMessage(assistantMessage: ChatMessageEntity) {
@@ -563,10 +606,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val estTokens = (userMessage.content.length + responseText.length) / 4
                 usageTracker.recordRequest(provider.id, maxOf(50, estTokens))
             }.onFailure { error ->
+                val isCancelled = !isActive || error is kotlinx.coroutines.CancellationException || error is java.util.concurrent.CancellationException || error.message?.contains("Canceled", ignoreCase = true) == true
                 repository.updateMessageContent(
                     assistantMessage.id,
-                    if (error is java.util.concurrent.CancellationException) originalContent else "Error: ${error.localizedMessage ?: "Failed to regenerate"}",
-                    isError = error !is java.util.concurrent.CancellationException
+                    if (isCancelled) originalContent else "Error: ${error.localizedMessage ?: "Failed to regenerate"}",
+                    isError = !isCancelled
                 )
             }
 
@@ -608,12 +652,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             stopSpeech()
             if (isTtsReady) {
-                // Strip markdown code blocks and symbols for clean spoken voice
-                val cleanText = text.replace(Regex("```[\\s\\S]*?```"), "Code snippet omitted.")
-                    .replace(Regex("[*#_`>]"), "")
-                    .take(2000) // safety limit for spoken text
+                // Strip markdown code blocks and format symbols for clean spoken voice without destroying identifiers
+                var spoken = text.replace(Regex("```[\\s\\S]*?```"), "Code snippet omitted.")
+                    .replace(Regex("`([^`]+)`"), "$1")
+                    .replace(Regex("""\*\*([^*]+)\*\*"""), "$1")
+                    .replace(Regex("""\*([^*]+)\*"""), "$1")
+                    .replace(Regex("""(?m)^[#>•\-*]\s*"""), "")
+                    .replace(Regex("""(?<=\s|^)[_]+|[_]+(?=\s|$)"""), "")
+
+                if (spoken.length > 2000) {
+                    spoken = spoken.take(2000) + "... Text truncated for speech."
+                }
                 _speakingMessageId.value = messageId
-                tts?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, messageId)
+                tts?.speak(spoken, TextToSpeech.QUEUE_FLUSH, null, messageId)
             }
         }
     }

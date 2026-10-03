@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -133,29 +134,41 @@ fun MapExplorerScreen(
             try {
                 val encoded = URLEncoder.encode(q, "UTF-8")
                 val url = "https://nominatim.openstreetmap.org/search?format=json&q=$encoded&addressdetails=1&limit=6"
-                val client = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).build()
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(12, TimeUnit.SECONDS)
+                    .readTimeout(12, TimeUnit.SECONDS)
+                    .build()
                 val req = Request.Builder()
                     .url(url)
-                    .header("User-Agent", "OmniChat-Android-Map/1.0")
+                    .header("User-Agent", "OmniChat-Android/1.0 (Android AI Studio)")
                     .build()
 
-                val res = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                if (res.isSuccessful) {
-                    val body = res.body?.string().orEmpty()
-                    val array = JSONArray(body)
-                    searchResults.clear()
-                    for (i in 0 until array.length()) {
-                        val obj = array.getJSONObject(i)
-                        val name = obj.optString("name").ifEmpty { obj.optString("display_name").substringBefore(",") }
-                        val lat = obj.optDouble("lat", 0.0)
-                        val lon = obj.optDouble("lon", 0.0)
-                        val disp = obj.optString("display_name")
-                        val type = obj.optString("type", "Place")
-                        searchResults.add(MapLocation(name = name, lat = lat, lon = lon, displayName = disp, type = type))
+                val items = withContext(Dispatchers.IO) {
+                    client.newCall(req).execute().use { res ->
+                        if (!res.isSuccessful) return@withContext emptyList<MapLocation>()
+                        val body = res.body?.string().orEmpty()
+                        if (body.isBlank()) return@withContext emptyList<MapLocation>()
+                        val array = JSONArray(body)
+                        val list = mutableListOf<MapLocation>()
+                        for (i in 0 until array.length()) {
+                            val obj = array.getJSONObject(i)
+                            val name = obj.optString("name").ifEmpty { obj.optString("display_name").substringBefore(",") }
+                            val lat = obj.optDouble("lat", 0.0)
+                            val lon = obj.optDouble("lon", 0.0)
+                            val disp = obj.optString("display_name")
+                            val type = obj.optString("type", "Place")
+                            list.add(MapLocation(name = name, lat = lat, lon = lon, displayName = disp, type = type))
+                        }
+                        list
                     }
                 }
+                searchResults.clear()
+                searchResults.addAll(items)
+                if (items.isEmpty()) {
+                    Toast.makeText(context, "No locations found for '$q'", Toast.LENGTH_SHORT).show()
+                }
             } catch (e: Exception) {
-                Toast.makeText(context, "Search failed: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Search failed: ${e.localizedMessage ?: "Network error"}", Toast.LENGTH_SHORT).show()
             } finally {
                 isSearching = false
             }
@@ -256,8 +269,10 @@ fun MapExplorerScreen(
         item {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(quickDestinations) { (cityName, coords) ->
+                    val isCitySelected = currentLocation.name.equals(cityName, ignoreCase = true) ||
+                            (Math.abs(currentLocation.lat - coords.first) < 0.05 && Math.abs(currentLocation.lon - coords.second) < 0.05)
                     FilterChip(
-                        selected = currentLocation.name.contains(cityName, ignoreCase = true),
+                        selected = isCitySelected,
                         onClick = {
                             currentLocation = MapLocation(
                                 name = cityName,
@@ -325,6 +340,9 @@ fun MapExplorerScreen(
                         selected = selectedLayer == layer,
                         onClick = {
                             selectedLayer = layer
+                            if (currentZoom > layer.maxZoom) {
+                                currentZoom = layer.maxZoom
+                            }
                         },
                         label = { Text(layer.label) },
                         leadingIcon = if (selectedLayer == layer) {
@@ -350,11 +368,16 @@ fun MapExplorerScreen(
                             .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                             .background(MaterialTheme.colorScheme.surface)
                     ) {
-                        // 3x3 Tile Grid for seamless high-resolution map rendering
+                        // 3x3 Tile Grid with sub-tile coordinate precision
                         val n = 1 shl currentZoom
-                        val centerTileX = ((currentLocation.lon + 180.0) / 360.0 * n).toInt().coerceIn(0, n - 1)
+                        val exactTileX = (currentLocation.lon + 180.0) / 360.0 * n
                         val latRad = Math.toRadians(currentLocation.lat.coerceIn(-85.0511, 85.0511))
-                        val centerTileY = ((1.0 - Math.log(Math.tan(latRad) + 1.0 / Math.cos(latRad)) / Math.PI) / 2.0 * n).toInt().coerceIn(0, n - 1)
+                        val exactTileY = ((1.0 - Math.log(Math.tan(latRad) + 1.0 / Math.cos(latRad)) / Math.PI) / 2.0 * n)
+
+                        val centerTileX = exactTileX.toInt().coerceIn(0, n - 1)
+                        val centerTileY = exactTileY.toInt().coerceIn(0, n - 1)
+                        val fracX = (exactTileX - centerTileX - 0.5).toFloat()
+                        val fracY = (exactTileY - centerTileY - 0.5).toFloat()
 
                         Column(modifier = Modifier.fillMaxSize()) {
                             for (dy in -1..1) {
@@ -362,7 +385,7 @@ fun MapExplorerScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .fillMaxWidth()
-                                ) {
+                                 ) {
                                     for (dx in -1..1) {
                                         val tileX = (centerTileX + dx).mod(n)
                                         val tileY = (centerTileY + dy).coerceIn(0, n - 1)
@@ -385,14 +408,20 @@ fun MapExplorerScreen(
                             }
                         }
 
-                        // Center Pin Marker with Location Name Pill
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                        // Center Pin Marker with sub-tile pixel offset
+                        BoxWithConstraints(
+                            modifier = Modifier.fillMaxSize()
                         ) {
+                            val tileWidth = maxWidth / 3f
+                            val tileHeight = maxHeight / 3f
+                            val pinXOffset = tileWidth * fracX
+                            val pinYOffset = tileHeight * fracY - 14.dp
+
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.offset(y = (-14).dp)
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .offset(x = pinXOffset, y = pinYOffset)
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
@@ -458,7 +487,7 @@ fun MapExplorerScreen(
                                 .padding(8.dp)
                         ) {
                             Text(
-                                text = "Zoom ${currentZoom}x • ${selectedLayer.label}",
+                                text = "Zoom Level $currentZoom • ${selectedLayer.label}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -493,8 +522,10 @@ fun MapExplorerScreen(
                                     try {
                                         context.startActivity(mapIntent)
                                     } catch (_: Exception) {
-                                        val osmWeb = "https://www.openstreetmap.org/#map=14/${currentLocation.lat}/${currentLocation.lon}"
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(osmWeb)))
+                                        try {
+                                            val osmWeb = "https://www.openstreetmap.org/#map=14/${currentLocation.lat}/${currentLocation.lon}"
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(osmWeb)))
+                                        } catch (_: Exception) {}
                                     }
                                 }
                             ) {

@@ -65,8 +65,8 @@ fun ApiKeyInputField(
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
-    // Default to visible so user can clearly see what they are entering
-    var isVisible by remember { mutableStateOf(true) }
+    // Default to masked so keys are not shown in cleartext by default
+    var isVisible by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
@@ -92,8 +92,10 @@ fun ApiKeyInputField(
             if (helpUrl.isNotBlank()) {
                 TextButton(
                     onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(helpUrl))
-                        context.startActivity(intent)
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(helpUrl))
+                            context.startActivity(intent)
+                        } catch (_: Exception) {}
                     },
                     modifier = Modifier.testTag("${testTagPrefix}_help_link")
                 ) {

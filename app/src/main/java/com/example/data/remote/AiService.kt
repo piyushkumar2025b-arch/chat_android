@@ -138,6 +138,7 @@ object AiService {
                 }
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Result.failure(e)
         }
     }
@@ -445,7 +446,7 @@ object AiService {
             val url = "https://text.pollinations.ai/$encodedPrompt?model=$effectiveModel&system=$encodedSystem"
 
             val req = Request.Builder().url(url).get().build()
-            val resp = httpClient.newCall(req).execute()
+            val resp = executeRequest(req)
             val text = resp.body?.string().orEmpty()
             if (resp.isSuccessful && text.isNotBlank()) {
                 Result.success(text)
@@ -453,6 +454,7 @@ object AiService {
                 openAiRes // Return original error
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             openAiRes
         }
     }

@@ -376,8 +376,12 @@ fun YouTubeScreen(
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Button(
                                         onClick = {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${vid.videoId}"))
-                                            context.startActivity(intent)
+                                            try {
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${vid.videoId}"))
+                                                context.startActivity(intent)
+                                            } catch (_: Exception) {
+                                                Toast.makeText(context, "Cannot open video link", Toast.LENGTH_SHORT).show()
+                                            }
                                         },
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.error,
@@ -420,11 +424,13 @@ fun YouTubeScreen(
 
                                     IconButton(
                                         onClick = {
-                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                type = "text/plain"
-                                                putExtra(Intent.EXTRA_TEXT, "Watch: https://youtube.com/watch?v=${vid.videoId}\n\n${vid.title}")
-                                            }
-                                            context.startActivity(Intent.createChooser(shareIntent, "Share Video"))
+                                            try {
+                                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                    type = "text/plain"
+                                                    putExtra(Intent.EXTRA_TEXT, "Watch: https://youtube.com/watch?v=${vid.videoId}\n\n${vid.title}")
+                                                }
+                                                context.startActivity(Intent.createChooser(shareIntent, "Share Video"))
+                                            } catch (_: Exception) {}
                                         }
                                     ) {
                                         Icon(Icons.Default.Share, contentDescription = "Share Video")

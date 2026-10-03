@@ -5,7 +5,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.pdf.PdfRenderer
+import android.media.ExifInterface
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Environment
@@ -65,10 +67,23 @@ object FileUtils {
             val originalExt = displayName.substringAfterLast('.', "").lowercase()
 
             val tempFile = File(cacheFolder, "${UUID.randomUUID()}_temp")
+            val maxBytes = 25 * 1024 * 1024L // 25MB safe limit
             val inputStream = contentResolver.openInputStream(uri) ?: return@withContext null
+            var totalBytes = 0L
+            val buffer = ByteArray(8192)
+
             inputStream.use { input ->
                 FileOutputStream(tempFile).use { output ->
-                    input.copyTo(output)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read == -1) break
+                        totalBytes += read
+                        if (totalBytes > maxBytes) {
+                            try { tempFile.delete() } catch (_: Exception) {}
+                            return@withContext null
+                        }
+                        output.write(buffer, 0, read)
+                    }
                 }
             }
 
@@ -940,27 +955,48 @@ object FileUtils {
     }
 
     /**
-     * Universal charset reader fallback.
+     * Universal charset reader fallback with bounded streaming and binary data detection.
      */
-    fun readTextWithCharsetFallback(file: File): String {
-        val bytes = file.readBytes()
-        val charsets = listOf(
-            Charsets.UTF_8,
-            Charsets.ISO_8859_1,
-            Charset.forName("Windows-1252"),
-            Charsets.UTF_16
-        )
+    fun readTextWithCharsetFallback(file: File, maxBytesToRead: Int = 262_144): String {
+        return try {
+            val stream = file.inputStream()
+            val buffer = ByteArray(maxBytesToRead)
+            val readCount = stream.use { it.read(buffer) }
+            if (readCount <= 0) return ""
+            val bytes = if (readCount < maxBytesToRead) buffer.copyOf(readCount) else buffer
 
-        for (cs in charsets) {
-            try {
-                val text = String(bytes, cs)
-                if (text.isNotBlank() && !text.contains('\uFFFD')) {
-                    return text
+            // Binary check: count non-printable control characters
+            var nonPrintable = 0
+            for (b in bytes) {
+                val unsigned = b.toInt() and 0xFF
+                if (unsigned == 0 || (unsigned < 9 && unsigned != 0) || (unsigned in 14..31)) {
+                    nonPrintable++
                 }
-            } catch (_: Exception) {}
-        }
+            }
+            if (nonPrintable > bytes.size * 0.15) {
+                return "Binary file format detected (${file.name}, ${formatFileSize(file.length())}). Raw binary contents are omitted to preserve prompt context."
+            }
 
-        return String(bytes, Charsets.UTF_8).replace("\u0000", "")
+            val charsets = listOf(
+                Charsets.UTF_8,
+                Charsets.ISO_8859_1,
+                Charset.forName("Windows-1252"),
+                Charsets.UTF_16
+            )
+
+            for (cs in charsets) {
+                try {
+                    val text = String(bytes, cs)
+                    if (text.isNotBlank() && !text.contains('\uFFFD')) {
+                        return text
+                    }
+                } catch (_: Exception) {}
+            }
+
+            String(bytes, Charsets.UTF_8).replace("\u0000", "")
+        } catch (e: Exception) {
+            "Unable to read file text: ${e.localizedMessage ?: "Unknown error"}"
+        }
     }
 
     suspend fun convertImageToBase64(file: File, maxDimension: Int = 1280): String? = withContext(Dispatchers.IO) {
@@ -977,14 +1013,35 @@ object FileUtils {
             val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
             val bitmap = BitmapFactory.decodeFile(file.absolutePath, decodeOptions) ?: return@withContext null
 
+            // EXIF orientation detection
+            val exif = try {
+                ExifInterface(file.absolutePath)
+            } catch (_: Throwable) { null }
+
+            val orientation = exif?.getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL
+            ) ?: ExifInterface.ORIENTATION_NORMAL
+
+            val rotatedBitmap = when (orientation) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> rotateBitmap(bitmap, 90f)
+                ExifInterface.ORIENTATION_ROTATE_180 -> rotateBitmap(bitmap, 180f)
+                ExifInterface.ORIENTATION_ROTATE_270 -> rotateBitmap(bitmap, 270f)
+                else -> bitmap
+            }
+
             val outputStream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
+            rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
             val bytes = outputStream.toByteArray()
             Base64.encodeToString(bytes, Base64.NO_WRAP)
         } catch (e: Exception) {
-            e.printStackTrace()
             null
         }
+    }
+
+    private fun rotateBitmap(bitmap: Bitmap, degrees: Float): Bitmap {
+        val matrix = Matrix().apply { postRotate(degrees) }
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 
     fun formatFileSize(bytes: Long): String {

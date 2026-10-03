@@ -375,7 +375,9 @@ fun VideoStudioScreen(
                                             type = "text/plain"
                                             putExtra(Intent.EXTRA_TEXT, "Generated Video Motion Scene:\n${item.videoPreviewUrl}\n\nPrompt: ${item.prompt}")
                                         }
-                                        context.startActivity(Intent.createChooser(shareIntent, "Share Video"))
+                                        try {
+                                            context.startActivity(Intent.createChooser(shareIntent, "Share Video"))
+                                        } catch (_: Exception) {}
                                     }
                                 ) {
                                     Icon(Icons.Default.Share, contentDescription = "Share")

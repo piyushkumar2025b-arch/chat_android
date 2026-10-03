@@ -49,12 +49,13 @@ object NewsFeedService {
                 .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:109.0)")
                 .build()
 
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                return@withContext Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+            val body = client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    return@withContext Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+                }
+                response.body?.string().orEmpty()
             }
 
-            val body = response.body?.string().orEmpty()
             val articles = parseRssFeed(body, category.label)
             Result.success(articles)
         } catch (e: Exception) {
@@ -102,14 +103,20 @@ object NewsFeedService {
                     XmlPullParser.END_TAG -> {
                         if (tagName.equals("item", ignoreCase = true) && inItem) {
                             if (title.isNotBlank()) {
-                                val cleanDesc = description
-                                    .replace(Regex("<[^>]*>"), "")
-                                    .replace("&quot;", "\"")
-                                    .replace("&amp;", "&")
-                                    .replace("&apos;", "'")
-                                    .replace("&lt;", "<")
-                                    .replace("&gt;", ">")
-                                    .trim()
+                                val cleanDesc = try {
+                                    android.text.Html.fromHtml(description, android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim()
+                                } catch (_: Throwable) {
+                                    description
+                                        .replace(Regex("<[^>]*>"), "")
+                                        .replace("&quot;", "\"")
+                                        .replace("&amp;", "&")
+                                        .replace("&apos;", "'")
+                                        .replace("&lt;", "<")
+                                        .replace("&gt;", ">")
+                                        .replace("&nbsp;", " ")
+                                        .replace("&#39;", "'")
+                                        .trim()
+                                }
 
                                 // If source is empty, try to extract from title (e.g. "Title - Source")
                                 val finalSource = if (source.isNotBlank()) {
@@ -178,46 +185,45 @@ object WebSearchService {
                 .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:109.0)")
                 .build()
 
-            val response = client.newCall(request).execute()
+            val jsonStr = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
             val results = mutableListOf<WebSearchResult>()
 
-            if (response.isSuccessful) {
-                val jsonStr = response.body?.string().orEmpty()
-                if (jsonStr.isNotBlank()) {
-                    val root = JSONObject(jsonStr)
+            if (jsonStr.isNotBlank()) {
+                val root = JSONObject(jsonStr)
 
-                    // 1. Check Abstract
-                    val abstractText = root.optString("AbstractText")
-                    val abstractSource = root.optString("AbstractSource")
-                    val abstractUrl = root.optString("AbstractURL")
-                    if (abstractText.isNotBlank()) {
+                // 1. Check Abstract
+                val abstractText = root.optString("AbstractText")
+                val abstractSource = root.optString("AbstractSource")
+                val abstractUrl = root.optString("AbstractURL")
+                if (abstractText.isNotBlank()) {
+                    results.add(
+                        WebSearchResult(
+                            title = if (abstractSource.isNotBlank()) "Overview ($abstractSource)" else "Direct Answer",
+                            snippet = abstractText,
+                            url = abstractUrl.ifEmpty { "https://duckduckgo.com/?q=$encoded" }
+                        )
+                    )
+                }
+
+                // 2. Check Related Topics
+                val related = root.optJSONArray("RelatedTopics") ?: JSONArray()
+                for (i in 0 until related.length()) {
+                    val item = related.optJSONObject(i) ?: continue
+                    val text = item.optString("Text")
+                    val firstUrl = item.optString("FirstURL")
+                    if (text.isNotBlank()) {
+                        val parts = text.split(" - ", limit = 2)
+                        val title = parts.firstOrNull() ?: "Result"
+                        val snippet = if (parts.size > 1) parts[1] else text
                         results.add(
                             WebSearchResult(
-                                title = if (abstractSource.isNotBlank()) "Overview ($abstractSource)" else "Direct Answer",
-                                snippet = abstractText,
-                                url = abstractUrl.ifEmpty { "https://duckduckgo.com/?q=$encoded" }
+                                title = title,
+                                snippet = snippet,
+                                url = firstUrl.ifEmpty { "https://duckduckgo.com/?q=$encoded" }
                             )
                         )
-                    }
-
-                    // 2. Check Related Topics
-                    val related = root.optJSONArray("RelatedTopics") ?: JSONArray()
-                    for (i in 0 until related.length()) {
-                        val item = related.optJSONObject(i) ?: continue
-                        val text = item.optString("Text")
-                        val firstUrl = item.optString("FirstURL")
-                        if (text.isNotBlank()) {
-                            val parts = text.split(" - ", limit = 2)
-                            val title = parts.firstOrNull() ?: "Result"
-                            val snippet = if (parts.size > 1) parts[1] else text
-                            results.add(
-                                WebSearchResult(
-                                    title = title,
-                                    snippet = snippet,
-                                    url = firstUrl.ifEmpty { "https://duckduckgo.com/?q=$encoded" }
-                                )
-                            )
-                        }
                     }
                 }
             }
@@ -244,21 +250,42 @@ object WebSearchService {
                 .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                 .build()
 
-            val res = client.newCall(req).execute()
-            if (res.isSuccessful) {
-                val html = res.body?.string().orEmpty()
-                // Simple regex extraction of results
-                val resultRegex = Regex("<a class=\"result__url\"[^>]*href=\"([^\"]+)\"[^>]*>([\\s\\S]*?)</a>[\\s\\S]*?<a class=\"result__snippet\"[^>]*>([\\s\\S]*?)</a>")
+            val html = client.newCall(req).execute().use { res ->
+                if (res.isSuccessful) res.body?.string().orEmpty() else ""
+            }
+            if (html.isNotBlank()) {
+                val resultRegex = Regex("""<a class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)</a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)</a>""")
                 resultRegex.findAll(html).take(6).forEach { match ->
-                    val url = match.groupValues[1]
-                    val title = match.groupValues[2].replace(Regex("<[^>]*>"), "").trim()
-                    val snippet = match.groupValues[3].replace(Regex("<[^>]*>"), "").trim()
+                    val rawHref = match.groupValues[1]
+                    val rawTitle = match.groupValues[2]
+                    val rawSnippet = match.groupValues[3]
+
+                    val decodedUrl = if (rawHref.contains("uddg=")) {
+                        try {
+                            java.net.URLDecoder.decode(rawHref.substringAfter("uddg=").substringBefore("&"), "UTF-8")
+                        } catch (_: Exception) { rawHref }
+                    } else if (rawHref.startsWith("//")) {
+                        "https:$rawHref"
+                    } else rawHref
+
+                    val title = try {
+                        android.text.Html.fromHtml(rawTitle, android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim()
+                    } catch (_: Throwable) {
+                        rawTitle.replace(Regex("<[^>]*>"), "").trim()
+                    }
+
+                    val snippet = try {
+                        android.text.Html.fromHtml(rawSnippet, android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim()
+                    } catch (_: Throwable) {
+                        rawSnippet.replace(Regex("<[^>]*>"), "").trim()
+                    }
+
                     if (title.isNotBlank()) {
                         list.add(
                             WebSearchResult(
                                 title = title,
                                 snippet = snippet,
-                                url = if (url.startsWith("//")) "https:$url" else url
+                                url = decodedUrl
                             )
                         )
                     }

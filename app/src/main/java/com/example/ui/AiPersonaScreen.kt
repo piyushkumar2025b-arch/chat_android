@@ -324,7 +324,8 @@ fun AiPersonaScreen(
         }
 
         // Test Drive Result Card (if any)
-        if (testReply != null) {
+        val currentReply = testReply
+        if (currentReply != null) {
             item {
                 Card(
                     shape = RoundedCornerShape(14.dp),
@@ -338,7 +339,7 @@ fun AiPersonaScreen(
                             Text("Test Reply Preview:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary)
                         }
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(testReply!!, style = MaterialTheme.typography.bodyMedium, lineHeight = 20.sp)
+                        Text(currentReply, style = MaterialTheme.typography.bodyMedium, lineHeight = 20.sp)
                     }
                 }
             }

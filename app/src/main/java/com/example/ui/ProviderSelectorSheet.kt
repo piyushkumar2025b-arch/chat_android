@@ -31,6 +31,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
@@ -38,6 +40,8 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
@@ -206,7 +210,13 @@ fun ProviderSelectorSheet(
                                     IconButton(
                                         onClick = {
                                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                            clipboard.setPrimaryClip(ClipData.newPlainText("API Key", currentKey))
+                                            val clipData = ClipData.newPlainText("API Key", currentKey)
+                                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                                clipData.description.extras = android.os.PersistableBundle().apply {
+                                                    putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+                                                }
+                                            }
+                                            clipboard.setPrimaryClip(clipData)
                                             Toast.makeText(context, "API Key copied!", Toast.LENGTH_SHORT).show()
                                         },
                                         modifier = Modifier.size(32.dp).testTag("copy_key_chip_${activeFilterProvider.id}")
@@ -215,17 +225,19 @@ fun ProviderSelectorSheet(
                                     }
                                 }
 
-                                // 1-tap Paste Key from clipboard
+                                // 1-tap Paste Key from clipboard with validation
                                 AssistChip(
                                     onClick = {
                                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                         val clip = clipboard.primaryClip
                                         if (clip != null && clip.itemCount > 0) {
                                             val pasted = clip.getItemAt(0).text?.toString()?.trim().orEmpty()
-                                            if (pasted.isNotEmpty()) {
+                                            if (pasted.length >= 8 && !pasted.contains(" ") && !pasted.contains("\n")) {
                                                 onUpdateKey(activeFilterProvider, pasted)
                                                 inlineKeyInput = pasted
                                                 Toast.makeText(context, "Pasted & saved key for ${activeFilterProvider.displayName}!", Toast.LENGTH_SHORT).show()
+                                            } else if (pasted.isNotEmpty()) {
+                                                Toast.makeText(context, "Clipboard content does not appear to be a valid API key", Toast.LENGTH_SHORT).show()
                                             } else {
                                                 Toast.makeText(context, "Clipboard empty", Toast.LENGTH_SHORT).show()
                                             }
@@ -256,6 +268,7 @@ fun ProviderSelectorSheet(
                     }
 
                     // Expandable inline input field for typing / editing key directly
+                    var isKeyVisible by remember { mutableStateOf(false) }
                     AnimatedVisibility(
                         visible = isInlineEditingKey && activeFilterProvider.requiresApiKey,
                         enter = fadeIn() + expandVertically(),
@@ -272,8 +285,18 @@ fun ProviderSelectorSheet(
                                     label = { Text("Enter API Key") },
                                     modifier = Modifier.weight(1f).testTag("inline_key_field"),
                                     singleLine = true,
+                                    visualTransformation = if (isKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                    trailingIcon = {
+                                        IconButton(onClick = { isKeyVisible = !isKeyVisible }) {
+                                            Icon(
+                                                imageVector = if (isKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                                contentDescription = if (isKeyVisible) "Hide key" else "Show key",
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    },
                                     keyboardOptions = KeyboardOptions(
-                                        keyboardType = KeyboardType.Text,
+                                        keyboardType = KeyboardType.Password,
                                         autoCorrectEnabled = false,
                                         imeAction = ImeAction.Done
                                     ),

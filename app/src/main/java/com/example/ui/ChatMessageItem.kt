@@ -196,17 +196,37 @@ fun ChatMessageItem(
 
                             if (isAuthIssue) {
                                 Spacer(modifier = Modifier.height(8.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    FilledTonalButton(
+                                        onClick = onOpenSettings,
+                                        colors = ButtonDefaults.filledTonalButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.error,
+                                            contentColor = MaterialTheme.colorScheme.onError
+                                        ),
+                                        modifier = Modifier.testTag("fix_key_button")
+                                    ) {
+                                        Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Configure Key")
+                                    }
+                                    FilledTonalButton(
+                                        onClick = onRegenerate,
+                                        modifier = Modifier.testTag("retry_message_button_${message.id}")
+                                    ) {
+                                        Icon(Icons.Default.Refresh, contentDescription = "Retry", modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Retry")
+                                    }
+                                }
+                            } else {
+                                Spacer(modifier = Modifier.height(8.dp))
                                 FilledTonalButton(
-                                    onClick = onOpenSettings,
-                                    colors = ButtonDefaults.filledTonalButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.error,
-                                        contentColor = MaterialTheme.colorScheme.onError
-                                    ),
-                                    modifier = Modifier.testTag("fix_key_button")
+                                    onClick = onRegenerate,
+                                    modifier = Modifier.testTag("retry_message_button_${message.id}")
                                 ) {
-                                    Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.Refresh, contentDescription = "Retry", modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Configure API Key in Settings")
+                                    Text("Retry Generation")
                                 }
                             }
                         } else {
@@ -271,6 +291,31 @@ fun ChatMessageItem(
                                 }
                             )
                         }
+                    }
+                }
+            }
+
+            // Action row for User messages
+            if (isUser && message.content.isNotBlank()) {
+                Row(
+                    modifier = Modifier.padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("User Question", message.content))
+                            Toast.makeText(context, "Question copied to clipboard", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(28.dp).testTag("copy_user_message_button_${message.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy message",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
                     }
                 }
             }

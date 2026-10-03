@@ -295,7 +295,9 @@ fun ArtifactsSheet(
                                     putExtra(Intent.EXTRA_TEXT, item.content)
                                     type = "text/plain"
                                 }
-                                context.startActivity(Intent.createChooser(sendIntent, "Share Artifact"))
+                                try {
+                                    context.startActivity(Intent.createChooser(sendIntent, "Share Artifact"))
+                                } catch (_: Exception) {}
                             }
                         )
                     }

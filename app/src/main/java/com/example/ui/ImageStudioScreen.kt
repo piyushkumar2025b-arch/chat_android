@@ -377,7 +377,9 @@ fun ImageStudioScreen(
                                             type = "text/plain"
                                             putExtra(Intent.EXTRA_TEXT, "Generated with OmniChat AI:\n$url\n\nPrompt: $promptText")
                                         }
-                                        context.startActivity(Intent.createChooser(shareIntent, "Share Image"))
+                                        try {
+                                            context.startActivity(Intent.createChooser(shareIntent, "Share Image"))
+                                        } catch (_: Exception) {}
                                     }
                                 ) {
                                     Icon(Icons.Default.Share, contentDescription = "Share")
