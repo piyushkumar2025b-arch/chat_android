@@ -25,7 +25,9 @@ data class NewsArticle(
 data class WebSearchResult(
     val title: String,
     val snippet: String,
-    val url: String
+    val url: String,
+    val source: String = "Web",
+    val pubDate: String = ""
 )
 
 object NewsFeedService {
