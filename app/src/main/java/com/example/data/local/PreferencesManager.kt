@@ -25,6 +25,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_HUGGINGFACE_API_KEY = "huggingface_api_key"
         private const val KEY_CEREBRAS_API_KEY = "cerebras_api_key"
         private const val KEY_YOUTUBE_API_KEY = "youtube_api_key"
+        private const val KEY_GOOGLE_MAPS_API_KEY = "google_maps_api_key"
         private const val KEY_ACTIVE_PERSONA_ID = "active_persona_id"
         private const val KEY_CUSTOM_PERSONA_INSTRUCTIONS = "custom_persona_instructions"
 
@@ -56,6 +57,19 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString(KEY_YOUTUBE_API_KEY, "") ?: ""
         set(value) = prefs.edit().putString(KEY_YOUTUBE_API_KEY, value.trim()).apply()
 
+    var googleMapsApiKey: String
+        get() {
+            val saved = prefs.getString(KEY_GOOGLE_MAPS_API_KEY, "") ?: ""
+            if (saved.isNotBlank()) return saved
+            return try {
+                val buildConfigKey = BuildConfig.MAPS_API_KEY
+                if (buildConfigKey != "MY_MAPS_API_KEY") buildConfigKey else ""
+            } catch (e: Exception) {
+                ""
+            }
+        }
+        set(value) = prefs.edit().putString(KEY_GOOGLE_MAPS_API_KEY, value.trim()).apply()
+
     var activePersonaId: String
         get() = prefs.getString(KEY_ACTIVE_PERSONA_ID, "default") ?: "default"
         set(value) = prefs.edit().putString(KEY_ACTIVE_PERSONA_ID, value).apply()
@@ -72,6 +86,7 @@ class PreferencesManager(context: Context) {
             put("huggingface", huggingFaceApiKey)
             put("cerebras", cerebrasApiKey)
             put("youtube", youtubeApiKey)
+            put("googleMaps", googleMapsApiKey)
             put("customUrl", customBaseUrl)
             put("customKey", customApiKey)
             put("customModel", customModel)
@@ -88,6 +103,7 @@ class PreferencesManager(context: Context) {
             if (obj.has("huggingface")) huggingFaceApiKey = obj.optString("huggingface", "")
             if (obj.has("cerebras")) cerebrasApiKey = obj.optString("cerebras", "")
             if (obj.has("youtube")) youtubeApiKey = obj.optString("youtube", "")
+            if (obj.has("googleMaps")) googleMapsApiKey = obj.optString("googleMaps", "")
             if (obj.has("customUrl")) customBaseUrl = obj.optString("customUrl", "")
             if (obj.has("customKey")) customApiKey = obj.optString("customKey", "")
             if (obj.has("customModel")) customModel = obj.optString("customModel", "")

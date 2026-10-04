@@ -66,6 +66,7 @@ fun QuickKeyDialog(
     var cerebrasKey by remember { mutableStateOf(preferencesManager.cerebrasApiKey) }
     var huggingFaceKey by remember { mutableStateOf(preferencesManager.huggingFaceApiKey) }
     var youtubeKey by remember { mutableStateOf(preferencesManager.youtubeApiKey) }
+    var googleMapsKey by remember { mutableStateOf(preferencesManager.googleMapsApiKey) }
     var customKey by remember { mutableStateOf(preferencesManager.customApiKey) }
 
     AlertDialog(
@@ -158,6 +159,7 @@ fun QuickKeyDialog(
                                             cerebrasKey = preferencesManager.cerebrasApiKey
                                             huggingFaceKey = preferencesManager.huggingFaceApiKey
                                             youtubeKey = preferencesManager.youtubeApiKey
+                                            googleMapsKey = preferencesManager.googleMapsApiKey
                                             customKey = preferencesManager.customApiKey
                                             onKeyUpdated()
                                             Toast.makeText(context, "Keys restored from backup successfully!", Toast.LENGTH_SHORT).show()
@@ -250,6 +252,18 @@ fun QuickKeyDialog(
 
                 HorizontalDivider()
 
+                // Google Maps API Key
+                ApiKeyInputField(
+                    title = "Google Maps API Key",
+                    key = googleMapsKey,
+                    onKeyChange = { googleMapsKey = it },
+                    placeholder = "AIzaSy...",
+                    helpUrl = "https://console.cloud.google.com/google/maps-apis/credentials",
+                    testTagPrefix = "quick_google_maps_key"
+                )
+
+                HorizontalDivider()
+
                 // Security Note
                 Surface(
                     shape = RoundedCornerShape(8.dp),
@@ -285,6 +299,7 @@ fun QuickKeyDialog(
                     preferencesManager.cerebrasApiKey = cerebrasKey
                     preferencesManager.huggingFaceApiKey = huggingFaceKey
                     preferencesManager.youtubeApiKey = youtubeKey
+                    preferencesManager.googleMapsApiKey = googleMapsKey
                     preferencesManager.customApiKey = customKey
                     onKeyUpdated()
                     Toast.makeText(context, "API Keys saved!", Toast.LENGTH_SHORT).show()

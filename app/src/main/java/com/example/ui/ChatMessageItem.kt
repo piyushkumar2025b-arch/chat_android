@@ -72,6 +72,7 @@ fun ChatMessageItem(
     onRegenerate: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenArtifact: ((ArtifactItem) -> Unit)? = null,
+    onAttachmentClick: ((AttachmentInfo) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -120,7 +121,10 @@ fun ChatMessageItem(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     for (att in attachments) {
-                        AttachmentBadge(attachment = att)
+                        AttachmentBadge(
+                            attachment = att,
+                            onClick = if (onAttachmentClick != null) { { onAttachmentClick(att) } } else null
+                        )
                     }
                 }
             }

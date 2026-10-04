@@ -73,6 +73,7 @@ fun SettingsDialog(
     var cerebrasKey by remember { mutableStateOf(preferencesManager.cerebrasApiKey) }
     var huggingFaceKey by remember { mutableStateOf(preferencesManager.huggingFaceApiKey) }
     var youtubeKey by remember { mutableStateOf(preferencesManager.youtubeApiKey) }
+    var googleMapsKey by remember { mutableStateOf(preferencesManager.googleMapsApiKey) }
     var customUrl by remember { mutableStateOf(preferencesManager.customBaseUrl) }
     var customKey by remember { mutableStateOf(preferencesManager.customApiKey) }
     var customModel by remember { mutableStateOf(preferencesManager.customModel) }
@@ -362,6 +363,18 @@ fun SettingsDialog(
 
                 HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.4f))
 
+                // Google Maps API Key
+                ApiKeyInputField(
+                    title = "Google Maps API Key",
+                    key = googleMapsKey,
+                    onKeyChange = { googleMapsKey = it },
+                    placeholder = "AIzaSy...",
+                    helpUrl = "https://console.cloud.google.com/google/maps-apis/credentials",
+                    testTagPrefix = "google_maps_key"
+                )
+
+                HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.4f))
+
                 // Custom Endpoint Options
                 Text("Custom OpenAI Endpoint (Optional)", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                 OutlinedTextField(
@@ -440,6 +453,7 @@ fun SettingsDialog(
                     preferencesManager.cerebrasApiKey = cerebrasKey
                     preferencesManager.huggingFaceApiKey = huggingFaceKey
                     preferencesManager.youtubeApiKey = youtubeKey
+                    preferencesManager.googleMapsApiKey = googleMapsKey
                     preferencesManager.customBaseUrl = customUrl
                     preferencesManager.customApiKey = customKey
                     preferencesManager.customModel = customModel

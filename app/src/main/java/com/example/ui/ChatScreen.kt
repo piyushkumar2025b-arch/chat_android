@@ -1,5 +1,9 @@
 package com.example.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -19,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -41,6 +46,7 @@ import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Explore
@@ -65,6 +71,7 @@ import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -82,6 +89,7 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -97,6 +105,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -1224,7 +1233,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                         onSpeakToggle = { viewModel.toggleSpeech(msg.id, msg.content) },
                                         onRegenerate = { viewModel.regenerateMessage(msg) },
                                         onOpenSettings = { showQuickKeyDialog = true },
-                                        onOpenArtifact = { art -> viewModel.selectArtifact(art) }
+                                        onOpenArtifact = { art -> viewModel.selectArtifact(art) },
+                                        onAttachmentClick = { att -> inspectingAttachment = att }
                                     )
                                 }
 
@@ -1265,6 +1275,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
 
                     AppSection.MAPS -> {
                         MapExplorerScreen(
+                            preferencesManager = viewModel.preferencesManager,
+                            onOpenSettings = { showQuickKeyDialog = true },
                             onSendLocationToChat = { prompt ->
                                 viewModel.sendMessage(prompt, explicitAttachments = emptyList())
                                 viewModel.navigateToSection(AppSection.CHAT)
@@ -1411,20 +1423,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 documentPickerLauncher.launch(arrayOf("*/*"))
             },
             onPickDocuments = {
-                documentPickerLauncher.launch(
-                    arrayOf(
-                        "application/pdf",
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        "application/msword",
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        "application/vnd.ms-excel",
-                        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                        "text/csv",
-                        "text/plain",
-                        "application/rtf",
-                        "*/*"
-                    )
-                )
+                documentPickerLauncher.launch(arrayOf("*/*"))
             },
             onPickPhotos = {
                 photoPickerLauncher.launch(
@@ -1432,19 +1431,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 )
             },
             onPickCode = {
-                documentPickerLauncher.launch(
-                    arrayOf(
-                        "text/*",
-                        "application/json",
-                        "application/xml",
-                        "application/javascript",
-                        "text/x-python",
-                        "text/x-kotlin",
-                        "text/x-java",
-                        "text/x-sql",
-                        "*/*"
-                    )
-                )
+                documentPickerLauncher.launch(arrayOf("*/*"))
             },
             onAddSampleFile = { sampleType ->
                 viewModel.addSampleAttachment(sampleType)
@@ -1455,13 +1442,39 @@ fun ChatScreen(viewModel: ChatViewModel) {
         )
     }
 
-    // Inspect Extracted Data Dialog
+    // Comprehensive Extracted File Details Dialog
     inspectingAttachment?.let { att ->
+        val fileDetailsState = produceState<com.example.data.remote.FileDetailsInfo?>(initialValue = null, key1 = att.id) {
+            val file = java.io.File(att.localUri)
+            value = if (file.exists()) {
+                com.example.data.remote.FileUtils.extractFileDetails(file, att.mimeType)
+            } else {
+                com.example.data.remote.FileDetailsInfo(
+                    fileName = att.name,
+                    mimeType = att.mimeType,
+                    sizeBytes = att.sizeBytes,
+                    sizeFormatted = com.example.data.remote.FileUtils.formatFileSize(att.sizeBytes),
+                    lineCount = 1,
+                    wordCount = 0,
+                    characterCount = 0,
+                    extractedText = att.previewSnippet ?: "File cache unavailable.",
+                    summarySnippet = att.previewSnippet ?: "",
+                    isImage = att.isImage
+                )
+            }
+        }
+        val details = fileDetailsState.value
+
         AlertDialog(
             onDismissRequest = { inspectingAttachment = null },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth()
+                .testTag("file_details_dialog"),
             icon = {
                 Icon(
-                    imageVector = Icons.Default.Description,
+                    imageVector = if (att.isImage) Icons.Default.Image else Icons.Default.Description,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(28.dp)
@@ -1469,42 +1482,142 @@ fun ChatScreen(viewModel: ChatViewModel) {
             },
             title = {
                 Text(
-                    text = "Retrieved File Data",
+                    text = "Extracted Document Details",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
                     Text(
                         text = att.name,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Format: ${att.mimeType} • Size: ${FileUtils.formatFileSize(att.sizeBytes)}",
+                        text = "${att.mimeType} • ${com.example.data.remote.FileUtils.formatFileSize(att.sizeBytes)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Extracted Content Preview:",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    if (details != null) {
+                        // Document metrics badges
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("${details.lineCount}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                    Text("Lines", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                }
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("${details.wordCount}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                    Text("Words", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                }
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("${details.characterCount}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                    Text("Characters", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = att.previewSnippet ?: if (att.isImage) "Image data prepared for multimodal vision analysis." else "Binary data indexed and linked.",
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(10.dp)
+                            text = "Extracted Document Content:",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
                         )
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 260.dp)
+                        ) {
+                            androidx.compose.foundation.text.selection.SelectionContainer {
+                                Text(
+                                    text = details.extractedText.ifBlank { "No text content detected." },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier
+                                        .padding(12.dp)
+                                        .verticalScroll(rememberScrollState())
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("Extracted Text", details.extractedText))
+                                    Toast.makeText(context, "Extracted text copied to clipboard!", Toast.LENGTH_SHORT).show()
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Copy Text", fontSize = 12.sp)
+                            }
+
+                            Button(
+                                onClick = {
+                                    val summaryPrompt = "Please analyze this file (${att.name}), extract all key insights, summarize its main points, and explain the core details."
+                                    viewModel.sendMessage(summaryPrompt, explicitAttachments = listOf(att))
+                                    inspectingAttachment = null
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f).testTag("ask_ai_file_details_button")
+                            ) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Ask AI", fontSize = 12.sp)
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Extracting full document data...", style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             },

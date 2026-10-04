@@ -54,7 +54,8 @@ object AiService {
         apiKey: String,
         systemPrompt: String,
         temperature: Float,
-        customBaseUrl: String
+        customBaseUrl: String,
+        supportsVision: Boolean = false
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
             when (provider) {
@@ -76,7 +77,8 @@ object AiService {
                     apiKey = apiKey,
                     systemPrompt = systemPrompt,
                     temperature = temperature,
-                    extraHeaders = emptyMap()
+                    extraHeaders = emptyMap(),
+                    supportsVision = supportsVision
                 )
                 ProviderType.OPENROUTER -> callOpenAiCompatible(
                     endpointUrl = provider.defaultBaseUrl,
@@ -90,7 +92,8 @@ object AiService {
                     extraHeaders = mapOf(
                         "HTTP-Referer" to "https://omnichat.android",
                         "X-Title" to "OmniChat"
-                    )
+                    ),
+                    supportsVision = supportsVision
                 )
                 ProviderType.POLLINATIONS -> callPollinations(
                     modelId = modelId,
@@ -109,7 +112,8 @@ object AiService {
                     apiKey = apiKey,
                     systemPrompt = systemPrompt,
                     temperature = temperature,
-                    extraHeaders = emptyMap()
+                    extraHeaders = emptyMap(),
+                    supportsVision = false
                 )
                 ProviderType.HUGGINGFACE -> callOpenAiCompatible(
                     endpointUrl = provider.defaultBaseUrl,
@@ -120,7 +124,8 @@ object AiService {
                     apiKey = apiKey,
                     systemPrompt = systemPrompt,
                     temperature = temperature,
-                    extraHeaders = emptyMap()
+                    extraHeaders = emptyMap(),
+                    supportsVision = false
                 )
                 ProviderType.CUSTOM -> {
                     val url = if (customBaseUrl.isNotBlank()) customBaseUrl else "https://api.openai.com/v1/chat/completions"
@@ -133,7 +138,8 @@ object AiService {
                         apiKey = apiKey,
                         systemPrompt = systemPrompt,
                         temperature = temperature,
-                        extraHeaders = emptyMap()
+                        extraHeaders = emptyMap(),
+                        supportsVision = supportsVision
                     )
                 }
             }
@@ -280,7 +286,8 @@ object AiService {
         apiKey: String,
         systemPrompt: String,
         temperature: Float,
-        extraHeaders: Map<String, String>
+        extraHeaders: Map<String, String>,
+        supportsVision: Boolean = false
     ): Result<String> {
         val messagesArray = JSONArray()
 
@@ -307,16 +314,22 @@ object AiService {
             val file = File(att.localUri)
             val isPdf = att.mimeType == "application/pdf" || att.name.endsWith(".pdf", true)
             if (att.isImage) {
-                val b64 = FileUtils.convertImageToBase64(file)
-                if (b64 != null) {
-                    imageBase64List.add(b64)
+                if (supportsVision) {
+                    val b64 = FileUtils.convertImageToBase64(file)
+                    if (b64 != null) {
+                        imageBase64List.add(b64)
+                    }
+                } else {
+                    fileTextAppendix += "\n\n[Attached Image: ${att.name} (${FileUtils.formatFileSize(att.sizeBytes)})]\n"
                 }
             } else if (isPdf) {
                 val text = FileUtils.readFullTextContent(file)
                 fileTextAppendix += "\n\n--- [Attached Document: ${att.name} (PDF)] ---\n$text\n--- [End of Document] ---\n"
-                val pdfImgB64 = FileUtils.convertPdfPageToBase64(file, 0)
-                if (pdfImgB64 != null) {
-                    imageBase64List.add(pdfImgB64)
+                if (supportsVision) {
+                    val pdfImgB64 = FileUtils.convertPdfPageToBase64(file, 0)
+                    if (pdfImgB64 != null) {
+                        imageBase64List.add(pdfImgB64)
+                    }
                 }
             } else {
                 val text = FileUtils.readFullTextContent(file)
@@ -414,6 +427,7 @@ object AiService {
         }
 
         // First try the OpenAI-compatible endpoint
+        val hasImages = attachments.any { it.isImage }
         val openAiRes = callOpenAiCompatible(
             endpointUrl = "https://text.pollinations.ai/openai/chat/completions",
             modelId = effectiveModel,
@@ -423,26 +437,50 @@ object AiService {
             apiKey = "",
             systemPrompt = systemPrompt,
             temperature = temperature,
-            extraHeaders = emptyMap()
+            extraHeaders = emptyMap(),
+            supportsVision = hasImages
         )
 
         if (openAiRes.isSuccess) {
             return openAiRes
         }
 
-        // Fallback to simple direct text GET endpoint for maximum reliability
+        // Fallback to direct text POST/GET endpoint for maximum reliability
         return try {
             var fileContext = ""
             for (att in attachments) {
                 if (!att.isImage) {
                     val file = File(att.localUri)
-                    fileContext += "\nFile (${att.name}): " + FileUtils.readFullTextContent(file, 20_000)
+                    fileContext += "\n\n--- [Attached Document: ${att.name}] ---\n" + FileUtils.readFullTextContent(file, 40_000) + "\n--- [End of Document] ---\n"
                 }
             }
 
-            val queryPrompt = if (fileContext.isNotEmpty()) "$prompt $fileContext" else prompt
-            val encodedPrompt = java.net.URLEncoder.encode(queryPrompt, "UTF-8")
-            val encodedSystem = java.net.URLEncoder.encode(systemPrompt, "UTF-8")
+            val queryPrompt = if (fileContext.isNotEmpty()) "$fileContext\nUser Query: $prompt" else prompt
+
+            // Try POST first to avoid HTTP 414 on large documents
+            val postJson = JSONObject().apply {
+                val msgs = JSONArray()
+                if (systemPrompt.isNotBlank()) {
+                    msgs.put(JSONObject().put("role", "system").put("content", systemPrompt))
+                }
+                msgs.put(JSONObject().put("role", "user").put("content", queryPrompt))
+                put("messages", msgs)
+                put("model", effectiveModel)
+            }
+            val postReq = Request.Builder()
+                .url("https://text.pollinations.ai/")
+                .post(postJson.toString().toRequestBody(jsonMediaType))
+                .build()
+
+            val postResp = executeRequest(postReq)
+            val postText = postResp.body?.string().orEmpty()
+            if (postResp.isSuccessful && postText.isNotBlank()) {
+                return Result.success(postText)
+            }
+
+            // Secondary fallback to simple GET
+            val encodedPrompt = java.net.URLEncoder.encode(queryPrompt.take(2000), "UTF-8")
+            val encodedSystem = java.net.URLEncoder.encode(systemPrompt.take(500), "UTF-8")
             val url = "https://text.pollinations.ai/$encodedPrompt?model=$effectiveModel&system=$encodedSystem"
 
             val req = Request.Builder().url(url).get().build()

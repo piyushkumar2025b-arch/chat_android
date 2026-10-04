@@ -163,6 +163,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         _keysRevision.value += 1
     }
 
+    fun updateGoogleMapsApiKey(key: String) {
+        preferencesManager.googleMapsApiKey = key
+        _keysRevision.value += 1
+    }
+
     fun setDailyLimit(limit: Int) {
         usageTracker.setDailyLimit(limit)
     }
@@ -446,7 +451,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         activeJob?.cancel()
         activeJob = viewModelScope.launch {
             _isGenerating.value = true
-            val displayPrompt = trimmed.ifEmpty { "Analyze the attached file(s)" }
+            val displayPrompt = trimmed.ifEmpty { "Analyze the attached file(s) and extract all key information, summary, and details." }
 
             // Snapshot history BEFORE inserting the new user message (excludes errors & placeholders)
             val historySnapshot = currentMessages.value.filter {
@@ -504,7 +509,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 apiKey = apiKey,
                 systemPrompt = preferencesManager.systemPrompt,
                 temperature = preferencesManager.temperature,
-                customBaseUrl = preferencesManager.customBaseUrl
+                customBaseUrl = preferencesManager.customBaseUrl,
+                supportsVision = model.supportsVision || provider == ProviderType.CUSTOM
             )
 
             result.onSuccess { responseText ->
@@ -598,7 +604,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 apiKey = apiKey,
                 systemPrompt = preferencesManager.systemPrompt,
                 temperature = preferencesManager.temperature,
-                customBaseUrl = preferencesManager.customBaseUrl
+                customBaseUrl = preferencesManager.customBaseUrl,
+                supportsVision = model.supportsVision || provider == ProviderType.CUSTOM
             )
 
             result.onSuccess { responseText ->

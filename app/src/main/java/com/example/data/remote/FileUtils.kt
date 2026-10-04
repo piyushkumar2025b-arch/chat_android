@@ -54,7 +54,10 @@ object FileUtils {
                 val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
                 if (cursor.moveToFirst()) {
                     if (nameIndex != -1) {
-                        displayName = cursor.getString(nameIndex) ?: displayName
+                        val retrieved = cursor.getString(nameIndex)
+                        if (!retrieved.isNullOrBlank()) {
+                            displayName = retrieved
+                        }
                     }
                     if (sizeIndex != -1) {
                         sizeBytes = cursor.getLong(sizeIndex)
@@ -62,12 +65,17 @@ object FileUtils {
                 }
             }
 
+            if (displayName.startsWith("file_") && !uri.lastPathSegment.isNullOrBlank()) {
+                val segment = uri.lastPathSegment!!.substringAfterLast('/')
+                if (segment.isNotBlank()) displayName = segment
+            }
+
             // Save to local cache directory so the app retains access across sessions
             val cacheFolder = File(context.filesDir, "chat_attachments").apply { mkdirs() }
             val originalExt = displayName.substringAfterLast('.', "").lowercase()
 
             val tempFile = File(cacheFolder, "${UUID.randomUUID()}_temp")
-            val maxBytes = 25 * 1024 * 1024L // 25MB safe limit
+            val maxBytes = 50 * 1024 * 1024L // 50MB safe limit
             val inputStream = contentResolver.openInputStream(uri) ?: return@withContext null
             var totalBytes = 0L
             val buffer = ByteArray(8192)
@@ -92,16 +100,25 @@ object FileUtils {
                 return@withContext null
             }
 
-            if (sizeBytes <= 0) {
-                sizeBytes = tempFile.length()
-            }
-
             val rawMime = contentResolver.getType(uri)
             val detectedType = detectFileType(tempFile, displayName, rawMime)
             val finalExt = (if (originalExt.isNotEmpty()) originalExt else detectedType.extension).filter { it.isLetterOrDigit() }
             val localFileName = "${UUID.randomUUID()}${if (finalExt.isNotEmpty()) ".$finalExt" else ""}"
             val targetFile = File(cacheFolder, localFileName)
-            tempFile.renameTo(targetFile)
+            
+            val moved = tempFile.renameTo(targetFile)
+            if (!moved) {
+                tempFile.copyTo(targetFile, overwrite = true)
+                try { tempFile.delete() } catch (_: Exception) {}
+            }
+
+            if (sizeBytes <= 0) {
+                sizeBytes = targetFile.length()
+            }
+
+            if (!displayName.contains('.') && finalExt.isNotEmpty()) {
+                displayName = "$displayName.$finalExt"
+            }
 
             val mimeType = if (detectedType.mimeType.isNotBlank() && detectedType.mimeType != "application/octet-stream") {
                 detectedType.mimeType
@@ -114,7 +131,7 @@ object FileUtils {
             // Generate preview snippet for documents, data, code or text files
             var snippet: String? = null
             if (!isImage) {
-                snippet = readTextSnippet(targetFile, maxChars = 240)
+                snippet = readTextSnippet(targetFile, maxChars = 300)
             }
 
             AttachmentInfo(
@@ -938,7 +955,7 @@ object FileUtils {
             val durationSec = durationMs / 1000
             val min = durationSec / 60
             val sec = durationSec % 60
-            val timeStr = String.format("%d:%02d", min, sec)
+            val timeStr = String.format(java.util.Locale.US, "%d:%02d", min, sec)
 
             val sb = StringBuilder()
             sb.append("[Media File: ${file.name} • Format: ${mime ?: "Audio/Video"}]\n")
@@ -1207,4 +1224,46 @@ Core Architecture:
             previewSnippet = content.take(200) + "..."
         )
     }
+
+    suspend fun extractFileDetails(file: File, mimeType: String): FileDetailsInfo = withContext(Dispatchers.IO) {
+        val isImg = mimeType.startsWith("image/") || isImageExtension(file.name)
+        val extracted = if (isImg) {
+            val base64 = convertImageToBase64(file)
+            if (base64 != null) "[Image file: ${file.name} (${formatFileSize(file.length())}) • Encoded for multimodal vision analysis]"
+            else "[Image file: ${file.name}]"
+        } else {
+            readFullTextContent(file, maxChars = 200_000)
+        }
+
+        val lines = if (isImg) 1 else extracted.lines().size
+        val words = if (isImg) 0 else extracted.split(Regex("\\s+")).count { it.isNotBlank() }
+        val chars = extracted.length
+        val summary = if (extracted.length > 320) extracted.take(320).trim() + "..." else extracted.trim()
+
+        FileDetailsInfo(
+            fileName = file.name,
+            mimeType = mimeType,
+            sizeBytes = file.length(),
+            sizeFormatted = formatFileSize(file.length()),
+            lineCount = lines,
+            wordCount = words,
+            characterCount = chars,
+            extractedText = extracted,
+            summarySnippet = summary,
+            isImage = isImg
+        )
+    }
 }
+
+data class FileDetailsInfo(
+    val fileName: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val sizeFormatted: String,
+    val lineCount: Int,
+    val wordCount: Int,
+    val characterCount: Int,
+    val extractedText: String,
+    val summarySnippet: String,
+    val isImage: Boolean
+)

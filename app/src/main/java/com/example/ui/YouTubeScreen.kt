@@ -4,7 +4,14 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.annotation.SuppressLint
+import android.view.ViewGroup
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Toast
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -104,6 +111,87 @@ val FEATURED_VIDEOS = listOf(
     )
 )
 
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun InlineYouTubePlayer(
+    videoId: String,
+    modifier: Modifier = Modifier
+) {
+    AndroidView(
+        factory = { ctx ->
+            WebView(ctx).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                settings.javaScriptEnabled = true
+                settings.domStorageEnabled = true
+                settings.mediaPlaybackRequiresUserGesture = false
+                settings.loadWithOverviewMode = true
+                settings.useWideViewPort = true
+                webChromeClient = WebChromeClient()
+                webViewClient = WebViewClient()
+                val html = """
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                        <style>
+                            * { margin: 0; padding: 0; box-sizing: border-box; }
+                            body, html { width: 100%; height: 100%; background: #000000; overflow: hidden; }
+                            .player-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+                            iframe { width: 100%; height: 100%; border: 0; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="player-wrapper">
+                            <iframe 
+                                id="yt-player"
+                                src="https://www.youtube-nocookie.com/embed/$videoId?autoplay=1&playsinline=1&enablejsapi=1&rel=0&modestbranding=1&fs=1"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowfullscreen>
+                            </iframe>
+                        </div>
+                    </body>
+                    </html>
+                """.trimIndent()
+                loadDataWithBaseURL("https://www.youtube.com", html, "text/html", "UTF-8", null)
+            }
+        },
+        update = { webView ->
+            val cur = webView.url
+            if (cur == null || !cur.contains(videoId)) {
+                val html = """
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                        <style>
+                            * { margin: 0; padding: 0; box-sizing: border-box; }
+                            body, html { width: 100%; height: 100%; background: #000000; overflow: hidden; }
+                            .player-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+                            iframe { width: 100%; height: 100%; border: 0; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="player-wrapper">
+                            <iframe 
+                                id="yt-player"
+                                src="https://www.youtube-nocookie.com/embed/$videoId?autoplay=1&playsinline=1&enablejsapi=1&rel=0&modestbranding=1&fs=1"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowfullscreen>
+                            </iframe>
+                        </div>
+                    </body>
+                    </html>
+                """.trimIndent()
+                webView.loadDataWithBaseURL("https://www.youtube.com", html, "text/html", "UTF-8", null)
+            }
+        },
+        modifier = modifier
+    )
+}
+
 @Composable
 fun YouTubeScreen(
     preferencesManager: PreferencesManager,
@@ -117,6 +205,7 @@ fun YouTubeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var isSearching by remember { mutableStateOf(false) }
     var activeVideo by remember { mutableStateOf<YouTubeVideoItem?>(FEATURED_VIDEOS.first()) }
+    var isPlayingInsideApp by remember { mutableStateOf(false) }
     val searchResults = remember { mutableStateListOf<YouTubeVideoItem>() }
 
     val hasKey = preferencesManager.youtubeApiKey.isNotBlank()
@@ -262,96 +351,135 @@ fun YouTubeScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column {
-                        // Native YouTube Video Card with 1-Tap Official Player Launch
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(16f / 9f)
-                                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .clickable {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${vid.videoId}"))
-                                    try {
-                                        context.startActivity(intent)
-                                    } catch (_: Exception) {
-                                        Toast.makeText(context, "Opening video...", Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AsyncImage(
-                                model = vid.thumbnailUrl,
-                                contentDescription = vid.title,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-
-                            // Dark overlay for contrast
+                        // Native In-App YouTube Video Player Container
+                        if (isPlayingInsideApp) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.28f))
-                            )
-
-                            // Glowing YouTube Play Button
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.error,
-                                shadowElevation = 8.dp,
-                                modifier = Modifier.size(64.dp)
+                                    .fillMaxWidth()
+                                    .aspectRatio(16f / 9f)
+                                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                                    .background(Color.Black)
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.PlayArrow,
-                                        contentDescription = "Watch video",
-                                        tint = MaterialTheme.colorScheme.onError,
-                                        modifier = Modifier.size(40.dp)
-                                    )
+                                InlineYouTubePlayer(
+                                    videoId = vid.videoId,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+
+                                // Floating overlay pill to stop player
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = Color.Black.copy(alpha = 0.75f),
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(10.dp)
+                                        .clickable { isPlayingInsideApp = false }
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Stop,
+                                            contentDescription = "Stop",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Stop Player",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
-
-                            // HD & Quality Badge in Top-Right
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = Color.Black.copy(alpha = 0.75f),
+                        } else {
+                            Box(
                                 modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(10.dp)
+                                    .fillMaxWidth()
+                                    .aspectRatio(16f / 9f)
+                                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .clickable {
+                                        isPlayingInsideApp = true
+                                    },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = "HD • Official Player",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                AsyncImage(
+                                    model = vid.thumbnailUrl,
+                                    contentDescription = vid.title,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
                                 )
-                            }
 
-                            // Watch prompt pill in Bottom-Center
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = Color.Black.copy(alpha = 0.85f),
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .padding(bottom = 12.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                                // Dark overlay for contrast
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.32f))
+                                )
+
+                                // Glowing YouTube Play Button
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.error,
+                                    shadowElevation = 8.dp,
+                                    modifier = Modifier.size(64.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.OpenInBrowser,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = "Play Inside App",
+                                            tint = MaterialTheme.colorScheme.onError,
+                                            modifier = Modifier.size(40.dp)
+                                        )
+                                    }
+                                }
+
+                                // In-App Badge in Top-Right
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color.Black.copy(alpha = 0.8f),
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(10.dp)
+                                ) {
                                     Text(
-                                        text = "Tap to Play in YouTube (1080p • 0 Lag)",
+                                        text = "In-App Player • HD",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = Color.White,
-                                        fontWeight = FontWeight.SemiBold
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
+                                }
+
+                                // Play prompt pill in Bottom-Center
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = Color.Black.copy(alpha = 0.85f),
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(bottom = 12.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Tap to Play Video Inside App",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -376,22 +504,25 @@ fun YouTubeScreen(
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Button(
                                         onClick = {
-                                            try {
-                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${vid.videoId}"))
-                                                context.startActivity(intent)
-                                            } catch (_: Exception) {
-                                                Toast.makeText(context, "Cannot open video link", Toast.LENGTH_SHORT).show()
-                                            }
+                                            isPlayingInsideApp = !isPlayingInsideApp
                                         },
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.error,
-                                            contentColor = MaterialTheme.colorScheme.onError
+                                            containerColor = if (isPlayingInsideApp) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error,
+                                            contentColor = if (isPlayingInsideApp) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onError
                                         ),
-                                        shape = RoundedCornerShape(8.dp)
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.testTag("toggle_in_app_player_button")
                                     ) {
-                                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Icon(
+                                            if (isPlayingInsideApp) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Watch Video", style = MaterialTheme.typography.labelSmall)
+                                        Text(
+                                            if (isPlayingInsideApp) "Stop Player" else "Play in App",
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
                                     }
 
                                     Button(
@@ -403,7 +534,8 @@ fun YouTubeScreen(
                                             containerColor = MaterialTheme.colorScheme.primary,
                                             contentColor = MaterialTheme.colorScheme.onPrimary
                                         ),
-                                        shape = RoundedCornerShape(8.dp)
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.testTag("summarize_video_ai_button")
                                     ) {
                                         Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
@@ -412,6 +544,19 @@ fun YouTubeScreen(
                                 }
 
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    IconButton(
+                                        onClick = {
+                                            try {
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${vid.videoId}"))
+                                                context.startActivity(intent)
+                                            } catch (_: Exception) {
+                                                Toast.makeText(context, "Cannot open video link", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.OpenInBrowser, contentDescription = "Open in YouTube App")
+                                    }
+
                                     IconButton(
                                         onClick = {
                                             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -510,7 +655,10 @@ fun YouTubeScreen(
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { activeVideo = video }
+                    .clickable {
+                        activeVideo = video
+                        isPlayingInsideApp = true
+                    }
             ) {
                 Row(
                     modifier = Modifier.padding(10.dp),

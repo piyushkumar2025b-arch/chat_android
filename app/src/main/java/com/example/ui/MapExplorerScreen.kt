@@ -1,7 +1,13 @@
 package com.example.ui
 
+import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.view.ViewGroup
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,6 +17,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,11 +36,13 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -43,9 +52,11 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -57,19 +68,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
+import com.example.data.local.PreferencesManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
+import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -82,15 +97,140 @@ data class MapLocation(
     val type: String
 )
 
-enum class MapTileLayer(val label: String, val tileUrl: String, val maxZoom: Int) {
-    OSM_STANDARD("OpenStreetMap", "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", 19),
-    CARTO_DARK("Carto Dark", "https://cartodb-basemaps-a.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png", 19),
-    CARTO_LIGHT("Carto Positron", "https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png", 19),
-    OPENTOPO("OpenTopo Relief", "https://tile.opentopomap.org/{z}/{x}/{y}.png", 17)
+enum class MapTileLayer(
+    val label: String,
+    val isGoogle: Boolean,
+    val googleMapType: String,
+    val tileUrl: String,
+    val maxZoom: Int
+) {
+    GOOGLE_ROADMAP("Google Roadmap", true, "roadmap", "", 21),
+    GOOGLE_SATELLITE("Google Satellite", true, "satellite", "", 21),
+    GOOGLE_HYBRID("Google Hybrid", true, "hybrid", "", 21),
+    GOOGLE_TERRAIN("Google Terrain", true, "terrain", "", 21),
+    OSM_STANDARD("OpenStreetMap", false, "", "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", 19),
+    CARTO_DARK("Carto Dark", false, "", "https://cartodb-basemaps-a.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png", 19),
+    CARTO_LIGHT("Carto Positron", false, "", "https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png", 19),
+    OPENTOPO("OpenTopo Relief", false, "", "https://tile.opentopomap.org/{z}/{x}/{y}.png", 17)
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun InteractiveGoogleMapView(
+    apiKey: String,
+    location: MapLocation,
+    zoom: Int,
+    mapType: String,
+    modifier: Modifier = Modifier
+) {
+    AndroidView(
+        factory = { ctx ->
+            WebView(ctx).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                settings.javaScriptEnabled = true
+                settings.domStorageEnabled = true
+                settings.loadWithOverviewMode = true
+                settings.useWideViewPort = true
+                webChromeClient = WebChromeClient()
+                webViewClient = WebViewClient()
+
+                val html = createGoogleMapHtml(apiKey, location.lat, location.lon, zoom, mapType, location.name)
+                loadDataWithBaseURL("https://maps.googleapis.com", html, "text/html", "UTF-8", null)
+            }
+        },
+        update = { webView ->
+            val script = "if (window.updateGoogleMap) { window.updateGoogleMap(${location.lat}, ${location.lon}, $zoom, '$mapType', '${escapeJs(location.name)}'); }"
+            webView.evaluateJavascript(script) { result ->
+                if (result == null || result == "null") {
+                    val html = createGoogleMapHtml(apiKey, location.lat, location.lon, zoom, mapType, location.name)
+                    webView.loadDataWithBaseURL("https://maps.googleapis.com", html, "text/html", "UTF-8", null)
+                }
+            }
+        },
+        modifier = modifier
+    )
+}
+
+private fun escapeJs(str: String): String {
+    return str.replace("\\", "\\\\")
+        .replace("'", "\\'")
+        .replace("\"", "\\\"")
+        .replace("\n", " ")
+        .replace("\r", " ")
+}
+
+private fun createGoogleMapHtml(
+    apiKey: String,
+    lat: Double,
+    lon: Double,
+    zoom: Int,
+    mapType: String,
+    title: String
+): String {
+    val cleanTitle = escapeJs(title)
+    return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body, html, #map { width: 100%; height: 100%; overflow: hidden; background: #202124; }
+            </style>
+            <script src="https://maps.googleapis.com/maps/api/js?key=$apiKey"></script>
+            <script>
+                var mapInstance = null;
+                var markerInstance = null;
+
+                function initMap() {
+                    var centerPos = { lat: $lat, lng: $lon };
+                    mapInstance = new google.maps.Map(document.getElementById('map'), {
+                        zoom: $zoom,
+                        center: centerPos,
+                        mapTypeId: '$mapType',
+                        zoomControl: true,
+                        mapTypeControl: false,
+                        streetViewControl: false,
+                        fullscreenControl: false,
+                        gestureHandling: 'greedy'
+                    });
+                    markerInstance = new google.maps.Marker({
+                        position: centerPos,
+                        map: mapInstance,
+                        title: '$cleanTitle',
+                        animation: google.maps.Animation.DROP
+                    });
+                }
+
+                window.updateGoogleMap = function(newLat, newLon, newZoom, newType, newTitle) {
+                    if (!mapInstance) return;
+                    var pos = { lat: newLat, lng: newLon };
+                    mapInstance.setCenter(pos);
+                    mapInstance.setZoom(newZoom);
+                    mapInstance.setMapTypeId(newType);
+                    if (markerInstance) {
+                        markerInstance.setPosition(pos);
+                        markerInstance.setTitle(newTitle);
+                    }
+                };
+
+                window.onload = initMap;
+            </script>
+        </head>
+        <body>
+            <div id="map"></div>
+        </body>
+        </html>
+    """.trimIndent()
 }
 
 @Composable
 fun MapExplorerScreen(
+    preferencesManager: PreferencesManager,
+    onOpenSettings: () -> Unit = {},
     onSendLocationToChat: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -99,7 +239,17 @@ fun MapExplorerScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var isSearching by remember { mutableStateOf(false) }
-    var selectedLayer by remember { mutableStateOf(MapTileLayer.OSM_STANDARD) }
+
+    var googleMapsApiKey by remember { mutableStateOf(preferencesManager.googleMapsApiKey) }
+    val hasGoogleMapsKey = googleMapsApiKey.isNotBlank()
+
+    var selectedLayer by remember {
+        mutableStateOf(if (hasGoogleMapsKey) MapTileLayer.GOOGLE_ROADMAP else MapTileLayer.OSM_STANDARD)
+    }
+
+    var showKeyDialog by remember { mutableStateOf(false) }
+    var keyDialogInput by remember { mutableStateOf(googleMapsApiKey) }
+
     var currentLocation by remember {
         mutableStateOf(
             MapLocation(
@@ -133,38 +283,84 @@ fun MapExplorerScreen(
         coroutineScope.launch {
             try {
                 val encoded = URLEncoder.encode(q, "UTF-8")
-                val url = "https://nominatim.openstreetmap.org/search?format=json&q=$encoded&addressdetails=1&limit=6"
                 val client = OkHttpClient.Builder()
                     .connectTimeout(12, TimeUnit.SECONDS)
                     .readTimeout(12, TimeUnit.SECONDS)
                     .build()
-                val req = Request.Builder()
-                    .url(url)
-                    .header("User-Agent", "OmniChat-Android/1.0 (Android AI Studio)")
-                    .build()
 
-                val items = withContext(Dispatchers.IO) {
-                    client.newCall(req).execute().use { res ->
-                        if (!res.isSuccessful) return@withContext emptyList<MapLocation>()
-                        val body = res.body?.string().orEmpty()
-                        if (body.isBlank()) return@withContext emptyList<MapLocation>()
-                        val array = JSONArray(body)
-                        val list = mutableListOf<MapLocation>()
-                        for (i in 0 until array.length()) {
-                            val obj = array.getJSONObject(i)
-                            val name = obj.optString("name").ifEmpty { obj.optString("display_name").substringBefore(",") }
-                            val lat = obj.optDouble("lat", 0.0)
-                            val lon = obj.optDouble("lon", 0.0)
-                            val disp = obj.optString("display_name")
-                            val type = obj.optString("type", "Place")
-                            list.add(MapLocation(name = name, lat = lat, lon = lon, displayName = disp, type = type))
+                var foundItems = emptyList<MapLocation>()
+
+                // 1. If Google Maps API key is configured, query Google Maps Geocoding API first
+                if (hasGoogleMapsKey) {
+                    try {
+                        val googleUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=$encoded&key=$googleMapsApiKey"
+                        val req = Request.Builder().url(googleUrl).build()
+                        val res = withContext(Dispatchers.IO) { client.newCall(req).execute() }
+                        if (res.isSuccessful) {
+                            val body = res.body?.string().orEmpty()
+                            val json = JSONObject(body)
+                            val status = json.optString("status")
+                            if (status == "OK") {
+                                val results = json.optJSONArray("results")
+                                if (results != null && results.length() > 0) {
+                                    val list = mutableListOf<MapLocation>()
+                                    for (i in 0 until results.length()) {
+                                        val obj = results.getJSONObject(i)
+                                        val formatted = obj.optString("formatted_address")
+                                        val geom = obj.optJSONObject("geometry")
+                                        val loc = geom?.optJSONObject("location")
+                                        val lat = loc?.optDouble("lat", 0.0) ?: 0.0
+                                        val lon = loc?.optDouble("lng", 0.0) ?: 0.0
+                                        val shortName = formatted.substringBefore(",")
+                                        list.add(
+                                            MapLocation(
+                                                name = shortName,
+                                                lat = lat,
+                                                lon = lon,
+                                                displayName = formatted,
+                                                type = "Google Place"
+                                            )
+                                        )
+                                    }
+                                    foundItems = list
+                                }
+                            }
                         }
-                        list
+                    } catch (_: Exception) {}
+                }
+
+                // 2. If Google Geocoding returned no results, fallback to OpenStreetMap Nominatim
+                if (foundItems.isEmpty()) {
+                    val osmUrl = "https://nominatim.openstreetmap.org/search?format=json&q=$encoded&addressdetails=1&limit=6"
+                    val req = Request.Builder()
+                        .url(osmUrl)
+                        .header("User-Agent", "OmniChat-Android/1.0 (Android AI Studio)")
+                        .build()
+
+                    foundItems = withContext(Dispatchers.IO) {
+                        client.newCall(req).execute().use { res ->
+                            if (!res.isSuccessful) return@withContext emptyList<MapLocation>()
+                            val body = res.body?.string().orEmpty()
+                            if (body.isBlank()) return@withContext emptyList<MapLocation>()
+                            val array = JSONArray(body)
+                            val list = mutableListOf<MapLocation>()
+                            for (i in 0 until array.length()) {
+                                val obj = array.getJSONObject(i)
+                                val name = obj.optString("name").ifEmpty { obj.optString("display_name").substringBefore(",") }
+                                val lat = obj.optDouble("lat", 0.0)
+                                val lon = obj.optDouble("lon", 0.0)
+                                val disp = obj.optString("display_name")
+                                val type = obj.optString("type", "Place")
+                                list.add(MapLocation(name = name, lat = lat, lon = lon, displayName = disp, type = type))
+                            }
+                            list
+                        }
                     }
                 }
+
                 searchResults.clear()
-                searchResults.addAll(items)
-                if (items.isEmpty()) {
+                searchResults.addAll(foundItems)
+                if (foundItems.isEmpty()) {
                     Toast.makeText(context, "No locations found for '$q'", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
@@ -181,6 +377,7 @@ fun MapExplorerScreen(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // Header
         item {
             Spacer(modifier = Modifier.height(8.dp))
             Row(
@@ -191,28 +388,74 @@ fun MapExplorerScreen(
                     modifier = Modifier
                         .size(38.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                        .background(if (hasGoogleMapsKey) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.Explore,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = if (hasGoogleMapsKey) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.size(22.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "Free Maps & Travel Explorer",
+                        "Google Maps & Travel Explorer",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "Powered by OpenStreetMap & Nominatim • 100% Free & Open",
+                        if (hasGoogleMapsKey) "Google Maps API Active • Interactive Roadmap, Satellite & Geocoding"
+                        else "Add Google Maps API Key to unlock high-res Satellite & Google Places",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                IconButton(
+                    onClick = {
+                        keyDialogInput = preferencesManager.googleMapsApiKey
+                        showKeyDialog = true
+                    }
+                ) {
+                    Icon(
+                        Icons.Default.Key,
+                        contentDescription = "Configure Google Maps Key",
+                        tint = if (hasGoogleMapsKey) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+
+        // Missing Google Maps Key Banner & 1-Tap Setup
+        if (!hasGoogleMapsKey) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Map, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Activate Google Maps", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text("Add your Google Maps API key to view high-resolution Google Satellite, Hybrid, and Terrain imagery.", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Button(
+                            onClick = {
+                                keyDialogInput = preferencesManager.googleMapsApiKey
+                                showKeyDialog = true
+                            },
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Add Key")
+                        }
+                    }
                 }
             }
         }
@@ -234,7 +477,7 @@ fun MapExplorerScreen(
                         modifier = Modifier
                             .weight(1f)
                             .testTag("map_search_input"),
-                        placeholder = { Text("Search any city, landmark, or place...") },
+                        placeholder = { Text(if (hasGoogleMapsKey) "Search Google Maps (places, cities)..." else "Search cities or landmarks...") },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
@@ -324,28 +567,35 @@ fun MapExplorerScreen(
             }
         }
 
-        // Map Tile Layer Selector
+        // Map Tile Layer Selector (Google Maps & OpenStreetMap)
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Map Style Layer", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                Text("Map Style & Provider", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                if (selectedLayer.isGoogle && !hasGoogleMapsKey) {
+                    Text("API Key Required", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                }
             }
             Spacer(modifier = Modifier.height(4.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(MapTileLayer.values()) { layer ->
+                    val isSelected = selectedLayer == layer
                     FilterChip(
-                        selected = selectedLayer == layer,
+                        selected = isSelected,
                         onClick = {
                             selectedLayer = layer
+                            if (layer.isGoogle && !hasGoogleMapsKey) {
+                                showKeyDialog = true
+                            }
                             if (currentZoom > layer.maxZoom) {
                                 currentZoom = layer.maxZoom
                             }
                         },
                         label = { Text(layer.label) },
-                        leadingIcon = if (selectedLayer == layer) {
+                        leadingIcon = if (isSelected) {
                             { Icon(Icons.Default.Layers, contentDescription = null, modifier = Modifier.size(14.dp)) }
                         } else null
                     )
@@ -364,84 +614,133 @@ fun MapExplorerScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(280.dp)
+                            .height(300.dp)
                             .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                            .background(MaterialTheme.colorScheme.surface)
+                            .background(Color(0xFF202124))
                     ) {
-                        // 3x3 Tile Grid with sub-tile coordinate precision
-                        val n = 1 shl currentZoom
-                        val exactTileX = (currentLocation.lon + 180.0) / 360.0 * n
-                        val latRad = Math.toRadians(currentLocation.lat.coerceIn(-85.0511, 85.0511))
-                        val exactTileY = ((1.0 - Math.log(Math.tan(latRad) + 1.0 / Math.cos(latRad)) / Math.PI) / 2.0 * n)
+                        if (selectedLayer.isGoogle && hasGoogleMapsKey) {
+                            // Interactive Embedded Google Map
+                            InteractiveGoogleMapView(
+                                apiKey = googleMapsApiKey,
+                                location = currentLocation,
+                                zoom = currentZoom,
+                                mapType = selectedLayer.googleMapType,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else if (selectedLayer.isGoogle && !hasGoogleMapsKey) {
+                            // Missing API Key Call-to-Action Box
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Map,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    "Google Maps API Key Required",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    "Enter your Google Maps API key to render Google Satellite and Roadmap views.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.LightGray
+                                )
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Button(
+                                    onClick = {
+                                        keyDialogInput = preferencesManager.googleMapsApiKey
+                                        showKeyDialog = true
+                                    }
+                                ) {
+                                    Text("Enter Google Maps API Key")
+                                }
+                            }
+                        } else {
+                            // OpenStreetMap 3x3 Tile Grid
+                            val n = 1 shl currentZoom
+                            val exactTileX = (currentLocation.lon + 180.0) / 360.0 * n
+                            val latRad = Math.toRadians(currentLocation.lat.coerceIn(-85.0511, 85.0511))
+                            val exactTileY = ((1.0 - Math.log(Math.tan(latRad) + 1.0 / Math.cos(latRad)) / Math.PI) / 2.0 * n)
 
-                        val centerTileX = exactTileX.toInt().coerceIn(0, n - 1)
-                        val centerTileY = exactTileY.toInt().coerceIn(0, n - 1)
-                        val fracX = (exactTileX - centerTileX - 0.5).toFloat()
-                        val fracY = (exactTileY - centerTileY - 0.5).toFloat()
+                            val centerTileX = exactTileX.toInt().coerceIn(0, n - 1)
+                            val centerTileY = exactTileY.toInt().coerceIn(0, n - 1)
+                            val fracX = (exactTileX - centerTileX - 0.5).toFloat()
+                            val fracY = (exactTileY - centerTileY - 0.5).toFloat()
 
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            for (dy in -1..1) {
-                                Row(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxWidth()
-                                 ) {
-                                    for (dx in -1..1) {
-                                        val tileX = (centerTileX + dx).mod(n)
-                                        val tileY = (centerTileY + dy).coerceIn(0, n - 1)
-                                        val tileUrl = selectedLayer.tileUrl
-                                            .replace("{s}", "a")
-                                            .replace("{z}", currentZoom.toString())
-                                            .replace("{x}", tileX.toString())
-                                            .replace("{y}", tileY.toString())
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                for (dy in -1..1) {
+                                    Row(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxWidth()
+                                    ) {
+                                        for (dx in -1..1) {
+                                            val tileX = (centerTileX + dx).mod(n)
+                                            val tileY = (centerTileY + dy).coerceIn(0, n - 1)
+                                            val tileUrl = selectedLayer.tileUrl
+                                                .replace("{s}", "a")
+                                                .replace("{z}", currentZoom.toString())
+                                                .replace("{x}", tileX.toString())
+                                                .replace("{y}", tileY.toString())
 
-                                        AsyncImage(
-                                            model = tileUrl,
-                                            contentDescription = "Map Tile",
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .fillMaxHeight(),
-                                            contentScale = ContentScale.Crop
-                                        )
+                                            AsyncImage(
+                                                model = tileUrl,
+                                                contentDescription = "Map Tile",
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .fillMaxHeight(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        // Center Pin Marker with sub-tile pixel offset
-                        BoxWithConstraints(
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            val tileWidth = maxWidth / 3f
-                            val tileHeight = maxHeight / 3f
-                            val pinXOffset = tileWidth * fracX
-                            val pinYOffset = tileHeight * fracY - 14.dp
-
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .align(Alignment.Center)
-                                    .offset(x = pinXOffset, y = pinYOffset)
+                            // Center Pin Marker
+                            BoxWithConstraints(
+                                modifier = Modifier.fillMaxSize()
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                                    shadowElevation = 4.dp
+                                val tileWidth = maxWidth / 3f
+                                val tileHeight = maxHeight / 3f
+                                val pinXOffset = tileWidth * fracX
+                                val pinYOffset = tileHeight * fracY - 14.dp
+
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .offset(x = pinXOffset, y = pinYOffset)
                                 ) {
-                                    Text(
-                                        text = currentLocation.name,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                                        shadowElevation = 4.dp
+                                    ) {
+                                        Text(
+                                            text = currentLocation.name,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.LocationOn,
+                                        contentDescription = "Marker",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(36.dp)
                                     )
                                 }
-                                Icon(
-                                    imageVector = Icons.Default.LocationOn,
-                                    contentDescription = "Marker",
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(36.dp)
-                                )
                             }
                         }
 
@@ -523,8 +822,8 @@ fun MapExplorerScreen(
                                         context.startActivity(mapIntent)
                                     } catch (_: Exception) {
                                         try {
-                                            val osmWeb = "https://www.openstreetmap.org/#map=14/${currentLocation.lat}/${currentLocation.lon}"
-                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(osmWeb)))
+                                            val webUrl = "https://www.google.com/maps/search/?api=1&query=${currentLocation.lat},${currentLocation.lon}"
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(webUrl)))
                                         } catch (_: Exception) {}
                                     }
                                 }
@@ -580,5 +879,65 @@ fun MapExplorerScreen(
         }
 
         item { Spacer(modifier = Modifier.height(24.dp)) }
+    }
+
+    // Google Maps API Key In-Place Dialog
+    if (showKeyDialog) {
+        AlertDialog(
+            onDismissRequest = { showKeyDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Google Maps API Key", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "Enter your Google Maps API key to enable interactive Google Roadmap, Satellite, Terrain, and Geocoding.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedTextField(
+                        value = keyDialogInput,
+                        onValueChange = { keyDialogInput = it },
+                        label = { Text("Google Maps Key") },
+                        placeholder = { Text("AIzaSy...") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("google_maps_key_dialog_input")
+                    )
+                    Text(
+                        "You can get a free Maps API key from Google Cloud Console.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val clean = keyDialogInput.trim()
+                        preferencesManager.googleMapsApiKey = clean
+                        googleMapsApiKey = clean
+                        if (clean.isNotBlank()) {
+                            selectedLayer = MapTileLayer.GOOGLE_ROADMAP
+                            Toast.makeText(context, "Google Maps API Key saved & activated!", Toast.LENGTH_SHORT).show()
+                        } else {
+                            selectedLayer = MapTileLayer.OSM_STANDARD
+                            Toast.makeText(context, "Google Maps Key removed. Switched to OpenStreetMap.", Toast.LENGTH_SHORT).show()
+                        }
+                        showKeyDialog = false
+                    },
+                    modifier = Modifier.testTag("save_google_maps_key_dialog_button")
+                ) {
+                    Text("Save & Activate")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showKeyDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
