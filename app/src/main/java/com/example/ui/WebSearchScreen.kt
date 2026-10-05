@@ -227,6 +227,35 @@ fun WebSearchScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                        ) {
+                            Text(
+                                text = result.source.ifEmpty { "Live Web" },
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        if (result.pubDate.isNotBlank()) {
+                            Text(
+                                text = result.pubDate,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Text(
                         text = result.title,
                         style = MaterialTheme.typography.titleSmall,
@@ -247,7 +276,7 @@ fun WebSearchScreen(
                     ) {
                         Button(
                             onClick = {
-                                val prompt = "Explain more about this topic from the web:\nTitle: ${result.title}\nDetails: ${result.snippet}"
+                                val prompt = "Explain more about this topic from the web (${result.source}):\nTitle: ${result.title}\nSource: ${result.url}\nDetails: ${result.snippet}"
                                 onSendSearchToChat(prompt)
                             },
                             colors = ButtonDefaults.buttonColors(

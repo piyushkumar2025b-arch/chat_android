@@ -487,8 +487,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val searchResults = WebSearchService.search(trimmed).getOrNull()
                     if (!searchResults.isNullOrEmpty()) {
-                        "\n\n[Live Web Search Context for '$trimmed']:\n" +
-                                searchResults.take(4).joinToString("\n") { "• ${it.title}: ${it.snippet} (${it.url})" }
+                        "\n\n[Live Real-Time Web Search Results & Sources for '$trimmed']:\n" +
+                                searchResults.take(5).joinToString("\n") { "• [${it.source}] ${it.title} (${it.pubDate}): ${it.snippet} (Source: ${it.url})" } +
+                                "\n\nNote for Assistant: You have live real-time internet access active. Use the above verified live web sources to provide an accurate, up-to-date answer and cite the publisher/sources."
                     } else ""
                 } catch (_: Exception) { "" }
             } else ""

@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
@@ -53,11 +54,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.remote.AudioSynthesizer
+import com.example.data.remote.MediaSaver
 import com.example.data.remote.SoundPreset
 import kotlinx.coroutines.launch
 
@@ -65,6 +68,7 @@ import kotlinx.coroutines.launch
 fun SoundStudioScreen(
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var selectedPreset by remember { mutableStateOf(SoundPreset.AMBIENT_DRONE) }
     var isPlaying by remember { mutableStateOf(false) }
@@ -240,6 +244,26 @@ fun SoundStudioScreen(
                                 modifier = Modifier.size(32.dp)
                             )
                         }
+
+                        IconButton(
+                            onClick = {
+                                val wavBytes = AudioSynthesizer.generateWavBytes(selectedPreset)
+                                coroutineScope.launch {
+                                    MediaSaver.saveAudioBytes(context, wavBytes, selectedPreset.title)
+                                }
+                            },
+                            modifier = Modifier
+                                .size(56.dp)
+                                .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
+                                .testTag("save_audio_button")
+                        ) {
+                            Icon(
+                                Icons.Default.Download,
+                                contentDescription = "Save Audio to Phone",
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -299,6 +323,21 @@ fun SoundStudioScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(preset.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
                         Text(preset.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(
+                        onClick = {
+                            val wavBytes = AudioSynthesizer.generateWavBytes(preset)
+                            coroutineScope.launch {
+                                MediaSaver.saveAudioBytes(context, wavBytes, preset.title)
+                            }
+                        }
+                    ) {
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = "Save to Music",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                     Icon(
                         if (isSelected && isPlaying) Icons.Default.GraphicEq else Icons.Default.PlayArrow,

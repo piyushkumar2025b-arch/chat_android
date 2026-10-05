@@ -51,6 +51,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,6 +61,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import com.example.data.remote.MediaSaver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -109,6 +112,8 @@ fun ImageStudioScreen(
     var isGenerating by remember { mutableStateOf(false) }
     var currentImageUrl by remember { mutableStateOf<String?>(null) }
     var previewFullscreenUrl by remember { mutableStateOf<String?>(null) }
+    var autoSaveToGallery by remember { mutableStateOf(true) }
+    var isSavingCurrent by remember { mutableStateOf(false) }
 
     val styles = listOf("Photorealistic", "Anime & Manga", "Cyberpunk", "Cinematic 3D", "Digital Art", "Fantasy Art", "Minimalist")
     val aspectRatios = listOf(
@@ -154,6 +159,12 @@ fun ImageStudioScreen(
             aspectRatio = selectedRatio
         ))
         isGenerating = false
+
+        if (autoSaveToGallery) {
+            coroutineScope.launch {
+                MediaSaver.saveImageFromUrl(context, url, rawPrompt)
+            }
+        }
     }
 
     fun enhancePrompt() {
@@ -231,6 +242,28 @@ fun ImageStudioScreen(
                             }
                         }
                     )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Auto-Save to Phone Gallery", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            Text("Saves generated photos to /Pictures/OmniChat", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(
+                            checked = autoSaveToGallery,
+                            onCheckedChange = { autoSaveToGallery = it },
+                            modifier = Modifier.testTag("auto_save_gallery_switch")
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
@@ -364,6 +397,24 @@ fun ImageStudioScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 IconButton(
                                     onClick = {
+                                        val url = currentImageUrl ?: return@IconButton
+                                        coroutineScope.launch {
+                                            isSavingCurrent = true
+                                            MediaSaver.saveImageFromUrl(context, url, promptText)
+                                            isSavingCurrent = false
+                                        }
+                                    },
+                                    enabled = !isSavingCurrent,
+                                    modifier = Modifier.testTag("save_image_to_phone_button")
+                                ) {
+                                    if (isSavingCurrent) {
+                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(Icons.Default.Download, contentDescription = "Save to Phone Gallery", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                IconButton(
+                                    onClick = {
                                         currentSeed = Random.nextInt(1000, 999999)
                                         generateImage()
                                     }
@@ -423,6 +474,15 @@ fun ImageStudioScreen(
                             Spacer(modifier = Modifier.height(4.dp))
                             Text("${item.style} • ${item.aspectRatio}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                         }
+                        IconButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    MediaSaver.saveImageFromUrl(context, item.imageUrl, item.prompt)
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.Download, contentDescription = "Save to Phone", tint = MaterialTheme.colorScheme.primary)
+                        }
                     }
                 }
             }
@@ -450,14 +510,34 @@ fun ImageStudioScreen(
                     contentScale = ContentScale.Fit
                 )
 
-                IconButton(
-                    onClick = { previewFullscreenUrl = null },
+                Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(24.dp)
-                        .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                        .padding(20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                    IconButton(
+                        onClick = {
+                            val url = previewFullscreenUrl ?: return@IconButton
+                            coroutineScope.launch {
+                                MediaSaver.saveImageFromUrl(context, url, "OmniArt")
+                            }
+                        },
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                            .testTag("fullscreen_download_image_button")
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = "Save to Phone", tint = Color.White)
+                    }
+
+                    IconButton(
+                        onClick = { previewFullscreenUrl = null },
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                    }
                 }
             }
         }

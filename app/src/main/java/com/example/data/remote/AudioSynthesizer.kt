@@ -230,4 +230,76 @@ object AudioSynthesizer {
             }
         }
     }
+
+    /**
+     * Generate standard 16-bit PCM WAV audio bytes for saving to device storage.
+     */
+    fun generateWavBytes(preset: SoundPreset): ByteArray {
+        val samples = generateSamples(preset)
+        val pcmData = ByteArray(samples.size * 2)
+        for (i in samples.indices) {
+            val s = samples[i].toInt()
+            pcmData[i * 2] = (s and 0xFF).toByte()
+            pcmData[i * 2 + 1] = ((s shr 8) and 0xFF).toByte()
+        }
+
+        val totalDataLen = pcmData.size
+        val totalAudioLen = totalDataLen + 36
+        val channels = 1
+        val byteRate = SAMPLE_RATE * 2 * channels
+
+        val header = ByteArray(44)
+        // RIFF/WAVE header
+        header[0] = 'R'.code.toByte()
+        header[1] = 'I'.code.toByte()
+        header[2] = 'F'.code.toByte()
+        header[3] = 'F'.code.toByte()
+        header[4] = (totalAudioLen and 0xFF).toByte()
+        header[5] = ((totalAudioLen shr 8) and 0xFF).toByte()
+        header[6] = ((totalAudioLen shr 16) and 0xFF).toByte()
+        header[7] = ((totalAudioLen shr 24) and 0xFF).toByte()
+        header[8] = 'W'.code.toByte()
+        header[9] = 'A'.code.toByte()
+        header[10] = 'V'.code.toByte()
+        header[11] = 'E'.code.toByte()
+        // 'fmt ' chunk
+        header[12] = 'f'.code.toByte()
+        header[13] = 'm'.code.toByte()
+        header[14] = 't'.code.toByte()
+        header[15] = ' '.code.toByte()
+        header[16] = 16 // 4 bytes: size of 'fmt ' chunk
+        header[17] = 0
+        header[18] = 0
+        header[19] = 0
+        header[20] = 1 // format = 1 (PCM)
+        header[21] = 0
+        header[22] = channels.toByte()
+        header[23] = 0
+        header[24] = (SAMPLE_RATE and 0xFF).toByte()
+        header[25] = ((SAMPLE_RATE shr 8) and 0xFF).toByte()
+        header[26] = ((SAMPLE_RATE shr 16) and 0xFF).toByte()
+        header[27] = ((SAMPLE_RATE shr 24) and 0xFF).toByte()
+        header[28] = (byteRate and 0xFF).toByte()
+        header[29] = ((byteRate shr 8) and 0xFF).toByte()
+        header[30] = ((byteRate shr 16) and 0xFF).toByte()
+        header[31] = ((byteRate shr 24) and 0xFF).toByte()
+        header[32] = 2 // block align (16 bit mono = 2 bytes)
+        header[33] = 0
+        header[34] = 16 // bits per sample
+        header[35] = 0
+        // 'data' chunk
+        header[36] = 'd'.code.toByte()
+        header[37] = 'a'.code.toByte()
+        header[38] = 't'.code.toByte()
+        header[39] = 'a'.code.toByte()
+        header[40] = (totalDataLen and 0xFF).toByte()
+        header[41] = ((totalDataLen shr 8) and 0xFF).toByte()
+        header[42] = ((totalDataLen shr 16) and 0xFF).toByte()
+        header[43] = ((totalDataLen shr 24) and 0xFF).toByte()
+
+        val fullWav = ByteArray(44 + totalDataLen)
+        System.arraycopy(header, 0, fullWav, 0, 44)
+        System.arraycopy(pcmData, 0, fullWav, 44, totalDataLen)
+        return fullWav
+    }
 }

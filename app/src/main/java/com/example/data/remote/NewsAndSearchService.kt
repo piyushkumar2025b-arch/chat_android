@@ -170,124 +170,239 @@ object NewsFeedService {
 
 object WebSearchService {
     private val client = OkHttpClient.Builder()
-        .connectTimeout(12, TimeUnit.SECONDS)
-        .readTimeout(12, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
     suspend fun search(query: String): Result<List<WebSearchResult>> = withContext(Dispatchers.IO) {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) return@withContext Result.success(emptyList())
 
+        val results = mutableListOf<WebSearchResult>()
+
         try {
-            val encoded = URLEncoder.encode(trimmed, "UTF-8")
-            // DuckDuckGo Instant Answer API
-            val ddgUrl = "https://api.duckduckgo.com/?q=$encoded&format=json&no_html=1&skip_disambig=1"
-            val request = Request.Builder()
-                .url(ddgUrl)
-                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:109.0)")
-                .build()
+            // 1. Fetch live news & current events from Google News Search RSS
+            val newsResults = fetchGoogleNewsSearch(trimmed)
+            results.addAll(newsResults)
 
-            val jsonStr = client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) response.body?.string().orEmpty() else ""
-            }
-            val results = mutableListOf<WebSearchResult>()
+            // 2. Fetch authoritative encyclopedia & knowledge from Wikipedia Live API
+            val wikiResults = fetchWikipediaSearch(trimmed)
+            results.addAll(wikiResults)
 
-            if (jsonStr.isNotBlank()) {
-                val root = JSONObject(jsonStr)
+            // 3. Supplement with DuckDuckGo Instant Answers if available
+            val ddgResults = fetchDuckDuckGoInstant(trimmed)
+            results.addAll(ddgResults)
 
-                // 1. Check Abstract
-                val abstractText = root.optString("AbstractText")
-                val abstractSource = root.optString("AbstractSource")
-                val abstractUrl = root.optString("AbstractURL")
-                if (abstractText.isNotBlank()) {
-                    results.add(
-                        WebSearchResult(
-                            title = if (abstractSource.isNotBlank()) "Overview ($abstractSource)" else "Direct Answer",
-                            snippet = abstractText,
-                            url = abstractUrl.ifEmpty { "https://duckduckgo.com/?q=$encoded" }
-                        )
-                    )
-                }
+            // Deduplicate by title & link, preserving order
+            val finalResults = results
+                .distinctBy { it.title.lowercase().trim() }
+                .take(12)
 
-                // 2. Check Related Topics
-                val related = root.optJSONArray("RelatedTopics") ?: JSONArray()
-                for (i in 0 until related.length()) {
-                    val item = related.optJSONObject(i) ?: continue
-                    val text = item.optString("Text")
-                    val firstUrl = item.optString("FirstURL")
-                    if (text.isNotBlank()) {
-                        val parts = text.split(" - ", limit = 2)
-                        val title = parts.firstOrNull() ?: "Result"
-                        val snippet = if (parts.size > 1) parts[1] else text
-                        results.add(
-                            WebSearchResult(
-                                title = title,
-                                snippet = snippet,
-                                url = firstUrl.ifEmpty { "https://duckduckgo.com/?q=$encoded" }
-                            )
-                        )
-                    }
-                }
-            }
-
-            // If DDG Instant Answer has few results, supplement with HTML search
-            if (results.size < 3) {
-                val htmlResults = fetchDuckDuckGoHtml(trimmed)
-                results.addAll(htmlResults)
-            }
-
-            Result.success(results.distinctBy { it.title }.take(8))
+            Result.success(finalResults)
         } catch (e: Exception) {
-            Result.failure(e)
+            e.printStackTrace()
+            if (results.isNotEmpty()) {
+                Result.success(results.distinctBy { it.title }.take(10))
+            } else {
+                Result.failure(e)
+            }
         }
     }
 
-    private fun fetchDuckDuckGoHtml(query: String): List<WebSearchResult> {
+    private fun fetchGoogleNewsSearch(query: String): List<WebSearchResult> {
         val list = mutableListOf<WebSearchResult>()
         try {
             val encoded = URLEncoder.encode(query, "UTF-8")
-            val htmlUrl = "https://html.duckduckgo.com/html/?q=$encoded"
-            val req = Request.Builder()
-                .url(htmlUrl)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+            val url = "https://news.google.com/rss/search?q=$encoded&hl=en-US&gl=US&ceid=US:en"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:109.0)")
                 .build()
 
-            val html = client.newCall(req).execute().use { res ->
-                if (res.isSuccessful) res.body?.string().orEmpty() else ""
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
             }
-            if (html.isNotBlank()) {
-                val resultRegex = Regex("""<a class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)</a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)</a>""")
-                resultRegex.findAll(html).take(6).forEach { match ->
-                    val rawHref = match.groupValues[1]
-                    val rawTitle = match.groupValues[2]
-                    val rawSnippet = match.groupValues[3]
 
-                    val decodedUrl = if (rawHref.contains("uddg=")) {
-                        try {
-                            java.net.URLDecoder.decode(rawHref.substringAfter("uddg=").substringBefore("&"), "UTF-8")
-                        } catch (_: Exception) { rawHref }
-                    } else if (rawHref.startsWith("//")) {
-                        "https:$rawHref"
-                    } else rawHref
+            if (body.isNotBlank()) {
+                val factory = XmlPullParserFactory.newInstance()
+                factory.isNamespaceAware = false
+                val parser = factory.newPullParser()
+                parser.setInput(StringReader(body))
 
-                    val title = try {
-                        android.text.Html.fromHtml(rawTitle, android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim()
-                    } catch (_: Throwable) {
-                        rawTitle.replace(Regex("<[^>]*>"), "").trim()
+                var eventType = parser.eventType
+                var inItem = false
+                var title = ""
+                var link = ""
+                var pubDate = ""
+                var source = ""
+                var description = ""
+
+                while (eventType != XmlPullParser.END_DOCUMENT && list.size < 6) {
+                    val tagName = parser.name ?: ""
+                    when (eventType) {
+                        XmlPullParser.START_TAG -> {
+                            if (tagName.equals("item", ignoreCase = true)) {
+                                inItem = true
+                                title = ""
+                                link = ""
+                                pubDate = ""
+                                source = ""
+                                description = ""
+                            } else if (inItem) {
+                                when (tagName.lowercase()) {
+                                    "title" -> title = parser.nextText()
+                                    "link" -> link = parser.nextText()
+                                    "pubdate" -> pubDate = parser.nextText()
+                                    "source" -> source = parser.nextText()
+                                    "description" -> description = parser.nextText()
+                                }
+                            }
+                        }
+                        XmlPullParser.END_TAG -> {
+                            if (tagName.equals("item", ignoreCase = true) && inItem) {
+                                if (title.isNotBlank()) {
+                                    val cleanDesc = try {
+                                        android.text.Html.fromHtml(description, android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim()
+                                    } catch (_: Throwable) {
+                                        description.replace(Regex("<[^>]*>"), "").trim()
+                                    }
+
+                                    val finalSource = if (source.isNotBlank()) {
+                                        source
+                                    } else {
+                                        val parts = title.split(" - ")
+                                        if (parts.size > 1) parts.last().trim() else "Google News"
+                                    }
+                                    val finalTitle = if (title.contains(" - ")) {
+                                        title.substringBeforeLast(" - ").trim()
+                                    } else title.trim()
+
+                                    val snippet = if (cleanDesc.isNotBlank() && cleanDesc != finalTitle) {
+                                        cleanDesc
+                                    } else {
+                                        "Live reporting from $finalSource on $finalTitle."
+                                    }
+
+                                    list.add(
+                                        WebSearchResult(
+                                            title = finalTitle,
+                                            snippet = snippet,
+                                            url = link.trim(),
+                                            source = finalSource,
+                                            pubDate = formatPubDate(pubDate)
+                                        )
+                                    )
+                                }
+                                inItem = false
+                            }
+                        }
                     }
+                    eventType = parser.next()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
 
-                    val snippet = try {
+    private fun fetchWikipediaSearch(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val encoded = URLEncoder.encode(query, "UTF-8")
+            val url = "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encoded&format=json&utf8=1"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "OmniChat/1.0 (Mobile Assistant)")
+                .build()
+
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val root = JSONObject(body)
+                val queryObj = root.optJSONObject("query")
+                val searchArr = queryObj?.optJSONArray("search") ?: JSONArray()
+                for (i in 0 until searchArr.length()) {
+                    if (list.size >= 4) break
+                    val item = searchArr.optJSONObject(i) ?: continue
+                    val title = item.optString("title")
+                    val pageId = item.optLong("pageid")
+                    val rawSnippet = item.optString("snippet")
+                    val cleanSnippet = try {
                         android.text.Html.fromHtml(rawSnippet, android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim()
                     } catch (_: Throwable) {
                         rawSnippet.replace(Regex("<[^>]*>"), "").trim()
                     }
 
-                    if (title.isNotBlank()) {
+                    if (title.isNotBlank() && cleanSnippet.isNotBlank()) {
+                        list.add(
+                            WebSearchResult(
+                                title = title,
+                                snippet = cleanSnippet,
+                                url = "https://en.wikipedia.org/?curid=$pageId",
+                                source = "Wikipedia",
+                                pubDate = "Encyclopedia"
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    private fun fetchDuckDuckGoInstant(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val encoded = URLEncoder.encode(query, "UTF-8")
+            val url = "https://api.duckduckgo.com/?q=$encoded&format=json&no_html=1&skip_disambig=1"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:109.0)")
+                .build()
+
+            val body = client.newCall(request).execute().use { res ->
+                if (res.isSuccessful) res.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val root = JSONObject(body)
+                val abstractText = root.optString("AbstractText")
+                val abstractSource = root.optString("AbstractSource")
+                val abstractUrl = root.optString("AbstractURL")
+                if (abstractText.isNotBlank()) {
+                    list.add(
+                        WebSearchResult(
+                            title = if (abstractSource.isNotBlank()) "Overview ($abstractSource)" else "Direct Answer",
+                            snippet = abstractText,
+                            url = abstractUrl.ifEmpty { "https://duckduckgo.com/?q=$encoded" },
+                            source = abstractSource.ifEmpty { "DuckDuckGo" },
+                            pubDate = "Live"
+                        )
+                    )
+                }
+
+                val related = root.optJSONArray("RelatedTopics") ?: JSONArray()
+                for (i in 0 until related.length()) {
+                    if (list.size >= 4) break
+                    val item = related.optJSONObject(i) ?: continue
+                    val text = item.optString("Text")
+                    val firstUrl = item.optString("FirstURL")
+                    if (text.isNotBlank()) {
+                        val parts = text.split(" - ", limit = 2)
+                        val title = parts.firstOrNull() ?: "Topic"
+                        val snippet = if (parts.size > 1) parts[1] else text
                         list.add(
                             WebSearchResult(
                                 title = title,
                                 snippet = snippet,
-                                url = decodedUrl
+                                url = firstUrl.ifEmpty { "https://duckduckgo.com/?q=$encoded" },
+                                source = "DuckDuckGo",
+                                pubDate = "Live"
                             )
                         )
                     }
@@ -295,5 +410,16 @@ object WebSearchService {
             }
         } catch (_: Exception) {}
         return list
+    }
+
+    private fun formatPubDate(raw: String): String {
+        return try {
+            val parts = raw.split(" ")
+            if (parts.size >= 5) {
+                "${parts[1]} ${parts[2]} ${parts[4]}"
+            } else raw
+        } catch (_: Exception) {
+            raw
+        }
     }
 }

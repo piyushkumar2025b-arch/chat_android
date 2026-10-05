@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -39,13 +40,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import com.example.data.remote.MediaSaver
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,6 +78,7 @@ fun VideoStudioScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     var promptText by remember { mutableStateOf("") }
     var selectedMotion by remember { mutableStateOf("Cinematic Drone") }
@@ -80,6 +86,8 @@ fun VideoStudioScreen(
     var selectedDuration by remember { mutableStateOf("5s") }
     var isGenerating by remember { mutableStateOf(false) }
     var currentVideoItem by remember { mutableStateOf<VideoGenerationItem?>(null) }
+    var autoSaveVideo by remember { mutableStateOf(true) }
+    var isSavingVideo by remember { mutableStateOf(false) }
 
     val motionTypes = listOf(
         "Cinematic Drone",
@@ -144,6 +152,12 @@ fun VideoStudioScreen(
         currentVideoItem = item
         videoHistory.add(0, item)
         isGenerating = false
+
+        if (autoSaveVideo) {
+            coroutineScope.launch {
+                MediaSaver.saveVideoFromUrl(context, previewUrl, rawPrompt)
+            }
+        }
     }
 
     LazyColumn(
@@ -212,6 +226,28 @@ fun VideoStudioScreen(
                             }
                         }
                     )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Auto-Save to Phone Movies", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            Text("Saves generated videos to /Movies/OmniChat", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(
+                            checked = autoSaveVideo,
+                            onCheckedChange = { autoSaveVideo = it },
+                            modifier = Modifier.testTag("auto_save_video_switch")
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
@@ -366,6 +402,23 @@ fun VideoStudioScreen(
                             }
 
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                IconButton(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            isSavingVideo = true
+                                            MediaSaver.saveVideoFromUrl(context, item.videoPreviewUrl, item.prompt)
+                                            isSavingVideo = false
+                                        }
+                                    },
+                                    enabled = !isSavingVideo,
+                                    modifier = Modifier.testTag("save_video_to_phone_button")
+                                ) {
+                                    if (isSavingVideo) {
+                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(Icons.Default.Download, contentDescription = "Save to Movies", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
                                 IconButton(onClick = { generateVideo() }) {
                                     Icon(Icons.Default.Refresh, contentDescription = "Re-render")
                                 }

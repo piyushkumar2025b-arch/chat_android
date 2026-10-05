@@ -32,8 +32,10 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Visibility
+import com.example.data.remote.MediaSaver
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -635,6 +637,52 @@ fun MarkdownCodeBlock(
 
                         Spacer(modifier = Modifier.width(6.dp))
                     }
+
+                    // Save File to Phone Downloads
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable {
+                                val ext = when (displayLang) {
+                                    "PYTHON" -> "py"
+                                    "KOTLIN" -> "kt"
+                                    "JAVASCRIPT" -> "js"
+                                    "TYPESCRIPT" -> "ts"
+                                    "HTML" -> "html"
+                                    "CSS" -> "css"
+                                    "JSON" -> "json"
+                                    "XML" -> "xml"
+                                    "SVG" -> "svg"
+                                    "BASH", "SHELL", "SH" -> "sh"
+                                    "SQL" -> "sql"
+                                    "JAVA" -> "java"
+                                    "RUST" -> "rs"
+                                    else -> "txt"
+                                }
+                                val fileName = "script_${System.currentTimeMillis()}.$ext"
+                                coroutineScope.launch {
+                                    MediaSaver.saveDocumentToDownloads(context, fileName, code)
+                                }
+                            }
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                            .testTag("save_code_file_button"),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Save file",
+                            tint = headerTextColor,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Save",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = headerTextColor
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
 
                     // Copy Code Button with Animated Feedback
                     Row(

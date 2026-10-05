@@ -30,9 +30,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.runtime.rememberCoroutineScope
+import com.example.data.remote.MediaSaver
+import kotlinx.coroutines.launch
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -77,6 +81,7 @@ fun ArtifactViewerDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val isPreviewable = artifact.type == ArtifactType.HTML_WEB || artifact.type == ArtifactType.SVG
     var selectedTab by remember { mutableIntStateOf(if (isPreviewable) 1 else 0) } // 0 = Code, 1 = Preview
 
@@ -161,6 +166,33 @@ fun ArtifactViewerDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
+
+                    // Save File to Phone Downloads Action
+                    IconButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                MediaSaver.saveDocumentToDownloads(
+                                    context = context,
+                                    fileName = artifact.title,
+                                    content = artifact.content,
+                                    mimeType = when (artifact.type) {
+                                        ArtifactType.HTML_WEB -> "text/html"
+                                        ArtifactType.SVG -> "image/svg+xml"
+                                        ArtifactType.MARKDOWN -> "text/markdown"
+                                        ArtifactType.JSON_DATA -> "application/json"
+                                        else -> "text/plain"
+                                    }
+                                )
+                            }
+                        },
+                        modifier = Modifier.testTag("save_artifact_file_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Save to Downloads",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
 
                     // Copy Action
