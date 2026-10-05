@@ -79,6 +79,7 @@ fun SettingsDialog(
     var customModel by remember { mutableStateOf(preferencesManager.customModel) }
     var systemPrompt by remember { mutableStateOf(preferencesManager.systemPrompt) }
     var temperature by remember { mutableFloatStateOf(preferencesManager.temperature) }
+    var maxTokens by remember { mutableStateOf(preferencesManager.maxOutputTokens) }
 
     var showConfirmClearDialog by remember { mutableStateOf(false) }
 
@@ -420,6 +421,30 @@ fun SettingsDialog(
                     )
                 }
 
+                // Max Output Length Slider (Elaborated Responses)
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Max Output Length (Elaboration)", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                        Text("$maxTokens tokens", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Slider(
+                        value = maxTokens.toFloat(),
+                        onValueChange = { maxTokens = (Math.round(it / 1024f) * 1024).toInt() },
+                        valueRange = 2048f..16384f,
+                        steps = 13,
+                        modifier = Modifier.fillMaxWidth().testTag("max_tokens_slider")
+                    )
+                    Text(
+                        "Larger token limits ensure full, richly elaborated answers without cutting off mid-sentence.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 // System Prompt
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("System Instructions", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
@@ -459,6 +484,7 @@ fun SettingsDialog(
                     preferencesManager.customModel = customModel
                     preferencesManager.systemPrompt = systemPrompt
                     preferencesManager.temperature = temperature
+                    preferencesManager.maxOutputTokens = maxTokens
                     onKeyUpdated?.invoke()
                     Toast.makeText(context, "Settings saved!", Toast.LENGTH_SHORT).show()
                     onDismiss()

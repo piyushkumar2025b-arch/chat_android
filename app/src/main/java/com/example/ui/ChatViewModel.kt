@@ -109,6 +109,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val _isGenerating = MutableStateFlow(false)
     val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
 
+    private val _continuingMessageId = MutableStateFlow<String?>(null)
+    val continuingMessageId: StateFlow<String?> = _continuingMessageId.asStateFlow()
+
     private val _selectedProvider = MutableStateFlow(
         ProviderType.values().firstOrNull { it.id == preferencesManager.lastProviderId } ?: ProviderType.POLLINATIONS
     )
@@ -511,7 +514,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 systemPrompt = preferencesManager.systemPrompt,
                 temperature = preferencesManager.temperature,
                 customBaseUrl = preferencesManager.customBaseUrl,
-                supportsVision = model.supportsVision || provider == ProviderType.CUSTOM
+                supportsVision = model.supportsVision || provider == ProviderType.CUSTOM,
+                maxTokens = preferencesManager.maxOutputTokens
             )
 
             result.onSuccess { responseText ->
@@ -606,7 +610,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 systemPrompt = preferencesManager.systemPrompt,
                 temperature = preferencesManager.temperature,
                 customBaseUrl = preferencesManager.customBaseUrl,
-                supportsVision = model.supportsVision || provider == ProviderType.CUSTOM
+                supportsVision = model.supportsVision || provider == ProviderType.CUSTOM,
+                maxTokens = preferencesManager.maxOutputTokens
             )
 
             result.onSuccess { responseText ->
@@ -626,10 +631,109 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Seamlessly continue generation for an assistant reply that stopped prematurely
+     * and append the completed continuation directly into the message.
+     */
+    fun continueMessage(assistantMessage: ChatMessageEntity) {
+        val sessionId = _currentSessionId.value ?: return
+        val allMsgs = currentMessages.value
+        val msgIndex = allMsgs.indexOfFirst { it.id == assistantMessage.id }
+        if (msgIndex < 0) return
+
+        val provider = _selectedProvider.value
+        val model = _selectedModel.value
+
+        // Pre-flight key and limits checks
+        if (provider.requiresApiKey && !isKeyConfigured(provider)) {
+            viewModelScope.launch {
+                repository.updateMessageContent(
+                    assistantMessage.id,
+                    "${assistantMessage.content}\n\n⚠️ ${provider.displayName} requires an API key to continue. Please add your key in Settings.",
+                    isError = true
+                )
+            }
+            return
+        }
+
+        if (usageTracker.isLimitReached()) {
+            viewModelScope.launch {
+                repository.updateMessageContent(
+                    assistantMessage.id,
+                    "${assistantMessage.content}\n\n⚠️ Daily budget reached.",
+                    isError = true
+                )
+            }
+            return
+        }
+
+        val originalContent = assistantMessage.content
+
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _isGenerating.value = true
+            _continuingMessageId.value = assistantMessage.id
+
+            try {
+                val apiKey = getApiKeyForProvider(provider)
+                // History up to and including the current assistant message
+                val history = allMsgs.take(msgIndex + 1).filter { !it.isError }
+
+                val effectiveModelId = if (provider == ProviderType.CUSTOM) {
+                    preferencesManager.customModel.trim().ifEmpty { "gpt-4o-mini" }
+                } else {
+                    model.id
+                }
+
+                val continueInstruction = "Continue your previous response directly from where you stopped. Do not repeat what you already wrote and do not include conversational filler like 'Sure' or 'Continuing'. Immediately start with the continuation text and complete the answer fully with rich elaboration:"
+
+                val result = AiService.sendMessage(
+                    provider = provider,
+                    modelId = effectiveModelId,
+                    prompt = continueInstruction,
+                    attachments = emptyList(),
+                    history = history,
+                    apiKey = apiKey,
+                    systemPrompt = preferencesManager.systemPrompt,
+                    temperature = preferencesManager.temperature,
+                    customBaseUrl = preferencesManager.customBaseUrl,
+                    supportsVision = false,
+                    maxTokens = preferencesManager.maxOutputTokens
+                )
+
+                result.onSuccess { continuationText ->
+                    val cleanedContinuation = continuationText.trim()
+                    if (cleanedContinuation.isNotBlank() && cleanedContinuation != "No response content received.") {
+                        val current = originalContent.trimEnd()
+                        val separator = if (current.endsWith("\n") || current.endsWith("```")) "\n\n" else if (current.endsWith(".")) " " else " "
+                        val combinedContent = current + separator + cleanedContinuation
+                        repository.updateMessageContent(assistantMessage.id, combinedContent, isError = false)
+
+                        val estTokens = (continueInstruction.length + cleanedContinuation.length) / 4
+                        usageTracker.recordRequest(provider.id, maxOf(50, estTokens))
+                    }
+                }.onFailure { error ->
+                    val isCancelled = !isActive || error is kotlinx.coroutines.CancellationException || error is java.util.concurrent.CancellationException || error.message?.contains("Canceled", ignoreCase = true) == true
+                    if (!isCancelled) {
+                        repository.updateMessageContent(
+                            assistantMessage.id,
+                            "$originalContent\n\n[Continuation error: ${error.localizedMessage ?: "Failed to continue"}]",
+                            isError = false
+                        )
+                    }
+                }
+            } finally {
+                _isGenerating.value = false
+                _continuingMessageId.value = null
+            }
+        }
+    }
+
     fun stopGeneration() {
         activeJob?.cancel()
         AiService.cancelActiveRequest()
         _isGenerating.value = false
+        _continuingMessageId.value = null
     }
 
     fun onKeysUpdated() {

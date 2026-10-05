@@ -28,6 +28,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_GOOGLE_MAPS_API_KEY = "google_maps_api_key"
         private const val KEY_ACTIVE_PERSONA_ID = "active_persona_id"
         private const val KEY_CUSTOM_PERSONA_INSTRUCTIONS = "custom_persona_instructions"
+        private const val KEY_MAX_OUTPUT_TOKENS = "max_output_tokens"
 
         const val DEFAULT_SYSTEM_PROMPT =
             "You are a friendly, highly intelligent AI assistant. Provide helpful, accurate, well-formatted, and concise answers with markdown and code snippets when needed."
@@ -77,6 +78,10 @@ class PreferencesManager(context: Context) {
     var customPersonaInstructions: String
         get() = prefs.getString(KEY_CUSTOM_PERSONA_INSTRUCTIONS, "") ?: ""
         set(value) = prefs.edit().putString(KEY_CUSTOM_PERSONA_INSTRUCTIONS, value).apply()
+
+    var maxOutputTokens: Int
+        get() = prefs.getInt(KEY_MAX_OUTPUT_TOKENS, 8192)
+        set(value) = prefs.edit().putInt(KEY_MAX_OUTPUT_TOKENS, value).apply()
 
     fun exportKeysJson(): String {
         val obj = org.json.JSONObject().apply {

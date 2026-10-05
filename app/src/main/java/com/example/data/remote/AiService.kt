@@ -55,7 +55,8 @@ object AiService {
         systemPrompt: String,
         temperature: Float,
         customBaseUrl: String,
-        supportsVision: Boolean = false
+        supportsVision: Boolean = false,
+        maxTokens: Int = 8192
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
             when (provider) {
@@ -66,7 +67,8 @@ object AiService {
                     history = history,
                     apiKey = apiKey,
                     systemPrompt = systemPrompt,
-                    temperature = temperature
+                    temperature = temperature,
+                    maxTokens = maxTokens
                 )
                 ProviderType.GROQ -> callOpenAiCompatible(
                     endpointUrl = provider.defaultBaseUrl,
@@ -78,7 +80,8 @@ object AiService {
                     systemPrompt = systemPrompt,
                     temperature = temperature,
                     extraHeaders = emptyMap(),
-                    supportsVision = supportsVision
+                    supportsVision = supportsVision,
+                    maxTokens = maxTokens
                 )
                 ProviderType.OPENROUTER -> callOpenAiCompatible(
                     endpointUrl = provider.defaultBaseUrl,
@@ -93,7 +96,8 @@ object AiService {
                         "HTTP-Referer" to "https://omnichat.android",
                         "X-Title" to "OmniChat"
                     ),
-                    supportsVision = supportsVision
+                    supportsVision = supportsVision,
+                    maxTokens = maxTokens
                 )
                 ProviderType.POLLINATIONS -> callPollinations(
                     modelId = modelId,
@@ -101,7 +105,8 @@ object AiService {
                     attachments = attachments,
                     history = history,
                     systemPrompt = systemPrompt,
-                    temperature = temperature
+                    temperature = temperature,
+                    maxTokens = maxTokens
                 )
                 ProviderType.CEREBRAS -> callOpenAiCompatible(
                     endpointUrl = provider.defaultBaseUrl,
@@ -113,7 +118,8 @@ object AiService {
                     systemPrompt = systemPrompt,
                     temperature = temperature,
                     extraHeaders = emptyMap(),
-                    supportsVision = false
+                    supportsVision = false,
+                    maxTokens = maxTokens
                 )
                 ProviderType.HUGGINGFACE -> callOpenAiCompatible(
                     endpointUrl = provider.defaultBaseUrl,
@@ -125,7 +131,8 @@ object AiService {
                     systemPrompt = systemPrompt,
                     temperature = temperature,
                     extraHeaders = emptyMap(),
-                    supportsVision = false
+                    supportsVision = false,
+                    maxTokens = maxTokens
                 )
                 ProviderType.CUSTOM -> {
                     val url = if (customBaseUrl.isNotBlank()) customBaseUrl else "https://api.openai.com/v1/chat/completions"
@@ -139,7 +146,8 @@ object AiService {
                         systemPrompt = systemPrompt,
                         temperature = temperature,
                         extraHeaders = emptyMap(),
-                        supportsVision = supportsVision
+                        supportsVision = supportsVision,
+                        maxTokens = maxTokens
                     )
                 }
             }
@@ -156,7 +164,8 @@ object AiService {
         history: List<ChatMessageEntity>,
         apiKey: String,
         systemPrompt: String,
-        temperature: Float
+        temperature: Float,
+        maxTokens: Int = 8192
     ): Result<String> {
         if (apiKey.isBlank()) {
             return Result.failure(IllegalStateException("Gemini API key is required. Please add it in Settings or via Secrets."))
@@ -223,7 +232,10 @@ object AiService {
                 val sysParts = JSONArray().put(JSONObject().put("text", systemPrompt))
                 put("systemInstruction", JSONObject().put("parts", sysParts))
             }
-            put("generationConfig", JSONObject().put("temperature", temperature))
+            put("generationConfig", JSONObject().apply {
+                put("temperature", temperature)
+                put("maxOutputTokens", maxTokens.coerceIn(1024, 8192))
+            })
         }
 
         val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelId:generateContent"
@@ -287,7 +299,8 @@ object AiService {
         systemPrompt: String,
         temperature: Float,
         extraHeaders: Map<String, String>,
-        supportsVision: Boolean = false
+        supportsVision: Boolean = false,
+        maxTokens: Int = 8192
     ): Result<String> {
         val messagesArray = JSONArray()
 
@@ -369,6 +382,7 @@ object AiService {
             put("model", modelId)
             put("messages", messagesArray)
             put("temperature", temperature)
+            put("max_tokens", maxTokens.coerceIn(1024, 16384))
         }
 
         val reqBuilder = Request.Builder()
@@ -419,7 +433,8 @@ object AiService {
         attachments: List<AttachmentInfo>,
         history: List<ChatMessageEntity>,
         systemPrompt: String,
-        temperature: Float
+        temperature: Float,
+        maxTokens: Int = 8192
     ): Result<String> {
         val effectiveModel = when (modelId) {
             "openai", "gpt-oss-20b", "openai-fast" -> modelId
@@ -438,7 +453,8 @@ object AiService {
             systemPrompt = systemPrompt,
             temperature = temperature,
             extraHeaders = emptyMap(),
-            supportsVision = hasImages
+            supportsVision = hasImages,
+            maxTokens = maxTokens
         )
 
         if (openAiRes.isSuccess) {
@@ -463,9 +479,13 @@ object AiService {
                 if (systemPrompt.isNotBlank()) {
                     msgs.put(JSONObject().put("role", "system").put("content", systemPrompt))
                 }
+                for (h in history.takeLast(10)) {
+                    msgs.put(JSONObject().put("role", if (h.role == "user") "user" else "assistant").put("content", h.content))
+                }
                 msgs.put(JSONObject().put("role", "user").put("content", queryPrompt))
                 put("messages", msgs)
                 put("model", effectiveModel)
+                put("max_tokens", maxTokens.coerceIn(1024, 16384))
             }
             val postReq = Request.Builder()
                 .url("https://text.pollinations.ai/")

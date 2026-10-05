@@ -39,6 +39,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
@@ -50,6 +51,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
@@ -140,6 +142,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
     val messages by viewModel.currentMessages.collectAsState()
     val pendingAttachments by viewModel.pendingAttachments.collectAsState()
     val isGenerating by viewModel.isGenerating.collectAsState()
+    val continuingMessageId by viewModel.continuingMessageId.collectAsState()
     val selectedProvider by viewModel.selectedProvider.collectAsState()
     val selectedModel by viewModel.selectedModel.collectAsState()
     val speakingMessageId by viewModel.speakingMessageId.collectAsState()
@@ -1042,6 +1045,47 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                 }
                             }
 
+                            // Quick Continue Banner when AI stopped or when elaboration is requested
+                            val lastMsg = messages.lastOrNull()
+                            if (!isGenerating && lastMsg != null && lastMsg.role == "assistant" && !lastMsg.isError && lastMsg.content.isNotBlank()) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable { viewModel.continueMessage(lastMsg) }
+                                        .testTag("quick_continue_chip")
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.FastForward,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Response stopped? Tap to Continue & Complete Answer",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp),
+                                            tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+                            }
+
                             // Input Text Field & Action Buttons
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1225,6 +1269,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                         viewModel.repository.parseAttachments(msg.attachmentsJson)
                                     }
                                     val isSpeaking = speakingMessageId == msg.id
+                                    val isContinuing = continuingMessageId == msg.id
 
                                     ChatMessageItem(
                                         message = msg,
@@ -1234,7 +1279,10 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                         onRegenerate = { viewModel.regenerateMessage(msg) },
                                         onOpenSettings = { showQuickKeyDialog = true },
                                         onOpenArtifact = { art -> viewModel.selectArtifact(art) },
-                                        onAttachmentClick = { att -> inspectingAttachment = att }
+                                        onAttachmentClick = { att -> inspectingAttachment = att },
+                                        onContinue = { viewModel.continueMessage(msg) },
+                                        isContinuing = isContinuing,
+                                        isGenerating = isGenerating
                                     )
                                 }
 
@@ -1253,7 +1301,11 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                             )
                                             Spacer(modifier = Modifier.width(10.dp))
                                             Text(
-                                                text = "${selectedProvider.displayName} is thinking...",
+                                                text = if (continuingMessageId != null) {
+                                                    "Continuing response with full elaboration..."
+                                                } else {
+                                                    "${selectedProvider.displayName} is thinking..."
+                                                },
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.primary
                                             )
