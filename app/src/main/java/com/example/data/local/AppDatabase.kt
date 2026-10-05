@@ -6,14 +6,22 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.example.data.model.ChatMessageEntity
 import com.example.data.model.ChatSessionEntity
+import com.example.data.model.KnowledgeChunkEntity
+import com.example.data.model.KnowledgeDocumentEntity
 
 @Database(
-    entities = [ChatSessionEntity::class, ChatMessageEntity::class],
-    version = 1,
+    entities = [
+        ChatSessionEntity::class,
+        ChatMessageEntity::class,
+        KnowledgeDocumentEntity::class,
+        KnowledgeChunkEntity::class
+    ],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun chatDao(): ChatDao
+    abstract fun ragDao(): RagDao
 
     companion object {
         @Volatile

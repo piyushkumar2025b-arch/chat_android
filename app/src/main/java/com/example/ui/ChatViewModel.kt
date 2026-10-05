@@ -18,9 +18,14 @@ import com.example.data.model.AttachmentInfo
 import com.example.data.model.AvailableModels
 import com.example.data.model.ChatMessageEntity
 import com.example.data.model.ChatSessionEntity
+import com.example.data.model.KnowledgeChunkEntity
+import com.example.data.model.KnowledgeDocumentEntity
 import com.example.data.model.ProviderType
+import com.example.data.model.RagEngineStats
+import com.example.data.model.RetrievedChunk
 import com.example.data.remote.AiService
 import com.example.data.remote.FileUtils
+import com.example.data.remote.RagEngine
 import com.example.data.remote.WebSearchService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
@@ -38,6 +43,7 @@ import java.util.Locale
 
 enum class AppSection(val label: String) {
     CHAT("Chat"),
+    KNOWLEDGE("RAG Hub"),
     STUDIO("Studio"),
     MAPS("Maps"),
     YOUTUBE("YouTube"),
@@ -68,6 +74,108 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleWebSearch() {
         _isWebSearchEnabled.value = !_isWebSearchEnabled.value
+    }
+
+    val ragEngine = RagEngine(database.ragDao())
+
+    val ragDocuments: StateFlow<List<KnowledgeDocumentEntity>> = database.ragDao().getAllDocuments()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _isRagEnabled = MutableStateFlow(true)
+    val isRagEnabled: StateFlow<Boolean> = _isRagEnabled.asStateFlow()
+
+    fun toggleRag() {
+        _isRagEnabled.value = !_isRagEnabled.value
+    }
+
+    private val _ragStats = MutableStateFlow(RagEngineStats())
+    val ragStats: StateFlow<RagEngineStats> = _ragStats.asStateFlow()
+
+    private val _testSearchResults = MutableStateFlow<List<RetrievedChunk>>(emptyList())
+    val testSearchResults: StateFlow<List<RetrievedChunk>> = _testSearchResults.asStateFlow()
+
+    private val _isRagProcessing = MutableStateFlow(false)
+    val isRagProcessing: StateFlow<Boolean> = _isRagProcessing.asStateFlow()
+
+    fun refreshRagStats() {
+        viewModelScope.launch {
+            _ragStats.value = ragEngine.getStats(preferencesManager.geminiApiKey)
+        }
+    }
+
+    fun ingestTextToRag(title: String, content: String, sourceType: String = "MANUAL", onComplete: (Boolean, String) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            _isRagProcessing.value = true
+            val res = ragEngine.ingestDocument(
+                title = title,
+                content = content,
+                sourceType = sourceType,
+                geminiApiKey = preferencesManager.geminiApiKey
+            )
+            _isRagProcessing.value = false
+            refreshRagStats()
+            if (res.isSuccess) {
+                onComplete(true, "Document indexed with ${res.getOrNull()?.chunkCount ?: 0} chunks")
+            } else {
+                onComplete(false, res.exceptionOrNull()?.localizedMessage ?: "Failed to index document")
+            }
+        }
+    }
+
+    fun ingestFileToRag(uri: Uri, onComplete: (Boolean, String) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            _isRagProcessing.value = true
+            val res = ragEngine.ingestFile(
+                context = getApplication(),
+                uri = uri,
+                geminiApiKey = preferencesManager.geminiApiKey
+            )
+            _isRagProcessing.value = false
+            refreshRagStats()
+            if (res.isSuccess) {
+                onComplete(true, "Document '${res.getOrNull()?.title}' indexed (${res.getOrNull()?.chunkCount ?: 0} chunks)")
+            } else {
+                onComplete(false, res.exceptionOrNull()?.localizedMessage ?: "Failed to ingest file")
+            }
+        }
+    }
+
+    fun deleteRagDocument(docId: String) {
+        viewModelScope.launch {
+            database.ragDao().deleteDocumentWithChunks(docId)
+            refreshRagStats()
+        }
+    }
+
+    fun clearEntireRag() {
+        viewModelScope.launch {
+            database.ragDao().clearEntireKnowledgeBase()
+            _testSearchResults.value = emptyList()
+            refreshRagStats()
+        }
+    }
+
+    fun loadStarterKnowledgeBase(onComplete: (Boolean, String) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            _isRagProcessing.value = true
+            val res = ragEngine.populateStarterKnowledgeBase(preferencesManager.geminiApiKey)
+            _isRagProcessing.value = false
+            refreshRagStats()
+            if (res.isSuccess) {
+                onComplete(true, "Loaded ${res.getOrNull() ?: 0} starter knowledge base documents")
+            } else {
+                onComplete(false, res.exceptionOrNull()?.localizedMessage ?: "Failed to load starter docs")
+            }
+        }
+    }
+
+    fun testRagQuery(query: String) {
+        viewModelScope.launch {
+            _isRagProcessing.value = true
+            val results = ragEngine.search(query, topK = 5, geminiApiKey = preferencesManager.geminiApiKey)
+            _testSearchResults.value = results
+            _isRagProcessing.value = false
+        }
     }
 
     val usageStats: StateFlow<UsageStats> = usageTracker.usageStats
@@ -225,6 +333,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         _currentSession.value = first
                         syncSessionModel(first)
                     }
+                }
+            }
+            // Auto-initialize RAG knowledge base if empty and fetch stats
+            launch {
+                try {
+                    if (database.ragDao().getDocumentCount() == 0) {
+                        ragEngine.populateStarterKnowledgeBase(preferencesManager.geminiApiKey)
+                    }
+                    refreshRagStats()
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
             }
         }
@@ -497,7 +616,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 } catch (_: Exception) { "" }
             } else ""
 
-            val promptWithGrounding = displayPrompt + webContext
+            val ragContext = if (_isRagEnabled.value && trimmed.isNotBlank()) {
+                try {
+                    val geminiKey = preferencesManager.geminiApiKey
+                    val retrieved = ragEngine.search(trimmed, topK = 4, geminiApiKey = geminiKey)
+                    if (retrieved.isNotEmpty()) {
+                        ragEngine.formatRagGroundingPrompt(retrieved)
+                    } else ""
+                } catch (_: Exception) { "" }
+            } else ""
+
+            val promptWithGrounding = displayPrompt + webContext + ragContext
             val effectiveModelId = if (provider == ProviderType.CUSTOM) {
                 preferencesManager.customModel.trim().ifEmpty { "gpt-4o-mini" }
             } else {
@@ -600,10 +729,22 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 model.id
             }
 
+            val ragContext = if (_isRagEnabled.value && userMessage.content.isNotBlank()) {
+                try {
+                    val geminiKey = preferencesManager.geminiApiKey
+                    val retrieved = ragEngine.search(userMessage.content, topK = 4, geminiApiKey = geminiKey)
+                    if (retrieved.isNotEmpty()) {
+                        ragEngine.formatRagGroundingPrompt(retrieved)
+                    } else ""
+                } catch (_: Exception) { "" }
+            } else ""
+
+            val regenPrompt = userMessage.content + ragContext
+
             val result = AiService.sendMessage(
                 provider = provider,
                 modelId = effectiveModelId,
-                prompt = userMessage.content,
+                prompt = regenPrompt,
                 attachments = attachments,
                 history = history,
                 apiKey = apiKey,
