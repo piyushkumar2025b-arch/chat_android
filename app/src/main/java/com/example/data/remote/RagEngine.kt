@@ -296,7 +296,7 @@ class RagEngine(private val ragDao: RagDao) {
             totalChunks = chunkCount,
             isGeminiEmbeddingAvailable = geminiApiKey.isNotBlank(),
             isHybridSearchActive = true,
-            activeEmbeddingModel = if (geminiApiKey.isNotBlank()) "gemini-embedding-2-preview" else "Local Hybrid TF-IDF"
+            activeEmbeddingModel = if (geminiApiKey.isNotBlank()) "text-embedding-004" else "Local Hybrid TF-IDF"
         )
     }
 
@@ -361,8 +361,9 @@ Process Flow:
     private fun fetchGeminiEmbedding(text: String, apiKey: String): List<Float>? {
         if (apiKey.isBlank()) return null
         return try {
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2-preview:embedContent?key=$apiKey"
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=$apiKey"
             val bodyJson = JSONObject().apply {
+                put("model", "models/text-embedding-004")
                 put("content", JSONObject().apply {
                     put("parts", JSONArray().put(JSONObject().put("text", text.take(2000))))
                 })
@@ -374,21 +375,23 @@ Process Flow:
                 .build()
 
             val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                // Try fallback to text-embedding-004
-                return fetchFallbackEmbedding(text, apiKey)
-            }
+            response.use { resp ->
+                if (!resp.isSuccessful) {
+                    // Try fallback to embedding-001
+                    return fetchFallbackEmbedding(text, apiKey)
+                }
 
-            val responseBody = response.body?.string().orEmpty()
-            val root = JSONObject(responseBody)
-            val embeddingObj = root.optJSONObject("embedding") ?: return null
-            val valuesArray = embeddingObj.optJSONArray("values") ?: return null
+                val responseBody = resp.body?.string().orEmpty()
+                val root = JSONObject(responseBody)
+                val embeddingObj = root.optJSONObject("embedding") ?: return null
+                val valuesArray = embeddingObj.optJSONArray("values") ?: return null
 
-            val result = ArrayList<Float>(valuesArray.length())
-            for (i in 0 until valuesArray.length()) {
-                result.add(valuesArray.getDouble(i).toFloat())
+                val result = ArrayList<Float>(valuesArray.length())
+                for (i in 0 until valuesArray.length()) {
+                    result.add(valuesArray.getDouble(i).toFloat())
+                }
+                result
             }
-            result
         } catch (e: Exception) {
             null
         }
@@ -396,8 +399,9 @@ Process Flow:
 
     private fun fetchFallbackEmbedding(text: String, apiKey: String): List<Float>? {
         return try {
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=$apiKey"
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent?key=$apiKey"
             val bodyJson = JSONObject().apply {
+                put("model", "models/embedding-001")
                 put("content", JSONObject().apply {
                     put("parts", JSONArray().put(JSONObject().put("text", text.take(2000))))
                 })
@@ -409,18 +413,20 @@ Process Flow:
                 .build()
 
             val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) return null
+            response.use { resp ->
+                if (!resp.isSuccessful) return null
 
-            val responseBody = response.body?.string().orEmpty()
-            val root = JSONObject(responseBody)
-            val embeddingObj = root.optJSONObject("embedding") ?: return null
-            val valuesArray = embeddingObj.optJSONArray("values") ?: return null
+                val responseBody = resp.body?.string().orEmpty()
+                val root = JSONObject(responseBody)
+                val embeddingObj = root.optJSONObject("embedding") ?: return null
+                val valuesArray = embeddingObj.optJSONArray("values") ?: return null
 
-            val result = ArrayList<Float>(valuesArray.length())
-            for (i in 0 until valuesArray.length()) {
-                result.add(valuesArray.getDouble(i).toFloat())
+                val result = ArrayList<Float>(valuesArray.length())
+                for (i in 0 until valuesArray.length()) {
+                    result.add(valuesArray.getDouble(i).toFloat())
+                }
+                result
             }
-            result
         } catch (e: Exception) {
             null
         }

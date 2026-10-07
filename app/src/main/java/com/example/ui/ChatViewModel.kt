@@ -27,8 +27,10 @@ import com.example.data.remote.AiService
 import com.example.data.remote.FileUtils
 import com.example.data.remote.RagEngine
 import com.example.data.remote.WebSearchService
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -145,6 +147,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             database.ragDao().deleteDocumentWithChunks(docId)
             refreshRagStats()
         }
+    }
+
+    suspend fun getChunksForDocument(docId: String): List<KnowledgeChunkEntity> = withContext(Dispatchers.IO) {
+        database.ragDao().getChunksForDoc(docId)
     }
 
     fun clearEntireRag() {

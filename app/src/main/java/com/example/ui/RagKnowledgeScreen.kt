@@ -28,16 +28,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.FactCheck
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Hub
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -212,7 +212,7 @@ fun RagKnowledgeScreen(
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    imageVector = Icons.Default.FactCheck,
+                                    imageVector = Icons.AutoMirrored.Filled.FactCheck,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(22.dp)
@@ -470,7 +470,7 @@ fun RagKnowledgeScreen(
                         },
                         modifier = Modifier.weight(1f).testTag("rag_load_starter_button")
                     ) {
-                        Icon(Icons.Default.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Add Starter Docs")
                     }
@@ -544,8 +544,7 @@ fun RagKnowledgeScreen(
                                 viewingDocumentChunks = doc
                                 isLoadingDocChunks = true
                                 coroutineScope.launch {
-                                    val chunks = viewModel.ragEngine.search(doc.title, topK = 10, geminiApiKey = "")
-                                    loadedChunksForDoc = chunks.map { it.chunk }.filter { it.docId == doc.id }
+                                    loadedChunksForDoc = viewModel.getChunksForDocument(doc.id)
                                     isLoadingDocChunks = false
                                 }
                             }
@@ -566,7 +565,7 @@ fun RagKnowledgeScreen(
                                     imageVector = when (doc.sourceType) {
                                         "PDF" -> Icons.Default.Description
                                         "CODE" -> Icons.AutoMirrored.Filled.OpenInNew
-                                        "SAMPLE" -> Icons.Default.MenuBook
+                                        "SAMPLE" -> Icons.AutoMirrored.Filled.MenuBook
                                         else -> Icons.Default.FolderOpen
                                     },
                                     contentDescription = null,

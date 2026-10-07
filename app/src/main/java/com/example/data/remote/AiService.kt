@@ -245,11 +245,12 @@ object AiService {
             .post(rootJson.toString().toRequestBody(jsonMediaType))
             .build()
 
-        val response = executeRequest(request)
-        val responseBody = response.body?.string().orEmpty()
+        val (responseCode, isSuccess, responseBody) = executeRequest(request).use { resp ->
+            Triple(resp.code, resp.isSuccessful, resp.body?.string().orEmpty())
+        }
 
-        if (!response.isSuccessful) {
-            val errorMsg = parseErrorMessage(responseBody, "Gemini error (${response.code})")
+        if (!isSuccess) {
+            val errorMsg = parseErrorMessage(responseBody, "Gemini error ($responseCode)")
             return Result.failure(Exception(errorMsg))
         }
 
@@ -397,11 +398,12 @@ object AiService {
             reqBuilder.addHeader(k, v)
         }
 
-        val response = executeRequest(reqBuilder.build())
-        val responseBody = response.body?.string().orEmpty()
+        val (responseCode, isSuccess, responseBody) = executeRequest(reqBuilder.build()).use { resp ->
+            Triple(resp.code, resp.isSuccessful, resp.body?.string().orEmpty())
+        }
 
-        if (!response.isSuccessful) {
-            val errorMsg = parseErrorMessage(responseBody, "Request failed (${response.code})")
+        if (!isSuccess) {
+            val errorMsg = parseErrorMessage(responseBody, "Request failed ($responseCode)")
             return Result.failure(Exception(errorMsg))
         }
 
@@ -492,9 +494,10 @@ object AiService {
                 .post(postJson.toString().toRequestBody(jsonMediaType))
                 .build()
 
-            val postResp = executeRequest(postReq)
-            val postText = postResp.body?.string().orEmpty()
-            if (postResp.isSuccessful && postText.isNotBlank()) {
+            val postText = executeRequest(postReq).use { resp ->
+                if (resp.isSuccessful) resp.body?.string().orEmpty() else ""
+            }
+            if (postText.isNotBlank()) {
                 return Result.success(postText)
             }
 
@@ -504,9 +507,10 @@ object AiService {
             val url = "https://text.pollinations.ai/$encodedPrompt?model=$effectiveModel&system=$encodedSystem"
 
             val req = Request.Builder().url(url).get().build()
-            val resp = executeRequest(req)
-            val text = resp.body?.string().orEmpty()
-            if (resp.isSuccessful && text.isNotBlank()) {
+            val text = executeRequest(req).use { resp ->
+                if (resp.isSuccessful) resp.body?.string().orEmpty() else ""
+            }
+            if (text.isNotBlank()) {
                 Result.success(text)
             } else {
                 openAiRes // Return original error

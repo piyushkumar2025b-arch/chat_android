@@ -54,12 +54,12 @@ object MediaSaver {
                 .build()
 
             val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                return@withContext Result.failure(Exception("Failed to download image (HTTP ${response.code})"))
-            }
-
-            val bytes = response.body?.bytes()
-                ?: return@withContext Result.failure(Exception("Image data was empty"))
+            val bytes = response.use { resp ->
+                if (!resp.isSuccessful) {
+                    return@withContext Result.failure(Exception("Failed to download image (HTTP ${resp.code})"))
+                }
+                resp.body?.bytes()
+            } ?: return@withContext Result.failure(Exception("Image data was empty"))
 
             val cleanName = promptTitle.take(30).replace(Regex("[^a-zA-Z0-9_]"), "_").trim('_').ifEmpty { "OmniArt" }
             val fileName = "Omni_${cleanName}_${System.currentTimeMillis()}.png"
@@ -154,12 +154,12 @@ object MediaSaver {
                 .build()
 
             val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                return@withContext Result.failure(Exception("Failed to download video (HTTP ${response.code})"))
-            }
-
-            val bytes = response.body?.bytes()
-                ?: return@withContext Result.failure(Exception("Video content was empty"))
+            val bytes = response.use { resp ->
+                if (!resp.isSuccessful) {
+                    return@withContext Result.failure(Exception("Failed to download video (HTTP ${resp.code})"))
+                }
+                resp.body?.bytes()
+            } ?: return@withContext Result.failure(Exception("Video content was empty"))
 
             val cleanName = promptTitle.take(30).replace(Regex("[^a-zA-Z0-9_]"), "_").trim('_').ifEmpty { "OmniVideo" }
             val fileName = "Omni_${cleanName}_${System.currentTimeMillis()}.mp4"
