@@ -63,7 +63,7 @@ class RagEngine(private val ragDao: RagDao) {
                 val relativeBreak = boundaryCheckWindow.lastIndexOfAny(charArrayOf('.', '\n', '!', '?'))
                 if (relativeBreak != -1) {
                     val candidateEnd = (end - 80).coerceAtLeast(start) + relativeBreak + 1
-                    if (candidateEnd in (start + 150)..length) {
+                    if (candidateEnd > start + 50 && candidateEnd <= length) {
                         end = candidateEnd
                     }
                 }
@@ -76,6 +76,10 @@ class RagEngine(private val ragDao: RagDao) {
 
             if (end >= length) break
             start = (end - overlap).coerceAtLeast(start + 1)
+        }
+
+        if (chunks.isEmpty() && cleaned.isNotBlank()) {
+            chunks.add(cleaned.trim())
         }
 
         return chunks

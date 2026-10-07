@@ -1,9 +1,9 @@
 package com.example
 
 import com.example.data.remote.NewsFeedService
+import com.example.data.remote.SearchCategory
 import com.example.data.remote.WebSearchService
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -33,6 +33,25 @@ class WebSearchTest {
         assertTrue("Title must not be blank", first.title.isNotBlank())
         assertTrue("Snippet must not be blank", first.snippet.isNotBlank())
         assertTrue("URL must not be blank", first.url.isNotBlank())
+    }
+
+    @Test
+    fun testKnowledgeCategorySearch() = runBlocking {
+        val result = WebSearchService.search("quantum physics", SearchCategory.KNOWLEDGE)
+        assertTrue(result.isSuccess)
+        val list = result.getOrNull()
+        assertNotNull(list)
+        assertTrue("Knowledge search should return results", list!!.isNotEmpty())
+        assertTrue(list.any { it.source.contains("Wikipedia", ignoreCase = true) || it.source.contains("DuckDuckGo", ignoreCase = true) })
+    }
+
+    @Test
+    fun testCodeCategorySearch() = runBlocking {
+        val result = WebSearchService.search("kotlin", SearchCategory.CODE)
+        assertTrue(result.isSuccess)
+        val list = result.getOrNull()
+        assertNotNull(list)
+        assertTrue("Code search should return results", list!!.isNotEmpty())
     }
 
     @Test
