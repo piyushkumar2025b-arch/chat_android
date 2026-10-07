@@ -163,10 +163,11 @@ class RagEngine(private val ragDao: RagDao) {
         geminiApiKey: String = ""
     ): Result<KnowledgeDocumentEntity> = withContext(Dispatchers.IO) {
         try {
-            val cachedFile = FileUtils.copyUriToInternalCache(context, uri)
+            val att = FileUtils.processPickedUri(context, uri)
                 ?: return@withContext Result.failure(Exception("Could not read file from storage."))
 
-            val fileName = cachedFile.name
+            val cachedFile = File(att.localUri)
+            val fileName = att.name
             val text = FileUtils.readFullTextContent(cachedFile, 150_000)
             if (text.isBlank()) {
                 return@withContext Result.failure(Exception("No readable text found in $fileName."))

@@ -53,6 +53,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -156,6 +157,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
     val selectedArtifact by viewModel.selectedArtifact.collectAsState()
     val currentSection by viewModel.currentSection.collectAsState()
     val isWebSearchEnabled by viewModel.isWebSearchEnabled.collectAsState()
+    val isRagEnabled by viewModel.isRagEnabled.collectAsState()
 
     var inputText by rememberSaveable { mutableStateOf("") }
     var showProviderSheet by remember { mutableStateOf(false) }
@@ -424,6 +426,43 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Phone Storage & Files", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                                 Text("All formats: PDF, Word, Excel, Code, Images", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // RAG Knowledge Base & Hub
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.KNOWLEDGE)
+                            }
+                            .testTag("drawer_rag_hub_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Hub, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("RAG Knowledge Hub", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                Text("Local Vector Store • Private Document Grounding", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (isRagEnabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                            ) {
+                                Text(
+                                    if (isRagEnabled) "Active" else "Off",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isRagEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
                             }
                         }
                     }
@@ -843,6 +882,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                         AppSection.NEWS -> "Live News & Intelligence"
                                         AppSection.SEARCH -> "Live Web Search"
                                         AppSection.READ_ALOUD -> "Read Aloud Narrator"
+                                        AppSection.KNOWLEDGE -> "RAG Knowledge Hub"
                                         else -> "OmniChat AI"
                                     },
                                     style = MaterialTheme.typography.titleMedium,
@@ -993,7 +1033,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                     onClick = { viewModel.toggleWebSearch() },
                                     label = {
                                         Text(
-                                            if (isWebSearchEnabled) "🌐 Web Search: ON" else "🌐 Search Web",
+                                            if (isWebSearchEnabled) "🌐 Web: ON" else "🌐 Web",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = if (isWebSearchEnabled) FontWeight.Bold else FontWeight.Normal
                                         )
@@ -1005,7 +1045,26 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                     modifier = Modifier.testTag("toggle_web_search_button")
                                 )
 
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+
+                                FilterChip(
+                                    selected = isRagEnabled,
+                                    onClick = { viewModel.toggleRag() },
+                                    label = {
+                                        Text(
+                                            if (isRagEnabled) "📚 RAG: ON" else "📚 RAG: OFF",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (isRagEnabled) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    ),
+                                    modifier = Modifier.testTag("toggle_rag_button")
+                                )
+
+                                Spacer(modifier = Modifier.width(6.dp))
 
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
@@ -1314,6 +1373,13 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                 }
                             }
                         }
+                    }
+
+                    AppSection.KNOWLEDGE -> {
+                        RagKnowledgeScreen(
+                            viewModel = viewModel,
+                            onBack = { viewModel.navigateToSection(AppSection.CHAT) }
+                        )
                     }
 
                     AppSection.STUDIO -> {
