@@ -229,9 +229,12 @@ fun YouTubeScreen(
                 val client = OkHttpClient.Builder().connectTimeout(12, TimeUnit.SECONDS).build()
                 val req = Request.Builder().url(url).build()
 
-                val res = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                if (res.isSuccessful) {
-                    val body = res.body?.string().orEmpty()
+                val (isSuccess, code, body) = withContext(Dispatchers.IO) {
+                    client.newCall(req).execute().use { res ->
+                        Triple(res.isSuccessful, res.code, res.body?.string().orEmpty())
+                    }
+                }
+                if (isSuccess) {
                     val json = JSONObject(body)
                     val items = json.optJSONArray("items")
                     searchResults.clear()
@@ -258,7 +261,6 @@ fun YouTubeScreen(
                         activeVideo = searchResults.first()
                     }
                 } else {
-                    val code = res.code
                     Toast.makeText(context, "YouTube API error ($code). Check your API key in Settings.", Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
