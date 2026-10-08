@@ -55,6 +55,24 @@ class WebSearchTest {
     }
 
     @Test
+    fun testBooksCategorySearch() = runBlocking {
+        val result = WebSearchService.search("relativity", SearchCategory.BOOKS)
+        assertTrue(result.isSuccess)
+        val list = result.getOrNull()
+        assertNotNull(list)
+        assertTrue("Books search should return results", list!!.isNotEmpty())
+    }
+
+    @Test
+    fun testScienceCategorySearch() = runBlocking {
+        val result = WebSearchService.search("cancer", SearchCategory.SCIENCE)
+        assertTrue(result.isSuccess)
+        val list = result.getOrNull()
+        assertNotNull(list)
+        assertTrue("Science search should return results", list!!.isNotEmpty())
+    }
+
+    @Test
     fun testNewsFeedServiceFetchesBBCArticles() = runBlocking {
         val result = NewsFeedService.fetchNews(NewsFeedService.NewsCategory.ALL)
         assertTrue(result.isSuccess)

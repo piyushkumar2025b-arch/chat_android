@@ -39,7 +39,8 @@ enum class SearchCategory(val id: String, val label: String, val icon: String) {
     KNOWLEDGE("knowledge", "Encyclopedia", "📖"),
     NEWS("news", "Live News", "📰"),
     SCIENCE("science", "Science & Research", "🔬"),
-    CODE("code", "Code & Dev", "💻")
+    CODE("code", "Code & Dev", "💻"),
+    BOOKS("books", "Books & Archive", "📚")
 }
 
 object NewsFeedService {
@@ -53,7 +54,10 @@ object NewsFeedService {
             "All News",
             listOf(
                 "BBC News" to "https://feeds.bbci.co.uk/news/rss.xml",
-                "New York Times" to "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+                "New York Times" to "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+                "The Guardian" to "https://www.theguardian.com/world/rss",
+                "Al Jazeera" to "https://www.aljazeera.com/xml/rss/all.xml",
+                "CNBC News" to "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"
             )
         ),
         TECH(
@@ -61,41 +65,53 @@ object NewsFeedService {
             listOf(
                 "BBC Tech" to "https://feeds.bbci.co.uk/news/technology/rss.xml",
                 "Ars Technica" to "https://feeds.arstechnica.com/arstechnica/index",
-                "NYT Tech" to "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml"
+                "NYT Tech" to "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+                "The Guardian Tech" to "https://www.theguardian.com/technology/rss",
+                "TechCrunch" to "https://feeds.feedburner.com/TechCrunch/",
+                "CNBC Tech" to "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=19854910"
             )
         ),
         WORLD(
             "World",
             listOf(
                 "BBC World" to "https://feeds.bbci.co.uk/news/world/rss.xml",
-                "NYT World" to "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
+                "NYT World" to "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+                "The Guardian World" to "https://www.theguardian.com/world/rss",
+                "Al Jazeera" to "https://www.aljazeera.com/xml/rss/all.xml"
             )
         ),
         SCIENCE(
             "Science",
             listOf(
                 "BBC Science" to "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
-                "NYT Science" to "https://rss.nytimes.com/services/xml/rss/nyt/Science.xml"
+                "NYT Science" to "https://rss.nytimes.com/services/xml/rss/nyt/Science.xml",
+                "The Guardian Science" to "https://www.theguardian.com/science/rss",
+                "NASA Releases" to "https://www.nasa.gov/news-release/feed/"
             )
         ),
         BUSINESS(
             "Business",
             listOf(
                 "BBC Business" to "https://feeds.bbci.co.uk/news/business/rss.xml",
-                "NYT Business" to "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml"
+                "NYT Business" to "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
+                "The Guardian Business" to "https://www.theguardian.com/business/rss",
+                "CNBC Markets" to "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"
             )
         ),
         ENTERTAINMENT(
             "Entertainment",
             listOf(
-                "BBC Entertainment" to "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml"
+                "BBC Culture" to "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml",
+                "The Guardian Culture" to "https://www.theguardian.com/culture/rss",
+                "NYT Arts" to "https://rss.nytimes.com/services/xml/rss/nyt/Arts.xml"
             )
         ),
         HEALTH(
             "Health",
             listOf(
                 "BBC Health" to "https://feeds.bbci.co.uk/news/health/rss.xml",
-                "NYT Health" to "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml"
+                "NYT Health" to "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
+                "The Guardian Health" to "https://www.theguardian.com/lifeandstyle/health-and-wellbeing/rss"
             )
         )
     }
@@ -245,7 +261,11 @@ object WebSearchService {
                         async { runCatching { fetchDuckDuckGo(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchBingNewsSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchStackOverflowSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchDevToSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchArXivSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchPubMedSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchOpenLibrarySearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchInternetArchiveSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchGitHubSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchHnSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchOpenAlexSearch(trimmed) }.getOrDefault(emptyList()) },
@@ -256,6 +276,8 @@ object WebSearchService {
                     SearchCategory.KNOWLEDGE -> listOf(
                         async { runCatching { fetchWikipediaSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchDuckDuckGo(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchOpenLibrarySearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchInternetArchiveSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchWikiquoteSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchWiktionarySearch(trimmed) }.getOrDefault(emptyList()) }
                     )
@@ -266,6 +288,7 @@ object WebSearchService {
                         async { runCatching { fetchWikipediaSearch(trimmed) }.getOrDefault(emptyList()) }
                     )
                     SearchCategory.SCIENCE -> listOf(
+                        async { runCatching { fetchPubMedSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchArXivSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchOpenAlexSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchCrossRefSearch(trimmed) }.getOrDefault(emptyList()) },
@@ -274,7 +297,14 @@ object WebSearchService {
                     SearchCategory.CODE -> listOf(
                         async { runCatching { fetchStackOverflowSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchGitHubSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchDevToSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchHnSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikipediaSearch(trimmed) }.getOrDefault(emptyList()) }
+                    )
+                    SearchCategory.BOOKS -> listOf(
+                        async { runCatching { fetchOpenLibrarySearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchInternetArchiveSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikiquoteSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchWikipediaSearch(trimmed) }.getOrDefault(emptyList()) }
                     )
                 }
@@ -1059,6 +1089,224 @@ object WebSearchService {
                                 source = "Wiktionary",
                                 pubDate = "Definition",
                                 category = "Encyclopedia"
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    /**
+     * PubMed / NCBI - Over 36 million biomedical citations and research articles.
+     */
+    private fun fetchPubMedSearch(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val encoded = URLEncoder.encode(query, "UTF-8")
+            val searchUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=$encoded&retmode=json&retmax=4"
+            val request = Request.Builder()
+                .url(searchUrl)
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
+                .build()
+
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val root = JSONObject(body)
+                val idList = root.optJSONObject("esearchresult")?.optJSONArray("idlist")
+                if (idList != null && idList.length() > 0) {
+                    val ids = mutableListOf<String>()
+                    for (i in 0 until idList.length()) {
+                        ids.add(idList.optString(i))
+                    }
+                    val idsParam = ids.joinToString(",")
+                    val sumUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=$idsParam&retmode=json"
+                    val sumReq = Request.Builder()
+                        .url(sumUrl)
+                        .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
+                        .build()
+                    val sumBody = client.newCall(sumReq).execute().use { r ->
+                        if (r.isSuccessful) r.body?.string().orEmpty() else ""
+                    }
+                    if (sumBody.isNotBlank()) {
+                        val sumRoot = JSONObject(sumBody)
+                        val resObj = sumRoot.optJSONObject("result")
+                        if (resObj != null) {
+                            for (id in ids) {
+                                val item = resObj.optJSONObject(id) ?: continue
+                                val rawTitle = item.optString("title")
+                                val cleanTitle = cleanHtml(rawTitle).trimEnd('.')
+                                val journal = item.optString("source")
+                                val pubDate = item.optString("pubdate")
+                                val articleUrl = "https://pubmed.ncbi.nlm.nih.gov/$id/"
+
+                                if (cleanTitle.isNotBlank()) {
+                                    list.add(
+                                        WebSearchResult(
+                                            title = cleanTitle,
+                                            snippet = if (journal.isNotBlank()) "Biomedical research published in $journal. PubMed ID: $id." else "National Library of Medicine PubMed research. ID: $id.",
+                                            url = articleUrl,
+                                            source = "PubMed",
+                                            pubDate = formatPubDate(pubDate),
+                                            category = "Science & Medicine"
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    /**
+     * DEV.to - Premier global software developer and engineering community.
+     */
+    private fun fetchDevToSearch(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val encoded = URLEncoder.encode(query, "UTF-8")
+            val url = "https://dev.to/api/articles?search=$encoded&per_page=4"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
+                .build()
+
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val array = JSONArray(body)
+                for (i in 0 until array.length()) {
+                    val item = array.optJSONObject(i) ?: continue
+                    val title = item.optString("title").trim()
+                    val desc = item.optString("description").trim()
+                    val urlVal = item.optString("url")
+                    val dateVal = item.optString("readable_publish_date")
+
+                    if (title.isNotBlank() && urlVal.isNotBlank()) {
+                        list.add(
+                            WebSearchResult(
+                                title = title,
+                                snippet = if (desc.isNotBlank()) cleanHtml(desc) else "Developer article on DEV Community.",
+                                url = urlVal,
+                                source = "DEV.to",
+                                pubDate = if (dateVal.isNotBlank()) dateVal else "Dev Article",
+                                category = "Code & Dev"
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    /**
+     * OpenLibrary - Free catalog of millions of books, literature and authors.
+     */
+    private fun fetchOpenLibrarySearch(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val encoded = URLEncoder.encode(query, "UTF-8")
+            val url = "https://openlibrary.org/search.json?q=$encoded&limit=4"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
+                .build()
+
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val root = JSONObject(body)
+                val docs = root.optJSONArray("docs") ?: JSONArray()
+                for (i in 0 until docs.length()) {
+                    val item = docs.optJSONObject(i) ?: continue
+                    val title = item.optString("title").trim()
+                    val key = item.optString("key")
+                    val authorsArr = item.optJSONArray("author_name")
+                    val author = if (authorsArr != null && authorsArr.length() > 0) authorsArr.optString(0) else ""
+                    val year = item.optInt("first_publish_year", 0)
+                    val bookUrl = "https://openlibrary.org$key"
+
+                    if (title.isNotBlank() && key.isNotBlank()) {
+                        val snippet = buildString {
+                            if (author.isNotBlank()) append("Book by $author. ")
+                            if (year > 0) append("First published in $year. ")
+                            append("Available in Open Library universal catalog.")
+                        }
+                        list.add(
+                            WebSearchResult(
+                                title = "$title (Book)",
+                                snippet = snippet,
+                                url = bookUrl,
+                                source = "OpenLibrary",
+                                pubDate = if (year > 0) year.toString() else "Book",
+                                category = "Books & Literature"
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    /**
+     * Internet Archive - Non-profit library of millions of books, media, and digital documents.
+     */
+    private fun fetchInternetArchiveSearch(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val encoded = URLEncoder.encode(query, "UTF-8")
+            val url = "https://archive.org/advancedsearch.php?q=$encoded&fl[]=identifier,title,description,mediatype&rows=4&output=json"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
+                .build()
+
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val root = JSONObject(body)
+                val docs = root.optJSONObject("response")?.optJSONArray("docs") ?: JSONArray()
+                for (i in 0 until docs.length()) {
+                    val item = docs.optJSONObject(i) ?: continue
+                    val identifier = item.optString("identifier")
+                    val title = item.optString("title").trim()
+                    val rawDesc = item.optString("description")
+                    val cleanDesc = cleanHtml(rawDesc)
+                    val mediaType = item.optString("mediatype", "archive")
+                    val itemUrl = "https://archive.org/details/$identifier"
+
+                    if (identifier.isNotBlank() && title.isNotBlank()) {
+                        list.add(
+                            WebSearchResult(
+                                title = title,
+                                snippet = if (cleanDesc.isNotBlank()) "$cleanDesc..." else "Historical digital resource preserved on archive.org ($mediaType).",
+                                url = itemUrl,
+                                source = "Internet Archive",
+                                pubDate = mediaType.replaceFirstChar { it.uppercase() },
+                                category = "Archive & History"
                             )
                         )
                     }

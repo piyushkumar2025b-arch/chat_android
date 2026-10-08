@@ -237,6 +237,7 @@ fun WebSearchScreen(
                             SearchCategory.KNOWLEDGE -> listOf("Quantum Computing", "James Webb Space Telescope", "Plate Tectonics", "CRISPR Gene Editing")
                             SearchCategory.SCIENCE -> listOf("Large Language Models", "Superconductivity", "Gravitational Waves", "Neural Architecture")
                             SearchCategory.CODE -> listOf("Kotlin Coroutines", "Jetpack Compose", "PyTorch 2.0", "FastAPI Framework")
+                            SearchCategory.BOOKS -> listOf("Artificial Intelligence Books", "Science Fiction Classics", "Dune Frank Herbert", "Philosophy of Mind")
                             SearchCategory.ALL -> listOf("Gemini 1.5 Pro", "Quantum Computing", "Kotlin 2.0", "Latest AI News", "SpaceX Starship")
                         }
                         items(suggestions) { topic ->
@@ -255,7 +256,7 @@ fun WebSearchScreen(
 
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "🌐 Active Sources: Wikipedia • StackOverflow • arXiv • GitHub • OpenAlex • Bing News • HackerNews • DuckDuckGo • CrossRef • Wikiquote • Wikinews • Wiktionary",
+                        text = "🌐 16 Free Sources: Wikipedia • DuckDuckGo • StackOverflow • GitHub • DEV.to • PubMed • arXiv • OpenAlex • OpenLibrary • Internet Archive • HackerNews • Bing News • CrossRef • Wikiquote • Wikinews • Wiktionary",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                     )
@@ -445,6 +446,10 @@ private fun getSourceBadgeColor(source: String): Color {
         "stack overflow" -> Color(0xFFF97316) // StackOverflow Orange
         "arxiv" -> Color(0xFFDC2626) // Crimson Red
         "github" -> Color(0xFF059669) // Emerald Green
+        "dev.to" -> Color(0xFF0F172A) // Dark Slate
+        "pubmed" -> Color(0xFF0284C7) // Sky Blue
+        "openlibrary" -> Color(0xFFB45309) // Amber Brown
+        "internet archive" -> Color(0xFF475569) // Classic Slate
         "hacker news" -> Color(0xFFEA580C) // Orange
         "openalex" -> Color(0xFF2563EB) // Royal Blue
         "crossref" -> Color(0xFF7C3AED) // Purple
@@ -462,6 +467,10 @@ private fun getSourceEmoji(source: String): String {
         "stack overflow" -> "💡"
         "arxiv" -> "🔬"
         "github" -> "💻"
+        "dev.to" -> "👩‍💻"
+        "pubmed" -> "🧬"
+        "openlibrary" -> "📚"
+        "internet archive" -> "🏛️"
         "hacker news" -> "⚡"
         "openalex" -> "🏛️"
         "crossref" -> "📚"
