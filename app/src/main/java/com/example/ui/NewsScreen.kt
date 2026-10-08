@@ -160,7 +160,7 @@ fun NewsScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "Real-time global news feed with AI instant summaries",
+                        "Real-time global news from BBC, NYT & Ars Technica with AI summaries",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

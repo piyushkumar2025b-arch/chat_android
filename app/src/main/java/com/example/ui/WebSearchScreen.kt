@@ -30,7 +30,6 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Search
@@ -64,7 +63,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.data.remote.SearchCategory
 import com.example.data.remote.WebSearchResult
 import com.example.data.remote.WebSearchService
@@ -81,22 +82,23 @@ fun WebSearchScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(SearchCategory.ALL) }
     var isSearching by remember { mutableStateOf(false) }
-    var hasSearched by remember { mutableStateOf(false) }
     val searchResults = remember { mutableStateListOf<WebSearchResult>() }
+    var hasSearched by remember { mutableStateOf(false) }
 
     fun executeSearch() {
-        val query = searchQuery.trim()
-        if (query.isEmpty()) return
+        val trimmed = searchQuery.trim()
+        if (trimmed.isEmpty()) return
 
         isSearching = true
         hasSearched = true
         coroutineScope.launch {
-            val result = WebSearchService.search(query, selectedCategory)
+            val result = WebSearchService.search(trimmed, selectedCategory)
             isSearching = false
-            searchResults.clear()
             result.onSuccess { list ->
+                searchResults.clear()
                 searchResults.addAll(list)
             }.onFailure { err ->
+                searchResults.clear()
                 Toast.makeText(context, "Search error: ${err.localizedMessage}", Toast.LENGTH_SHORT).show()
             }
         }
@@ -136,7 +138,7 @@ fun WebSearchScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "Real-time research across Wikipedia, arXiv, GitHub, Bing News & Web",
+                        "Wikipedia • arXiv • GitHub • Bing News • StackOverflow • OpenAlex • HackerNews",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -162,7 +164,7 @@ fun WebSearchScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("web_search_query_input"),
-                            placeholder = { Text("Search topics, code, papers, news...") },
+                            placeholder = { Text("Search topics, code, papers, news, quotes...") },
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                             trailingIcon = {
                                 if (searchQuery.isNotEmpty()) {
@@ -253,7 +255,7 @@ fun WebSearchScreen(
 
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "🌐 Active Sources: Wikipedia • arXiv • GitHub • Bing News • HackerNews • DuckDuckGo • CrossRef",
+                        text = "🌐 Active Sources: Wikipedia • StackOverflow • arXiv • GitHub • OpenAlex • Bing News • HackerNews • DuckDuckGo • CrossRef • Wikiquote • Wikinews • Wiktionary",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                     )
@@ -276,7 +278,7 @@ fun WebSearchScreen(
 
                     Button(
                         onClick = {
-                            val contextSnippets = searchResults.take(8).joinToString("\n\n") {
+                            val contextSnippets = searchResults.take(10).joinToString("\n\n") {
                                 "• [${it.source}] ${it.title} (${it.pubDate}):\n${it.snippet}\nLink: ${it.url}"
                             }
                             val prompt = "Based on these verified live real-time web sources for '$searchQuery':\n\n$contextSnippets\n\nPlease synthesize a clear, comprehensive, and updated answer with source citations for: $searchQuery"
@@ -356,17 +358,25 @@ fun WebSearchScreen(
 
                     Text(
                         text = result.title,
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        lineHeight = 22.sp
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = result.snippet,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+
+                    if (result.snippet.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = result.snippet,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = 18.sp
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(10.dp))
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -374,7 +384,7 @@ fun WebSearchScreen(
                     ) {
                         Button(
                             onClick = {
-                                val prompt = "Explain more about this topic from ${result.source}:\nTitle: ${result.title}\nSource: ${result.url}\nSummary: ${result.snippet}"
+                                val prompt = "Based on this verified live real-time web source from ${result.source}:\n\nTitle: ${result.title}\nSnippet: ${result.snippet}\nLink: ${result.url}\n\nPlease analyze, explain, or answer key takeaways from this source for: $searchQuery"
                                 onSendSearchToChat(prompt)
                             },
                             colors = ButtonDefaults.buttonColors(
@@ -432,10 +442,14 @@ private fun getSourceBadgeColor(source: String): Color {
     return when (source.lowercase()) {
         "wikipedia" -> MaterialTheme.colorScheme.primary
         "duckduckgo" -> Color(0xFFD97706) // Amber
+        "stack overflow" -> Color(0xFFF97316) // StackOverflow Orange
         "arxiv" -> Color(0xFFDC2626) // Crimson Red
         "github" -> Color(0xFF059669) // Emerald Green
         "hacker news" -> Color(0xFFEA580C) // Orange
+        "openalex" -> Color(0xFF2563EB) // Royal Blue
         "crossref" -> Color(0xFF7C3AED) // Purple
+        "wikiquote" -> Color(0xFF4F46E5) // Indigo
+        "wikinews" -> Color(0xFF0284C7) // Sky Blue
         "wiktionary" -> Color(0xFF0D9488) // Teal
         else -> MaterialTheme.colorScheme.tertiary
     }
@@ -445,10 +459,14 @@ private fun getSourceEmoji(source: String): String {
     return when (source.lowercase()) {
         "wikipedia" -> "📖"
         "duckduckgo" -> "🦆"
+        "stack overflow" -> "💡"
         "arxiv" -> "🔬"
         "github" -> "💻"
         "hacker news" -> "⚡"
+        "openalex" -> "🏛️"
         "crossref" -> "📚"
+        "wikiquote" -> "💬"
+        "wikinews" -> "📢"
         "wiktionary" -> "📝"
         else -> "📰"
     }

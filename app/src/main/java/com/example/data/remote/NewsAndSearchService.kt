@@ -48,38 +48,103 @@ object NewsFeedService {
         .readTimeout(12, TimeUnit.SECONDS)
         .build()
 
-    enum class NewsCategory(val label: String, val rssUrl: String) {
-        ALL("All News", "https://feeds.bbci.co.uk/news/rss.xml"),
-        TECH("Tech & AI", "https://feeds.bbci.co.uk/news/technology/rss.xml"),
-        WORLD("World", "https://feeds.bbci.co.uk/news/world/rss.xml"),
-        SCIENCE("Science", "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml"),
-        BUSINESS("Business", "https://feeds.bbci.co.uk/news/business/rss.xml"),
-        ENTERTAINMENT("Entertainment", "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml"),
-        HEALTH("Health", "https://feeds.bbci.co.uk/news/health/rss.xml")
+    enum class NewsCategory(val label: String, val feeds: List<Pair<String, String>>) {
+        ALL(
+            "All News",
+            listOf(
+                "BBC News" to "https://feeds.bbci.co.uk/news/rss.xml",
+                "New York Times" to "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+            )
+        ),
+        TECH(
+            "Tech & AI",
+            listOf(
+                "BBC Tech" to "https://feeds.bbci.co.uk/news/technology/rss.xml",
+                "Ars Technica" to "https://feeds.arstechnica.com/arstechnica/index",
+                "NYT Tech" to "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml"
+            )
+        ),
+        WORLD(
+            "World",
+            listOf(
+                "BBC World" to "https://feeds.bbci.co.uk/news/world/rss.xml",
+                "NYT World" to "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
+            )
+        ),
+        SCIENCE(
+            "Science",
+            listOf(
+                "BBC Science" to "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
+                "NYT Science" to "https://rss.nytimes.com/services/xml/rss/nyt/Science.xml"
+            )
+        ),
+        BUSINESS(
+            "Business",
+            listOf(
+                "BBC Business" to "https://feeds.bbci.co.uk/news/business/rss.xml",
+                "NYT Business" to "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml"
+            )
+        ),
+        ENTERTAINMENT(
+            "Entertainment",
+            listOf(
+                "BBC Entertainment" to "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml"
+            )
+        ),
+        HEALTH(
+            "Health",
+            listOf(
+                "BBC Health" to "https://feeds.bbci.co.uk/news/health/rss.xml",
+                "NYT Health" to "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml"
+            )
+        )
     }
 
     suspend fun fetchNews(category: NewsCategory): Result<List<NewsArticle>> = withContext(Dispatchers.IO) {
-        try {
-            val request = Request.Builder()
-                .url(category.rssUrl)
-                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
-                .build()
+        val allArticles = mutableListOf<NewsArticle>()
 
-            val body = client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return@withContext Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+        try {
+            coroutineScope {
+                val deferreds = category.feeds.map { (sourceName, feedUrl) ->
+                    async {
+                        runCatching {
+                            val request = Request.Builder()
+                                .url(feedUrl)
+                                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
+                                .build()
+
+                            val body = client.newCall(request).execute().use { response ->
+                                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+                            }
+                            if (body.isNotBlank()) parseRssFeed(body, category.label, sourceName) else emptyList()
+                        }.getOrDefault(emptyList())
+                    }
                 }
-                response.body?.string().orEmpty()
+
+                for (deferred in deferreds) {
+                    allArticles.addAll(deferred.await())
+                }
             }
 
-            val articles = parseRssFeed(body, category.label)
-            Result.success(articles)
+            if (allArticles.isNotEmpty()) {
+                val deduplicated = allArticles
+                    .distinctBy { it.title.lowercase().trim() }
+                    .sortedByDescending { it.id }
+                Result.success(deduplicated)
+            } else {
+                Result.failure(Exception("Could not fetch news from sources. Please check network connection."))
+            }
         } catch (e: Exception) {
-            Result.failure(e)
+            e.printStackTrace()
+            if (allArticles.isNotEmpty()) {
+                Result.success(allArticles.distinctBy { it.title.lowercase().trim() })
+            } else {
+                Result.failure(e)
+            }
         }
     }
 
-    private fun parseRssFeed(xml: String, categoryName: String): List<NewsArticle> {
+    private fun parseRssFeed(xml: String, categoryName: String, defaultSourceName: String): List<NewsArticle> {
         val list = mutableListOf<NewsArticle>()
         try {
             val factory = XmlPullParserFactory.newInstance()
@@ -111,7 +176,10 @@ object NewsFeedService {
                                 "title" -> title = parser.nextText()
                                 "link" -> link = parser.nextText()
                                 "pubdate" -> pubDate = parser.nextText()
-                                "source", "news:source" -> source = parser.nextText()
+                                "source", "news:source", "dc:creator" -> {
+                                    val text = parser.nextText()
+                                    if (source.isEmpty() && text.isNotBlank()) source = text
+                                }
                                 "description" -> description = parser.nextText()
                             }
                         }
@@ -120,11 +188,10 @@ object NewsFeedService {
                         if (tagName.equals("item", ignoreCase = true) && inItem) {
                             if (title.isNotBlank()) {
                                 val cleanDesc = cleanHtml(description)
-                                val finalSource = if (source.isNotBlank()) {
-                                    source
-                                } else {
-                                    val parts = title.split(" - ")
-                                    if (parts.size > 1) parts.last().trim() else "BBC News"
+                                val finalSource = when {
+                                    source.isNotBlank() && !source.contains("Inside Climate", ignoreCase = true) -> source
+                                    title.contains(" - ") -> title.substringAfterLast(" - ").trim()
+                                    else -> defaultSourceName
                                 }
                                 val finalTitle = if (title.contains(" - ")) {
                                     title.substringBeforeLast(" - ").trim()
@@ -177,27 +244,35 @@ object WebSearchService {
                         async { runCatching { fetchWikipediaSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchDuckDuckGo(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchBingNewsSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchStackOverflowSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchArXivSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchGitHubSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchHnSearch(trimmed) }.getOrDefault(emptyList()) },
-                        async { runCatching { fetchCrossRefSearch(trimmed) }.getOrDefault(emptyList()) }
+                        async { runCatching { fetchOpenAlexSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchCrossRefSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikiquoteSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikinewsSearch(trimmed) }.getOrDefault(emptyList()) }
                     )
                     SearchCategory.KNOWLEDGE -> listOf(
                         async { runCatching { fetchWikipediaSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchDuckDuckGo(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikiquoteSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchWiktionarySearch(trimmed) }.getOrDefault(emptyList()) }
                     )
                     SearchCategory.NEWS -> listOf(
                         async { runCatching { fetchBingNewsSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikinewsSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchHnSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchWikipediaSearch(trimmed) }.getOrDefault(emptyList()) }
                     )
                     SearchCategory.SCIENCE -> listOf(
                         async { runCatching { fetchArXivSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchOpenAlexSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchCrossRefSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchWikipediaSearch(trimmed) }.getOrDefault(emptyList()) }
                     )
                     SearchCategory.CODE -> listOf(
+                        async { runCatching { fetchStackOverflowSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchGitHubSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchHnSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchWikipediaSearch(trimmed) }.getOrDefault(emptyList()) }
@@ -212,13 +287,13 @@ object WebSearchService {
             // Deduplicate by normalized title & URL, preserving order
             val finalResults = results
                 .distinctBy { it.title.lowercase().trim() }
-                .take(18)
+                .take(24)
 
             Result.success(finalResults)
         } catch (e: Exception) {
             e.printStackTrace()
             if (results.isNotEmpty()) {
-                Result.success(results.distinctBy { it.title.lowercase().trim() }.take(15))
+                Result.success(results.distinctBy { it.title.lowercase().trim() }.take(18))
             } else {
                 Result.failure(e)
             }
@@ -259,10 +334,10 @@ object WebSearchService {
                             list.add(
                                 WebSearchResult(
                                     title = title,
-                                    snippet = if (cleanSnippet.isNotBlank()) cleanSnippet else "Encyclopedia article on $title.",
+                                    snippet = if (cleanSnippet.isNotBlank()) "$cleanSnippet..." else "Wikipedia entry for $title.",
                                     url = fullUrl,
                                     source = "Wikipedia",
-                                    pubDate = "Encyclopedia",
+                                    pubDate = formatPubDate(item.optString("timestamp")),
                                     category = "Encyclopedia"
                                 )
                             )
@@ -271,34 +346,39 @@ object WebSearchService {
                 }
             }
 
-            // Fallback to opensearch if list search returned no results
+            // Fallback to opensearch if list=search produced zero results
             if (list.isEmpty()) {
-                val openUrl = "https://en.wikipedia.org/w/api.php?action=opensearch&search=$encoded&limit=4&namespace=0&format=json"
-                val openReq = Request.Builder()
-                    .url(openUrl)
+                val openSearchUrl = "https://en.wikipedia.org/w/api.php?action=opensearch&search=$encoded&limit=4&namespace=0&format=json"
+                val osReq = Request.Builder()
+                    .url(openSearchUrl)
                     .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
                     .build()
-                val openBody = client.newCall(openReq).execute().use { r -> if (r.isSuccessful) r.body?.string().orEmpty() else "" }
-                if (openBody.isNotBlank()) {
-                    val arr = JSONArray(openBody)
-                    val titles = arr.optJSONArray(1) ?: JSONArray()
-                    val snippets = arr.optJSONArray(2) ?: JSONArray()
-                    val urls = arr.optJSONArray(3) ?: JSONArray()
-                    for (i in 0 until titles.length()) {
-                        val t = titles.optString(i)
-                        val s = snippets.optString(i)
-                        val u = urls.optString(i)
-                        if (t.isNotBlank()) {
-                            list.add(
-                                WebSearchResult(
-                                    title = t,
-                                    snippet = if (s.isNotBlank()) s else "Encyclopedia information on $t.",
-                                    url = u,
-                                    source = "Wikipedia",
-                                    pubDate = "Encyclopedia",
-                                    category = "Encyclopedia"
+                val osBody = client.newCall(osReq).execute().use { response ->
+                    if (response.isSuccessful) response.body?.string().orEmpty() else ""
+                }
+                if (osBody.isNotBlank()) {
+                    val rootArray = JSONArray(osBody)
+                    if (rootArray.length() >= 4) {
+                        val titles = rootArray.optJSONArray(1) ?: JSONArray()
+                        val descs = rootArray.optJSONArray(2) ?: JSONArray()
+                        val urls = rootArray.optJSONArray(3) ?: JSONArray()
+
+                        for (i in 0 until titles.length()) {
+                            val t = titles.optString(i)
+                            val d = descs.optString(i)
+                            val u = urls.optString(i)
+                            if (t.isNotBlank() && u.isNotBlank()) {
+                                list.add(
+                                    WebSearchResult(
+                                        title = t,
+                                        snippet = if (d.isNotBlank()) d else "Wikipedia article on $t.",
+                                        url = u,
+                                        source = "Wikipedia",
+                                        pubDate = "Encyclopedia",
+                                        category = "Encyclopedia"
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                 }
@@ -310,7 +390,7 @@ object WebSearchService {
     }
 
     /**
-     * DuckDuckGo Instant Answers and Related Topics.
+     * DuckDuckGo Instant Answer API + Related Topics.
      */
     private fun fetchDuckDuckGo(query: String): List<WebSearchResult> {
         val list = mutableListOf<WebSearchResult>()
@@ -322,77 +402,72 @@ object WebSearchService {
                 .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
                 .build()
 
-            val body = client.newCall(request).execute().use { res ->
-                if (res.isSuccessful) res.body?.string().orEmpty() else ""
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
             }
 
             if (body.isNotBlank()) {
                 val root = JSONObject(body)
-                val abstractText = root.optString("AbstractText").trim()
-                val abstractSource = root.optString("AbstractSource")
+                val abstractText = root.optString("AbstractText")
                 val abstractUrl = root.optString("AbstractURL")
                 val heading = root.optString("Heading")
+                val source = root.optString("AbstractSource").ifEmpty { "DuckDuckGo" }
 
                 if (abstractText.isNotBlank()) {
                     list.add(
                         WebSearchResult(
-                            title = if (heading.isNotBlank()) heading else if (abstractSource.isNotBlank()) "Overview ($abstractSource)" else "Direct Answer",
+                            title = heading.ifEmpty { query },
                             snippet = abstractText,
                             url = abstractUrl.ifEmpty { "https://duckduckgo.com/?q=$encoded" },
-                            source = abstractSource.ifEmpty { "DuckDuckGo" },
-                            pubDate = "Instant",
-                            category = "Web Answers"
+                            source = source,
+                            pubDate = "Instant Answer",
+                            category = "Knowledge"
                         )
                     )
                 }
 
-                // Parse RelatedTopics
+                // Extract from RelatedTopics
                 val relatedTopics = root.optJSONArray("RelatedTopics")
                 if (relatedTopics != null) {
                     for (i in 0 until relatedTopics.length()) {
                         if (list.size >= 4) break
                         val topic = relatedTopics.optJSONObject(i) ?: continue
-
-                        // Check if direct topic item
-                        val text = topic.optString("Text").trim()
-                        val firstUrl = topic.optString("FirstURL").trim()
+                        val text = topic.optString("Text")
+                        val firstUrl = topic.optString("FirstURL")
 
                         if (text.isNotBlank() && firstUrl.isNotBlank()) {
-                            val parts = text.split(" - ", limit = 2)
-                            val title = if (parts.size > 1) parts[0].trim() else text.take(60)
-                            val desc = if (parts.size > 1) parts[1].trim() else text
+                            val topicTitle = text.substringBefore(" - ").take(70)
                             list.add(
                                 WebSearchResult(
-                                    title = title,
-                                    snippet = desc,
+                                    title = topicTitle,
+                                    snippet = text,
                                     url = firstUrl,
                                     source = "DuckDuckGo",
-                                    pubDate = "Topic",
-                                    category = "Web Answers"
+                                    pubDate = "Related Topic",
+                                    category = "Web"
                                 )
                             )
-                        } else if (topic.has("Topics")) {
-                            // Subtopics cluster
-                            val subArr = topic.optJSONArray("Topics") ?: continue
-                            for (j in 0 until subArr.length()) {
-                                if (list.size >= 4) break
-                                val sub = subArr.optJSONObject(j) ?: continue
-                                val subText = sub.optString("Text").trim()
-                                val subUrl = sub.optString("FirstURL").trim()
-                                if (subText.isNotBlank()) {
-                                    val parts = subText.split(" - ", limit = 2)
-                                    val title = if (parts.size > 1) parts[0].trim() else subText.take(60)
-                                    val desc = if (parts.size > 1) parts[1].trim() else subText
-                                    list.add(
-                                        WebSearchResult(
-                                            title = title,
-                                            snippet = desc,
-                                            url = subUrl,
-                                            source = "DuckDuckGo",
-                                            pubDate = "Topic",
-                                            category = "Web Answers"
+                        } else {
+                            // Subtopics array check
+                            val topicsArray = topic.optJSONArray("Topics")
+                            if (topicsArray != null) {
+                                for (j in 0 until topicsArray.length()) {
+                                    if (list.size >= 4) break
+                                    val subTopic = topicsArray.optJSONObject(j) ?: continue
+                                    val subText = subTopic.optString("Text")
+                                    val subUrl = subTopic.optString("FirstURL")
+                                    if (subText.isNotBlank() && subUrl.isNotBlank()) {
+                                        list.add(
+                                            WebSearchResult(
+                                                title = subText.substringBefore(" - ").take(70),
+                                                snippet = subText,
+                                                url = subUrl,
+                                                source = "DuckDuckGo",
+                                                pubDate = "Related Topic",
+                                                category = "Web"
+                                            )
                                         )
-                                    )
+                                    }
                                 }
                             }
                         }
@@ -406,7 +481,7 @@ object WebSearchService {
     }
 
     /**
-     * Bing News RSS search.
+     * Bing News RSS Live Web Feed.
      */
     private fun fetchBingNewsSearch(query: String): List<WebSearchResult> {
         val list = mutableListOf<WebSearchResult>()
@@ -460,27 +535,19 @@ object WebSearchService {
                         XmlPullParser.END_TAG -> {
                             if (tagName.equals("item", ignoreCase = true) && inItem) {
                                 if (title.isNotBlank()) {
-                                    val cleanDesc = cleanHtml(description)
-                                    val directUrl = try {
-                                        if (link.contains("url=")) {
-                                            val extracted = link.substringAfter("url=").substringBefore("&")
-                                            URLDecoder.decode(extracted, "UTF-8")
-                                        } else link.trim()
-                                    } catch (_: Exception) { link.trim() }
-
-                                    val finalSource = if (source.isNotBlank()) {
-                                        source.trim()
-                                    } else {
+                                    val realUrl = if (link.contains("url=")) {
                                         try {
-                                            java.net.URI(directUrl).host?.removePrefix("www.") ?: "News"
-                                        } catch (_: Exception) { "News" }
-                                    }
+                                            URLDecoder.decode(link.substringAfter("url=").substringBefore("&"), "UTF-8")
+                                        } catch (_: Exception) { link }
+                                    } else link
+
+                                    val finalSource = source.ifEmpty { "Bing News" }
 
                                     list.add(
                                         WebSearchResult(
-                                            title = title.trim(),
-                                            snippet = if (cleanDesc.isNotBlank()) cleanDesc else "News report from $finalSource on ${title.trim()}.",
-                                            url = directUrl,
+                                            title = cleanHtml(title),
+                                            snippet = cleanHtml(description).ifEmpty { "Live news report on $title." },
+                                            url = realUrl.trim(),
                                             source = finalSource,
                                             pubDate = formatPubDate(pubDate),
                                             category = "News"
@@ -492,6 +559,65 @@ object WebSearchService {
                         }
                     }
                     eventType = parser.next()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    /**
+     * StackOverflow & Stack Exchange Developer Solutions & QA.
+     */
+    private fun fetchStackOverflowSearch(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val encoded = URLEncoder.encode(query, "UTF-8")
+            val url = "https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q=$encoded&site=stackoverflow&pagesize=3"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "OmniChat/1.0 (Android; Mobile)")
+                .header("Accept-Encoding", "identity")
+                .build()
+
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val root = JSONObject(body)
+                val items = root.optJSONArray("items") ?: JSONArray()
+                for (i in 0 until items.length()) {
+                    if (list.size >= 3) break
+                    val item = items.optJSONObject(i) ?: continue
+                    val title = cleanHtml(item.optString("title"))
+                    val link = item.optString("link")
+                    val isAnswered = item.optBoolean("is_answered", false)
+                    val score = item.optInt("score", 0)
+                    val answerCount = item.optInt("answer_count", 0)
+                    val tagsArr = item.optJSONArray("tags")
+                    val tags = mutableListOf<String>()
+                    if (tagsArr != null) {
+                        for (t in 0 until tagsArr.length()) {
+                            tags.add(tagsArr.optString(t))
+                        }
+                    }
+
+                    if (title.isNotBlank() && link.isNotBlank()) {
+                        val tagString = if (tags.isNotEmpty()) "Tags: [${tags.take(4).joinToString(", ")}]. " else ""
+                        val status = if (isAnswered) "Answered ($answerCount answers, score $score)" else "Score $score ($answerCount answers)"
+                        list.add(
+                            WebSearchResult(
+                                title = title,
+                                snippet = "$tagString$status - Verified developer solution from Stack Overflow community.",
+                                url = link,
+                                source = "Stack Overflow",
+                                pubDate = "Q&A Solution",
+                                category = "Code"
+                            )
+                        )
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -584,6 +710,62 @@ object WebSearchService {
     }
 
     /**
+     * OpenAlex Global Scientific Catalog (250M+ open scholarly papers).
+     */
+    private fun fetchOpenAlexSearch(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val encoded = URLEncoder.encode(query, "UTF-8")
+            val url = "https://api.openalex.org/works?search=$encoded&per-page=3"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "OmniChat/1.0 (mailto:dev@omnichat.app)")
+                .build()
+
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val root = JSONObject(body)
+                val results = root.optJSONArray("results") ?: JSONArray()
+                for (i in 0 until results.length()) {
+                    if (list.size >= 3) break
+                    val item = results.optJSONObject(i) ?: continue
+                    val title = item.optString("title").trim()
+                    val doi = item.optString("doi")
+                    val pubYear = item.optInt("publication_year", 0)
+                    val citedCount = item.optInt("cited_by_count", 0)
+                    val primaryLocation = item.optJSONObject("primary_location")
+                    val sourceObj = primaryLocation?.optJSONObject("source")
+                    val sourceDisplayName = sourceObj?.optString("display_name").orEmpty()
+
+                    if (title.isNotBlank()) {
+                        val yearText = if (pubYear > 0) " ($pubYear)" else ""
+                        val citeText = if (citedCount > 0) " • Cited $citedCount times" else ""
+                        val venueText = if (sourceDisplayName.isNotBlank()) "Published in $sourceDisplayName." else "Peer-reviewed scientific research."
+                        val linkUrl = if (doi.isNotBlank()) doi else item.optString("id")
+
+                        list.add(
+                            WebSearchResult(
+                                title = title,
+                                snippet = "$venueText$yearText$citeText Open access academic paper via OpenAlex.",
+                                url = linkUrl.ifEmpty { "https://openalex.org/works?search=$encoded" },
+                                source = "OpenAlex",
+                                pubDate = if (pubYear > 0) pubYear.toString() else "Paper",
+                                category = "Science"
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    /**
      * GitHub Open Source Repositories & Tools.
      */
     private fun fetchGitHubSearch(query: String): List<WebSearchResult> {
@@ -606,29 +788,25 @@ object WebSearchService {
                 val items = root.optJSONArray("items") ?: JSONArray()
                 for (i in 0 until items.length()) {
                     if (list.size >= 4) break
-                    val item = items.optJSONObject(i) ?: continue
-                    val fullName = item.optString("full_name")
-                    val desc = item.optString("description")
-                    val stars = item.optInt("stargazers_count", 0)
-                    val lang = item.optString("language")
-                    val htmlUrl = item.optString("html_url")
-                    val updatedAt = item.optString("updated_at")
+                    val repo = items.optJSONObject(i) ?: continue
+                    val fullName = repo.optString("full_name")
+                    val desc = repo.optString("description")
+                    val htmlUrl = repo.optString("html_url")
+                    val stars = repo.optInt("stargazers_count", 0)
+                    val language = repo.optString("language")
 
-                    if (fullName.isNotBlank()) {
-                        val starsStr = if (stars >= 1000) String.format("%.1fk", stars / 1000.0) else "$stars"
-                        val meta = buildString {
-                            append("★ $starsStr")
-                            if (lang.isNotBlank() && lang != "null") append(" • $lang")
-                        }
-                        val snippet = if (desc.isNotBlank() && desc != "null") "$desc ($meta)" else "GitHub open-source repository ($meta)"
+                    if (fullName.isNotBlank() && htmlUrl.isNotBlank()) {
+                        val langText = if (language.isNotBlank() && language != "null") " [$language]" else ""
+                        val starsText = if (stars > 0) " ⭐ $stars" else ""
+                        val cleanDesc = if (desc.isNotBlank() && desc != "null") desc else "Open-source repository on GitHub."
 
                         list.add(
                             WebSearchResult(
-                                title = fullName,
-                                snippet = snippet,
+                                title = "$fullName$langText",
+                                snippet = "$cleanDesc$starsText",
                                 url = htmlUrl,
                                 source = "GitHub",
-                                pubDate = formatPubDate(updatedAt),
+                                pubDate = if (stars > 0) "⭐ $stars" else "Repository",
                                 category = "Code"
                             )
                         )
@@ -642,13 +820,13 @@ object WebSearchService {
     }
 
     /**
-     * Hacker News Algolia Community Search.
+     * Hacker News Real-time Tech & Discussion (Algolia).
      */
     private fun fetchHnSearch(query: String): List<WebSearchResult> {
         val list = mutableListOf<WebSearchResult>()
         try {
             val encoded = URLEncoder.encode(query, "UTF-8")
-            val url = "https://hn.algolia.com/api/v1/search?query=$encoded&hitsPerPage=5"
+            val url = "https://hn.algolia.com/api/v1/search?query=$encoded&hitsPerPage=4"
             val request = Request.Builder()
                 .url(url)
                 .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
@@ -665,26 +843,29 @@ object WebSearchService {
                     if (list.size >= 4) break
                     val hit = hits.optJSONObject(i) ?: continue
                     val title = hit.optString("title").ifEmpty { hit.optString("story_title") }
-                    val rawUrl = hit.optString("url").ifEmpty { "https://news.ycombinator.com/item?id=" + hit.optString("objectID") }
+                    val rawUrl = hit.optString("url")
+                    val objectId = hit.optString("objectID")
                     val points = hit.optInt("points", 0)
                     val comments = hit.optInt("num_comments", 0)
                     val author = hit.optString("author")
                     val storyText = hit.optString("story_text")
 
+                    val finalUrl = if (rawUrl.isNotBlank()) rawUrl else "https://news.ycombinator.com/item?id=$objectId"
+
                     if (title.isNotBlank()) {
                         val snippet = if (storyText.isNotBlank()) {
-                            cleanHtml(storyText)
+                            cleanHtml(storyText).take(220)
                         } else {
-                            "Discussion ($points points, $comments comments by $author)."
+                            "Hacker News discussion: $points points, $comments comments by $author."
                         }
 
                         list.add(
                             WebSearchResult(
                                 title = title,
                                 snippet = snippet,
-                                url = rawUrl,
+                                url = finalUrl,
                                 source = "Hacker News",
-                                pubDate = formatPubDate(hit.optString("created_at")),
+                                pubDate = if (points > 0) "$points pts ($comments comments)" else "Tech",
                                 category = "Tech"
                             )
                         )
@@ -740,6 +921,98 @@ object WebSearchService {
                                 source = "CrossRef",
                                 pubDate = "Journal",
                                 category = "Science"
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    /**
+     * Wikiquote Notable Quotes & Speeches.
+     */
+    private fun fetchWikiquoteSearch(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val encoded = URLEncoder.encode(query, "UTF-8")
+            val url = "https://en.wikiquote.org/w/api.php?action=query&list=search&srsearch=$encoded&format=json&srlimit=3"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
+                .build()
+
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val root = JSONObject(body)
+                val queryObj = root.optJSONObject("query")
+                val searchArr = queryObj?.optJSONArray("search") ?: JSONArray()
+                for (i in 0 until searchArr.length()) {
+                    val item = searchArr.optJSONObject(i) ?: continue
+                    val title = item.optString("title")
+                    val snippet = cleanHtml(item.optString("snippet"))
+                    val pageUrl = "https://en.wikiquote.org/wiki/" + URLEncoder.encode(title.replace(" ", "_"), "UTF-8")
+                    if (title.isNotBlank() && snippet.isNotBlank()) {
+                        list.add(
+                            WebSearchResult(
+                                title = "$title (Quotes)",
+                                snippet = "$snippet...",
+                                url = pageUrl,
+                                source = "Wikiquote",
+                                pubDate = "Quotes",
+                                category = "Knowledge"
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    /**
+     * Wikinews Free News Reports.
+     */
+    private fun fetchWikinewsSearch(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val encoded = URLEncoder.encode(query, "UTF-8")
+            val url = "https://en.wikinews.org/w/api.php?action=query&list=search&srsearch=$encoded&format=json&srlimit=3"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
+                .build()
+
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val root = JSONObject(body)
+                val queryObj = root.optJSONObject("query")
+                val searchArr = queryObj?.optJSONArray("search") ?: JSONArray()
+                for (i in 0 until searchArr.length()) {
+                    val item = searchArr.optJSONObject(i) ?: continue
+                    val title = item.optString("title")
+                    val snippet = cleanHtml(item.optString("snippet"))
+                    val pageUrl = "https://en.wikinews.org/wiki/" + URLEncoder.encode(title.replace(" ", "_"), "UTF-8")
+                    if (title.isNotBlank()) {
+                        list.add(
+                            WebSearchResult(
+                                title = title,
+                                snippet = if (snippet.isNotBlank()) "$snippet..." else "Wikinews coverage of $title.",
+                                url = pageUrl,
+                                source = "Wikinews",
+                                pubDate = formatPubDate(item.optString("timestamp")),
+                                category = "News"
                             )
                         )
                     }
