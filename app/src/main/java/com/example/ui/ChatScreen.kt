@@ -50,6 +50,9 @@ import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Folder
@@ -581,8 +584,104 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             Icon(Icons.Default.Palette, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("AI Creation Studio", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                Text("Images, Video Motion & SFX", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("AI Studio & Multi-Tool", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Images, Beats, Code, Markdown & Video", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // Photo & Image Editor
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.IMAGE_EDITOR)
+                            }
+                            .testTag("drawer_image_editor_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.tertiary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Photo & Image Editor", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Filters, Color Curves, Crop, Pen & Watermark", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // Markdown Hub & Viewer
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.MARKDOWN)
+                            }
+                            .testTag("drawer_markdown_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.secondary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Markdown Hub & Viewer", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Open .md files, rich preview & live editor", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // Code Studio & HTML Runner
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.CODE_STUDIO)
+                            }
+                            .testTag("drawer_code_studio_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Code Studio & HTML Runner", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("AI execution & in-site interactive web preview", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // Music Studio & Beat Visualizer
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.MUSIC_STUDIO)
+                            }
+                            .testTag("drawer_music_studio_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.GraphicEq, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Music Studio & Visualizer", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Upload songs, equalize tunes & beat radar", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -1384,10 +1483,48 @@ fun ChatScreen(viewModel: ChatViewModel) {
 
                     AppSection.STUDIO -> {
                         StudioScreen(
+                            preferencesManager = viewModel.preferencesManager,
                             onSendPromptToChat = { prompt ->
                                 viewModel.sendMessage(prompt)
                                 viewModel.navigateToSection(AppSection.CHAT)
                             }
+                        )
+                    }
+
+                    AppSection.IMAGE_EDITOR -> {
+                        ImageEditorScreen(
+                            onBack = { viewModel.navigateToSection(AppSection.CHAT) },
+                            onSendImageToChat = { prompt ->
+                                viewModel.sendMessage(prompt)
+                                viewModel.navigateToSection(AppSection.CHAT)
+                            }
+                        )
+                    }
+
+                    AppSection.MARKDOWN -> {
+                        MarkdownStudioScreen(
+                            onBack = { viewModel.navigateToSection(AppSection.CHAT) },
+                            onSendToChat = { prompt ->
+                                viewModel.sendMessage(prompt)
+                                viewModel.navigateToSection(AppSection.CHAT)
+                            }
+                        )
+                    }
+
+                    AppSection.CODE_STUDIO -> {
+                        CodeStudioScreen(
+                            preferencesManager = viewModel.preferencesManager,
+                            onBack = { viewModel.navigateToSection(AppSection.CHAT) },
+                            onSendToChat = { prompt ->
+                                viewModel.sendMessage(prompt)
+                                viewModel.navigateToSection(AppSection.CHAT)
+                            }
+                        )
+                    }
+
+                    AppSection.MUSIC_STUDIO -> {
+                        MusicStudioScreen(
+                            onBack = { viewModel.navigateToSection(AppSection.CHAT) }
                         )
                     }
 

@@ -54,7 +54,11 @@ enum class AppSection(val label: String) {
     LEARN("Learn AI"),
     NEWS("News"),
     SEARCH("Search"),
-    READ_ALOUD("Read Aloud")
+    READ_ALOUD("Read Aloud"),
+    IMAGE_EDITOR("Image Editor"),
+    MARKDOWN("Markdown Hub"),
+    CODE_STUDIO("Code Studio"),
+    MUSIC_STUDIO("Music Studio")
 }
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
