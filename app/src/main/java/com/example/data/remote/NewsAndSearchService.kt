@@ -40,7 +40,8 @@ enum class SearchCategory(val id: String, val label: String, val icon: String) {
     NEWS("news", "Live News", "📰"),
     SCIENCE("science", "Science & Research", "🔬"),
     CODE("code", "Code & Dev", "💻"),
-    BOOKS("books", "Books & Archive", "📚")
+    BOOKS("books", "Books & Archive", "📚"),
+    TRAVEL("travel", "Travel & Places", "🗺️")
 }
 
 object NewsFeedService {
@@ -56,8 +57,10 @@ object NewsFeedService {
                 "BBC News" to "https://feeds.bbci.co.uk/news/rss.xml",
                 "New York Times" to "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
                 "The Guardian" to "https://www.theguardian.com/world/rss",
+                "Deutsche Welle" to "https://rss.dw.com/rdf/rss-en-all",
                 "Al Jazeera" to "https://www.aljazeera.com/xml/rss/all.xml",
-                "CNBC News" to "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"
+                "CNBC News" to "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114",
+                "Reuters / Yahoo" to "https://news.yahoo.com/rss/"
             )
         ),
         TECH(
@@ -68,6 +71,8 @@ object NewsFeedService {
                 "NYT Tech" to "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
                 "The Guardian Tech" to "https://www.theguardian.com/technology/rss",
                 "TechCrunch" to "https://feeds.feedburner.com/TechCrunch/",
+                "Wired News" to "https://www.wired.com/feed/rss",
+                "MIT Tech Review" to "https://www.technologyreview.com/feed/",
                 "CNBC Tech" to "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=19854910"
             )
         ),
@@ -77,6 +82,7 @@ object NewsFeedService {
                 "BBC World" to "https://feeds.bbci.co.uk/news/world/rss.xml",
                 "NYT World" to "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
                 "The Guardian World" to "https://www.theguardian.com/world/rss",
+                "Deutsche Welle" to "https://rss.dw.com/rdf/rss-en-all",
                 "Al Jazeera" to "https://www.aljazeera.com/xml/rss/all.xml"
             )
         ),
@@ -95,7 +101,8 @@ object NewsFeedService {
                 "BBC Business" to "https://feeds.bbci.co.uk/news/business/rss.xml",
                 "NYT Business" to "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
                 "The Guardian Business" to "https://www.theguardian.com/business/rss",
-                "CNBC Markets" to "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"
+                "CNBC Markets" to "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114",
+                "Yahoo Finance" to "https://finance.yahoo.com/news/rssindex"
             )
         ),
         ENTERTAINMENT(
@@ -112,6 +119,13 @@ object NewsFeedService {
                 "BBC Health" to "https://feeds.bbci.co.uk/news/health/rss.xml",
                 "NYT Health" to "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
                 "The Guardian Health" to "https://www.theguardian.com/lifeandstyle/health-and-wellbeing/rss"
+            )
+        ),
+        SPORTS(
+            "Sports",
+            listOf(
+                "BBC Sport" to "https://feeds.bbci.co.uk/sport/rss.xml",
+                "Yahoo Sports" to "https://sports.yahoo.com/rss/"
             )
         )
     }
@@ -266,6 +280,12 @@ object WebSearchService {
                         async { runCatching { fetchPubMedSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchOpenLibrarySearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchInternetArchiveSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchNasaImagesSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchNpmSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikibooksSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikiversitySearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikivoyageSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikimediaCommonsSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchGitHubSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchHnSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchOpenAlexSearch(trimmed) }.getOrDefault(emptyList()) },
@@ -276,6 +296,9 @@ object WebSearchService {
                     SearchCategory.KNOWLEDGE -> listOf(
                         async { runCatching { fetchWikipediaSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchDuckDuckGo(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikibooksSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikiversitySearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikimediaCommonsSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchOpenLibrarySearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchInternetArchiveSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchWikiquoteSearch(trimmed) }.getOrDefault(emptyList()) },
@@ -290,6 +313,8 @@ object WebSearchService {
                     SearchCategory.SCIENCE -> listOf(
                         async { runCatching { fetchPubMedSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchArXivSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchNasaImagesSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikiversitySearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchOpenAlexSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchCrossRefSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchWikipediaSearch(trimmed) }.getOrDefault(emptyList()) }
@@ -297,6 +322,7 @@ object WebSearchService {
                     SearchCategory.CODE -> listOf(
                         async { runCatching { fetchStackOverflowSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchGitHubSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchNpmSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchDevToSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchHnSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchWikipediaSearch(trimmed) }.getOrDefault(emptyList()) }
@@ -304,8 +330,15 @@ object WebSearchService {
                     SearchCategory.BOOKS -> listOf(
                         async { runCatching { fetchOpenLibrarySearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchInternetArchiveSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikibooksSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchWikiquoteSearch(trimmed) }.getOrDefault(emptyList()) },
                         async { runCatching { fetchWikipediaSearch(trimmed) }.getOrDefault(emptyList()) }
+                    )
+                    SearchCategory.TRAVEL -> listOf(
+                        async { runCatching { fetchWikivoyageSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikimediaCommonsSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchWikipediaSearch(trimmed) }.getOrDefault(emptyList()) },
+                        async { runCatching { fetchDuckDuckGo(trimmed) }.getOrDefault(emptyList()) }
                     )
                 }
 
@@ -317,7 +350,7 @@ object WebSearchService {
             // Deduplicate by normalized title & URL, preserving order
             val finalResults = results
                 .distinctBy { it.title.lowercase().trim() }
-                .take(24)
+                .take(28)
 
             Result.success(finalResults)
         } catch (e: Exception) {
@@ -1307,6 +1340,283 @@ object WebSearchService {
                                 source = "Internet Archive",
                                 pubDate = mediaType.replaceFirstChar { it.uppercase() },
                                 category = "Archive & History"
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    /**
+     * Wikibooks - Free open-content textbooks, manuals, and instructional guides.
+     */
+    private fun fetchWikibooksSearch(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val url = "https://en.wikibooks.org/w/api.php?action=opensearch&search=${URLEncoder.encode(query, "UTF-8")}&limit=4&namespace=0&format=json"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
+                .build()
+
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val array = JSONArray(body)
+                val titles = array.optJSONArray(1) ?: JSONArray()
+                val descriptions = array.optJSONArray(2) ?: JSONArray()
+                val links = array.optJSONArray(3) ?: JSONArray()
+
+                for (i in 0 until titles.length()) {
+                    val title = titles.optString(i)
+                    val desc = descriptions.optString(i)
+                    val link = links.optString(i)
+                    if (title.isNotBlank() && link.isNotBlank()) {
+                        list.add(
+                            WebSearchResult(
+                                title = title,
+                                snippet = if (desc.isNotBlank()) desc else "Free open textbook and manual from Wikibooks.",
+                                url = link,
+                                source = "Wikibooks",
+                                category = "Books & Learning"
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    /**
+     * Wikiversity - Open learning resources, research projects, and university courses.
+     */
+    private fun fetchWikiversitySearch(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val url = "https://en.wikiversity.org/w/api.php?action=opensearch&search=${URLEncoder.encode(query, "UTF-8")}&limit=4&namespace=0&format=json"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
+                .build()
+
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val array = JSONArray(body)
+                val titles = array.optJSONArray(1) ?: JSONArray()
+                val descriptions = array.optJSONArray(2) ?: JSONArray()
+                val links = array.optJSONArray(3) ?: JSONArray()
+
+                for (i in 0 until titles.length()) {
+                    val title = titles.optString(i)
+                    val desc = descriptions.optString(i)
+                    val link = links.optString(i)
+                    if (title.isNotBlank() && link.isNotBlank()) {
+                        list.add(
+                            WebSearchResult(
+                                title = title,
+                                snippet = if (desc.isNotBlank()) desc else "Open learning module and academic research resource from Wikiversity.",
+                                url = link,
+                                source = "Wikiversity",
+                                category = "Education & Courses"
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    /**
+     * Wikivoyage - Worldwide travel guide with destinations, itineraries, and culture.
+     */
+    private fun fetchWikivoyageSearch(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val url = "https://en.wikivoyage.org/w/api.php?action=opensearch&search=${URLEncoder.encode(query, "UTF-8")}&limit=4&namespace=0&format=json"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
+                .build()
+
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val array = JSONArray(body)
+                val titles = array.optJSONArray(1) ?: JSONArray()
+                val descriptions = array.optJSONArray(2) ?: JSONArray()
+                val links = array.optJSONArray(3) ?: JSONArray()
+
+                for (i in 0 until titles.length()) {
+                    val title = titles.optString(i)
+                    val desc = descriptions.optString(i)
+                    val link = links.optString(i)
+                    if (title.isNotBlank() && link.isNotBlank()) {
+                        list.add(
+                            WebSearchResult(
+                                title = title,
+                                snippet = if (desc.isNotBlank()) desc else "Global destination travel guide and cultural highlights from Wikivoyage.",
+                                url = link,
+                                source = "Wikivoyage",
+                                category = "Travel & Culture"
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    /**
+     * Wikimedia Commons - Free public domain media database and scientific archives.
+     */
+    private fun fetchWikimediaCommonsSearch(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val url = "https://commons.wikimedia.org/w/api.php?action=opensearch&search=${URLEncoder.encode(query, "UTF-8")}&limit=4&namespace=0&format=json"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
+                .build()
+
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val array = JSONArray(body)
+                val titles = array.optJSONArray(1) ?: JSONArray()
+                val descriptions = array.optJSONArray(2) ?: JSONArray()
+                val links = array.optJSONArray(3) ?: JSONArray()
+
+                for (i in 0 until titles.length()) {
+                    val title = titles.optString(i)
+                    val desc = descriptions.optString(i)
+                    val link = links.optString(i)
+                    if (title.isNotBlank() && link.isNotBlank()) {
+                        list.add(
+                            WebSearchResult(
+                                title = title,
+                                snippet = if (desc.isNotBlank()) desc else "Public domain historical and scientific archive record from Wikimedia Commons.",
+                                url = link,
+                                source = "Wikimedia Commons",
+                                category = "Media & Archives"
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    /**
+     * NPM Registry - Search JavaScript, TypeScript, and web engineering packages.
+     */
+    private fun fetchNpmSearch(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val url = "https://registry.npmjs.org/-/v1/search?text=${URLEncoder.encode(query, "UTF-8")}&size=4"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
+                .build()
+
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val root = JSONObject(body)
+                val objects = root.optJSONArray("objects") ?: JSONArray()
+                for (i in 0 until objects.length()) {
+                    val obj = objects.optJSONObject(i) ?: continue
+                    val pkg = obj.optJSONObject("package") ?: continue
+                    val name = pkg.optString("name")
+                    val desc = pkg.optString("description")
+                    val version = pkg.optString("version")
+                    val npmLink = pkg.optJSONObject("links")?.optString("npm") ?: "https://www.npmjs.com/package/$name"
+
+                    if (name.isNotBlank()) {
+                        list.add(
+                            WebSearchResult(
+                                title = "$name (v$version)",
+                                snippet = if (desc.isNotBlank()) desc else "Open-source software package available on NPM registry.",
+                                url = npmLink,
+                                source = "NPM Registry",
+                                category = "Code & Packages"
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    /**
+     * NASA Images API - Search NASA aerospace missions, space telescopes, and planetary discoveries.
+     */
+    private fun fetchNasaImagesSearch(query: String): List<WebSearchResult> {
+        val list = mutableListOf<WebSearchResult>()
+        try {
+            val url = "https://images-api.nasa.gov/search?q=${URLEncoder.encode(query, "UTF-8")}&media_type=image"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) OmniChat/1.0")
+                .build()
+
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+
+            if (body.isNotBlank()) {
+                val root = JSONObject(body)
+                val items = root.optJSONObject("collection")?.optJSONArray("items") ?: JSONArray()
+                val limit = items.length().coerceAtMost(4)
+                for (i in 0 until limit) {
+                    val item = items.optJSONObject(i) ?: continue
+                    val dataArray = item.optJSONArray("data") ?: continue
+                    val data = dataArray.optJSONObject(0) ?: continue
+                    val title = data.optString("title").trim()
+                    val rawDesc = data.optString("description")
+                    val cleanDesc = cleanHtml(rawDesc).take(200)
+                    val nasaId = data.optString("nasa_id")
+                    val date = data.optString("date_created").take(10)
+                    val link = "https://images.nasa.gov/details/$nasaId"
+
+                    if (title.isNotBlank()) {
+                        list.add(
+                            WebSearchResult(
+                                title = title,
+                                snippet = if (cleanDesc.isNotBlank()) "$cleanDesc..." else "Official NASA mission discovery record.",
+                                url = link,
+                                source = "NASA Archives",
+                                pubDate = date,
+                                category = "Space & Science"
                             )
                         )
                     }
