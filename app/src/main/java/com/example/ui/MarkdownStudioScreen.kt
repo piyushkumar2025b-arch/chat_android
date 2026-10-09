@@ -499,46 +499,68 @@ private fun MarkdownToolbarButton(
 }
 
 private fun getSampleMarkdownTemplate(): String = """
-# 🚀 OmniChat Super Engine
+# 🚀 OmniChat — All-in-One Intelligent Studio & Productivity Hub
 
-Welcome to the **OmniChat Markdown Studio**. You can open, write, preview, and export `.md` files directly on your device.
+Welcome to **OmniChat**, a unified Android ecosystem combining multi-provider AI assistance, creative media studios, and privacy-first offline utilities.
 
 ---
 
-## ⚡ Highlights & Key Features
+## 🎯 What Was Built & Why It's Useful
+Modern mobile workflows force users to juggle 5 to 10 isolated applications (calculators, password managers, notes apps, photo editors, markdown viewers, code runners, audio players, and news readers). None of them communicate with each other.
 
-- **Multi-Engine AI Assistance**: Gemini, Groq, OpenRouter, and free server-side endpoints.
-- **Rich Media & Art Studio**: Generative images, motion videos, synthesizers, and audio visualizers.
-- **Embedded Web Code Sandbox**: Run interactive HTML, CSS, JavaScript, and simulated Python.
-- **Markdown Document Processor**: Full GFM specification with tables, code fences, and checklists.
+**OmniChat unites all these workflows into a single cohesive Material Design 3 app where native utilities and AI work together**:
+- **Smart Calculator** with both Standard & Scientific keypads + one-tap **AI Step-by-Step Solver**.
+- **Calendar & Planner** with interactive monthly grid, event dots, daily timeline, and **AI Day Optimizer**.
+- **Password Vault** with encrypted Room storage, custom strength generator, and **AI Security Audit**.
+- **Notes Hub** with 6 color tags, checklist formatters (`- [ ] `), pinned notes, and **AI Polish/Summarize**.
+- **Photo & Image Editor** with 6 one-tap color filters, brightness/contrast sliders, crop/rotate, touch doodle pen, and AI vision export.
+- **Code Studio & Sandbox** with code upload, interactive in-site HTML/JS webview runner, console logs, and AI execution diagnostics.
+- **Music Studio & Visualizer** with custom audio upload, speed/pitch tuning, 3-band equalizer, and 3 beat visualizers (32-band spectrum, beat radar, waveform ribbon).
+- **Markdown Hub** with `.md` file reader, live editor, split view, and document metrics.
+- **Private RAG Vector Store** for zero-cloud document grounding and semantic search.
+- **16 Free Knowledge Engines** (Wikipedia, PubMed NCBI, DEV.to, OpenLibrary, Internet Archive) + **8 Live News Feeds** with zero API keys.
+
+---
+
+## 🛠️ Complete Tech Stack
+- **Language**: Kotlin 2.0+ (100% type-safe, coroutines & flows)
+- **UI Framework**: Jetpack Compose & Material Design 3 (M3)
+- **Database**: AndroidX Room (KSP SQLite) with version 3 schema
+- **Architecture**: MVVM (Model-View-ViewModel) + Clean Architecture
+- **Audio & Media**: Native Android `MediaPlayer`, `PlaybackParams`, `AudioSynthesizer`
+- **Graphics**: Jetpack Compose `Canvas`, Android `Bitmap`, `ColorMatrix`
+- **Web Execution**: Sandboxed Android `WebView` with JavaScript console interception
+- **AI Integration**: Multi-provider support (Gemini 2.5/Flash, Groq, OpenRouter, REST)
+- **Zero-Key Feeds**: OkHttp, DOM/SAX XML news parsers, PubMed e-utilities, OpenLibrary APIs
+- **Testing**: Robolectric local JVM testing
 
 ---
 
 ### 📊 Capabilities Matrix
 
-| Feature | Supported | Latency | Status |
+| Feature | Local Offline | AI Integrated | Status |
 |:---|:---:|:---:|:---|
-| **Image Filters** | ✅ Yes | Instant | Production |
-| **HTML Web Preview** | ✅ Yes | Real-time | Active |
-| **Beat Visualizer** | ✅ Yes | 60 FPS | Smooth |
-| **RAG Knowledge Store** | ✅ Yes | Local | Offline Ready |
+| **Password Vault** | ✅ Yes (Room) | ✅ NIST Audit | 🟢 Production |
+| **Notes Hub** | ✅ Yes (Room) | ✅ Polish & Summarize | 🟢 Production |
+| **Smart Calculator** | ✅ Yes | ✅ Step-by-Step Math | 🟢 Production |
+| **Calendar Planner** | ✅ Yes (Room) | ✅ AI Day Planner | 🟢 Production |
+| **Photo Editor** | ✅ Yes (Bitmap) | ✅ Vision Reasoning | 🟢 Production |
+| **HTML/JS Sandbox** | ✅ Yes (WebView) | ✅ AI Code Runner | 🟢 Production |
+| **Beat Visualizer** | ✅ Yes (Canvas) | ✅ Procedural Tunes | 🟢 Production |
+| **RAG Vector Hub** | ✅ Yes (Embeddings) | ✅ Grounded Answers | 🟢 Production |
 
 ---
 
-### 💻 Code Example
+### 💻 Code Architecture Example
 
 ```kotlin
-fun main() {
-    println("OmniChat is ready for high-velocity creation!")
-}
+// Reactive Flow collection inside Jetpack Compose
+val passwords by productivityDao.getAllPasswordsFlow().collectAsState(initial = emptyList())
+val notes by productivityDao.getAllNotesFlow().collectAsState(initial = emptyList())
+val events by productivityDao.getEventsForMonthFlow(year, month).collectAsState(initial = emptyList())
 ```
 
-> **Pro Tip**: Use the **Split View** tab to edit on top and watch real-time formatting updates below.
-
-- [x] Create comprehensive image editor
-- [x] Build Markdown file viewer and hub
-- [x] Add code runner with in-site HTML preview
-- [x] Implement beat visualizer & song studio
+> **Pro Tip**: Use the **Split View** tab above to edit Markdown in real-time or tap **Save to Downloads** to export!
 """.trimIndent()
 
 private fun getProjectSpecTemplate(): String = """
