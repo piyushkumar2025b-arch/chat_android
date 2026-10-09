@@ -8,20 +8,27 @@ import com.example.data.model.ChatMessageEntity
 import com.example.data.model.ChatSessionEntity
 import com.example.data.model.KnowledgeChunkEntity
 import com.example.data.model.KnowledgeDocumentEntity
+import com.example.data.model.PasswordItemEntity
+import com.example.data.model.NoteItemEntity
+import com.example.data.model.CalendarEventEntity
 
 @Database(
     entities = [
         ChatSessionEntity::class,
         ChatMessageEntity::class,
         KnowledgeDocumentEntity::class,
-        KnowledgeChunkEntity::class
+        KnowledgeChunkEntity::class,
+        PasswordItemEntity::class,
+        NoteItemEntity::class,
+        CalendarEventEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun chatDao(): ChatDao
     abstract fun ragDao(): RagDao
+    abstract fun productivityDao(): ProductivityDao
 
     companion object {
         @Volatile

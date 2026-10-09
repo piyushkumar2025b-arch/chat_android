@@ -58,7 +58,11 @@ enum class AppSection(val label: String) {
     IMAGE_EDITOR("Image Editor"),
     MARKDOWN("Markdown Hub"),
     CODE_STUDIO("Code Studio"),
-    MUSIC_STUDIO("Music Studio")
+    MUSIC_STUDIO("Music Studio"),
+    PASSWORDS("Password Vault"),
+    NOTES("Notes Hub"),
+    CALCULATOR("Calculator"),
+    CALENDAR("Calendar")
 }
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
@@ -67,6 +71,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getInstance(application)
     val repository = ChatRepository(database.chatDao())
     val usageTracker = UsageTracker(application, preferencesManager)
+    val productivityDao = database.productivityDao()
 
     private val _currentSection = MutableStateFlow(AppSection.CHAT)
     val currentSection: StateFlow<AppSection> = _currentSection.asStateFlow()

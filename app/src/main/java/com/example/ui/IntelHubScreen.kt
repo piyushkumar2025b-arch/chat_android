@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Note
+import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.Psychology
@@ -31,12 +35,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.data.local.PreferencesManager
+import com.example.data.local.ProductivityDao
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IntelHubScreen(
     initialTab: Int = 0,
     preferencesManager: PreferencesManager,
+    productivityDao: ProductivityDao? = null,
     onSendPromptToChat: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -46,7 +52,11 @@ fun IntelHubScreen(
         Triple("Learn AI", Icons.Default.School, 1),
         Triple("Live News", Icons.Default.Newspaper, 2),
         Triple("Web Search", Icons.Default.Language, 3),
-        Triple("Read Aloud", Icons.Default.RecordVoiceOver, 4)
+        Triple("Read Aloud", Icons.Default.RecordVoiceOver, 4),
+        Triple("Passwords", Icons.Default.Key, 5),
+        Triple("Notes", Icons.AutoMirrored.Filled.Note, 6),
+        Triple("Calculator", Icons.Default.Calculate, 7),
+        Triple("Calendar", Icons.Default.CalendarMonth, 8)
     )
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -83,6 +93,31 @@ fun IntelHubScreen(
                 2 -> NewsScreen(onSummarizeArticleInChat = onSendPromptToChat)
                 3 -> WebSearchScreen(onSendSearchToChat = onSendPromptToChat)
                 4 -> ReadAloudScreen(onSendTextToChat = onSendPromptToChat)
+                5 -> {
+                    if (productivityDao != null) {
+                        PasswordSaverScreen(
+                            productivityDao = productivityDao,
+                            onSendToChat = onSendPromptToChat
+                        )
+                    }
+                }
+                6 -> {
+                    if (productivityDao != null) {
+                        NotesScreen(
+                            productivityDao = productivityDao,
+                            onSendToChat = onSendPromptToChat
+                        )
+                    }
+                }
+                7 -> CalculatorScreen(onSendToChat = onSendPromptToChat)
+                8 -> {
+                    if (productivityDao != null) {
+                        CalendarScreen(
+                            productivityDao = productivityDao,
+                            onSendToChat = onSendPromptToChat
+                        )
+                    }
+                }
             }
         }
     }

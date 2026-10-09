@@ -41,17 +41,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.FastForward
@@ -758,6 +762,102 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         }
                     }
 
+                    // Password Vault & Generator
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.PASSWORDS)
+                            }
+                            .testTag("drawer_password_vault_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Password Vault & Generator", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Encrypted storage, password meter & auto-copy", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // Notes Hub
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.NOTES)
+                            }
+                            .testTag("drawer_notes_hub_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Note, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.tertiary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Notes Hub & Journal", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Pinned notes, color tags & AI polish", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // Smart Calculator
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.CALCULATOR)
+                            }
+                            .testTag("drawer_calculator_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Calculate, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.secondary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Smart Calculator", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Standard, scientific, unit converter & AI solver", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // Calendar & Planner
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.CALENDAR)
+                            }
+                            .testTag("drawer_calendar_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Calendar & Planner", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Monthly grid, scheduled tasks & AI agenda", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
                     // Artifacts Menu
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -1382,7 +1482,11 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                 currentSection == AppSection.LEARN ||
                                 currentSection == AppSection.NEWS ||
                                 currentSection == AppSection.SEARCH ||
-                                currentSection == AppSection.READ_ALOUD
+                                currentSection == AppSection.READ_ALOUD ||
+                                currentSection == AppSection.PASSWORDS ||
+                                currentSection == AppSection.NOTES ||
+                                currentSection == AppSection.CALCULATOR ||
+                                currentSection == AppSection.CALENDAR
                         NavigationBarItem(
                             selected = isHubSelected,
                             onClick = { viewModel.navigateToSection(AppSection.INTEL_HUB) },
@@ -1528,6 +1632,49 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         )
                     }
 
+                    AppSection.PASSWORDS -> {
+                        PasswordSaverScreen(
+                            productivityDao = viewModel.productivityDao,
+                            onBack = { viewModel.navigateToSection(AppSection.CHAT) },
+                            onSendToChat = { prompt ->
+                                viewModel.sendMessage(prompt)
+                                viewModel.navigateToSection(AppSection.CHAT)
+                            }
+                        )
+                    }
+
+                    AppSection.NOTES -> {
+                        NotesScreen(
+                            productivityDao = viewModel.productivityDao,
+                            onBack = { viewModel.navigateToSection(AppSection.CHAT) },
+                            onSendToChat = { prompt ->
+                                viewModel.sendMessage(prompt)
+                                viewModel.navigateToSection(AppSection.CHAT)
+                            }
+                        )
+                    }
+
+                    AppSection.CALCULATOR -> {
+                        CalculatorScreen(
+                            onBack = { viewModel.navigateToSection(AppSection.CHAT) },
+                            onSendToChat = { prompt ->
+                                viewModel.sendMessage(prompt)
+                                viewModel.navigateToSection(AppSection.CHAT)
+                            }
+                        )
+                    }
+
+                    AppSection.CALENDAR -> {
+                        CalendarScreen(
+                            productivityDao = viewModel.productivityDao,
+                            onBack = { viewModel.navigateToSection(AppSection.CHAT) },
+                            onSendToChat = { prompt ->
+                                viewModel.sendMessage(prompt)
+                                viewModel.navigateToSection(AppSection.CHAT)
+                            }
+                        )
+                    }
+
                     AppSection.MAPS -> {
                         MapExplorerScreen(
                             preferencesManager = viewModel.preferencesManager,
@@ -1562,6 +1709,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         IntelHubScreen(
                             initialTab = initialTab,
                             preferencesManager = viewModel.preferencesManager,
+                            productivityDao = viewModel.productivityDao,
                             onSendPromptToChat = { prompt ->
                                 viewModel.sendMessage(prompt, explicitAttachments = emptyList())
                                 viewModel.navigateToSection(AppSection.CHAT)
