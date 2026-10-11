@@ -9,15 +9,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Newspaper
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -56,7 +60,11 @@ fun IntelHubScreen(
         Triple("Passwords", Icons.Default.Key, 5),
         Triple("Notes", Icons.AutoMirrored.Filled.Note, 6),
         Triple("Calculator", Icons.Default.Calculate, 7),
-        Triple("Calendar", Icons.Default.CalendarMonth, 8)
+        Triple("Calendar", Icons.Default.CalendarMonth, 8),
+        Triple("Step Counter", Icons.AutoMirrored.Filled.DirectionsWalk, 9),
+        Triple("2048 Game", Icons.Default.SportsEsports, 10),
+        Triple("Notifications", Icons.Default.NotificationsActive, 11),
+        Triple("Image Editor", Icons.Default.Image, 12)
     )
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -118,6 +126,10 @@ fun IntelHubScreen(
                         )
                     }
                 }
+                9 -> StepCounterScreen(onSendStatsToChat = onSendPromptToChat)
+                10 -> Game2048Screen(onSendScoreToChat = onSendPromptToChat)
+                11 -> NotificationCenterScreen()
+                12 -> ImageEditorScreen(onSendImageToChat = onSendPromptToChat)
             }
         }
     }

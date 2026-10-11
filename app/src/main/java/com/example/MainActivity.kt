@@ -23,6 +23,7 @@ class MainActivity : ComponentActivity() {
         } catch (_: Exception) {}
 
         super.onCreate(savedInstanceState)
+        com.example.util.AppNotificationManager.initChannels(this)
         enableEdgeToEdge()
         setContent {
             val viewModel: ChatViewModel = viewModel()

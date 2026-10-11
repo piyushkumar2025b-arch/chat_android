@@ -64,7 +64,10 @@ enum class AppSection(val label: String) {
     PASSWORDS("Password Vault"),
     NOTES("Notes Hub"),
     CALCULATOR("Calculator"),
-    CALENDAR("Calendar")
+    CALENDAR("Calendar"),
+    STEP_COUNTER("Step Counter"),
+    GAME_2048("2048 Game"),
+    NOTIFICATIONS("Notifications")
 }
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {

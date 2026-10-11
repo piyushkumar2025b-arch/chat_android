@@ -29,6 +29,9 @@ interface ChatDao {
     @Query("UPDATE chat_sessions SET title = :title, updatedAt = :updatedAt WHERE id = :sessionId")
     suspend fun updateSessionTitle(sessionId: String, title: String, updatedAt: Long = System.currentTimeMillis())
 
+    @Query("UPDATE chat_sessions SET updatedAt = :updatedAt WHERE id = :sessionId")
+    suspend fun updateSessionTimestamp(sessionId: String, updatedAt: Long = System.currentTimeMillis())
+
     @Query("UPDATE chat_sessions SET providerId = :providerId, modelId = :modelId, updatedAt = :updatedAt WHERE id = :sessionId")
     suspend fun updateSessionModel(sessionId: String, providerId: String, modelId: String, updatedAt: Long = System.currentTimeMillis())
 

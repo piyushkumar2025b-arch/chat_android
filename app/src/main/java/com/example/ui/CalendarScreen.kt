@@ -231,6 +231,8 @@ fun CalendarScreen(
                 } else {
                     currentMonth--
                 }
+                val maxD = getDaysInMonth(currentYear, currentMonth)
+                if (selectedDay > maxD) selectedDay = maxD
             }) {
                 Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Month")
             }
@@ -249,6 +251,8 @@ fun CalendarScreen(
                 } else {
                     currentMonth++
                 }
+                val maxD = getDaysInMonth(currentYear, currentMonth)
+                if (selectedDay > maxD) selectedDay = maxD
             }) {
                 Icon(Icons.Default.ChevronRight, contentDescription = "Next Month")
             }

@@ -111,7 +111,7 @@ class ChatRepository(private val chatDao: ChatDao) {
         )
         chatDao.insertMessage(message)
         // Update session timestamp
-        chatDao.updateSessionTitle(sessionId, getSession(sessionId)?.title ?: "Chat", System.currentTimeMillis())
+        chatDao.updateSessionTimestamp(sessionId)
         return message
     }
 

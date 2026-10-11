@@ -5,15 +5,11 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="sharedpref" path="omnichat_prefs.xml"/>
+        <exclude domain="database" path="omnichat_database"/>
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="sharedpref" path="omnichat_prefs.xml"/>
+        <exclude domain="database" path="omnichat_database"/>
     </device-transfer>
-    -->
 </data-extraction-rules>

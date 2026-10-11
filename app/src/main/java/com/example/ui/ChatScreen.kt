@@ -14,6 +14,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +42,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
@@ -53,6 +55,9 @@ import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Note
@@ -858,6 +863,78 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         }
                     }
 
+                    // Live Step Counter
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.STEP_COUNTER)
+                            }
+                            .testTag("drawer_step_counter_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color(0xFF10B981))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Live Step Counter", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Hardware motion sensor, goal tracking & calories", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // 2048 Puzzle Game
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.GAME_2048)
+                            }
+                            .testTag("drawer_game_2048_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.SportsEsports, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color(0xFFEDC22E))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("2048 Classic Game", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Swipe & merge numbers to reach 2048", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // App Notifications Center
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.NOTIFICATIONS)
+                            }
+                            .testTag("drawer_notifications_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color(0xFF3B82F6))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Notifications Center", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Real system alerts, fitness milestones & tips", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
                     // Artifacts Menu
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -1082,6 +1159,14 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                         AppSection.SEARCH -> "Live Web Search"
                                         AppSection.READ_ALOUD -> "Read Aloud Narrator"
                                         AppSection.KNOWLEDGE -> "RAG Knowledge Hub"
+                                        AppSection.STEP_COUNTER -> "Live Step Counter"
+                                        AppSection.GAME_2048 -> "2048 Puzzle Game"
+                                        AppSection.NOTIFICATIONS -> "Notification Center"
+                                        AppSection.IMAGE_EDITOR -> "Image Editor & Studio"
+                                        AppSection.CALCULATOR -> "Smart Calculator"
+                                        AppSection.CALENDAR -> "Calendar & Planner"
+                                        AppSection.NOTES -> "Notes Hub"
+                                        AppSection.PASSWORDS -> "Password Vault"
                                         else -> "OmniChat AI"
                                     },
                                     style = MaterialTheme.typography.titleMedium,
@@ -1486,7 +1571,10 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                 currentSection == AppSection.PASSWORDS ||
                                 currentSection == AppSection.NOTES ||
                                 currentSection == AppSection.CALCULATOR ||
-                                currentSection == AppSection.CALENDAR
+                                currentSection == AppSection.CALENDAR ||
+                                currentSection == AppSection.STEP_COUNTER ||
+                                currentSection == AppSection.GAME_2048 ||
+                                currentSection == AppSection.NOTIFICATIONS
                         NavigationBarItem(
                             selected = isHubSelected,
                             onClick = { viewModel.navigateToSection(AppSection.INTEL_HUB) },
@@ -1672,6 +1760,32 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                 viewModel.sendMessage(prompt)
                                 viewModel.navigateToSection(AppSection.CHAT)
                             }
+                        )
+                    }
+
+                    AppSection.STEP_COUNTER -> {
+                        StepCounterScreen(
+                            onBack = { viewModel.navigateToSection(AppSection.CHAT) },
+                            onSendStatsToChat = { prompt ->
+                                viewModel.sendMessage(prompt)
+                                viewModel.navigateToSection(AppSection.CHAT)
+                            }
+                        )
+                    }
+
+                    AppSection.GAME_2048 -> {
+                        Game2048Screen(
+                            onBack = { viewModel.navigateToSection(AppSection.CHAT) },
+                            onSendScoreToChat = { prompt ->
+                                viewModel.sendMessage(prompt)
+                                viewModel.navigateToSection(AppSection.CHAT)
+                            }
+                        )
+                    }
+
+                    AppSection.NOTIFICATIONS -> {
+                        NotificationCenterScreen(
+                            onBack = { viewModel.navigateToSection(AppSection.CHAT) }
                         )
                     }
 
