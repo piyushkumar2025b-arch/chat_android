@@ -8,6 +8,20 @@ class PreferencesManager(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("omnichat_prefs", Context.MODE_PRIVATE)
 
+    private val vaultSecurity = VaultSecurityManager.getInstance(context)
+
+    private fun getSecureString(key: String): String {
+        val raw = prefs.getString(key, "") ?: ""
+        if (raw.isBlank()) return ""
+        return vaultSecurity.decrypt(raw)
+    }
+
+    private fun putSecureString(key: String, value: String) {
+        val trimmed = value.trim()
+        val toSave = if (trimmed.isNotBlank()) vaultSecurity.encrypt(trimmed) else ""
+        prefs.edit().putString(key, toSave).apply()
+    }
+
     companion object {
         private const val KEY_GEMINI_API_KEY = "gemini_api_key"
         private const val KEY_GROQ_API_KEY = "groq_api_key"
@@ -39,8 +53,8 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putInt(KEY_DAILY_LIMIT, value).apply()
 
     var huggingFaceApiKey: String
-        get() = prefs.getString(KEY_HUGGINGFACE_API_KEY, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_HUGGINGFACE_API_KEY, value.trim()).apply()
+        get() = getSecureString(KEY_HUGGINGFACE_API_KEY)
+        set(value) = putSecureString(KEY_HUGGINGFACE_API_KEY, value)
 
     var selectedTheme: String
         get() = prefs.getString(KEY_SELECTED_THEME, "indigo") ?: "indigo"
@@ -51,16 +65,16 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putString(KEY_THEME_MODE, value).apply()
 
     var cerebrasApiKey: String
-        get() = prefs.getString(KEY_CEREBRAS_API_KEY, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_CEREBRAS_API_KEY, value.trim()).apply()
+        get() = getSecureString(KEY_CEREBRAS_API_KEY)
+        set(value) = putSecureString(KEY_CEREBRAS_API_KEY, value)
 
     var youtubeApiKey: String
-        get() = prefs.getString(KEY_YOUTUBE_API_KEY, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_YOUTUBE_API_KEY, value.trim()).apply()
+        get() = getSecureString(KEY_YOUTUBE_API_KEY)
+        set(value) = putSecureString(KEY_YOUTUBE_API_KEY, value)
 
     var googleMapsApiKey: String
         get() {
-            val saved = prefs.getString(KEY_GOOGLE_MAPS_API_KEY, "") ?: ""
+            val saved = getSecureString(KEY_GOOGLE_MAPS_API_KEY)
             if (saved.isNotBlank()) return saved
             return try {
                 val buildConfigKey = BuildConfig.MAPS_API_KEY
@@ -69,7 +83,7 @@ class PreferencesManager(context: Context) {
                 ""
             }
         }
-        set(value) = prefs.edit().putString(KEY_GOOGLE_MAPS_API_KEY, value.trim()).apply()
+        set(value) = putSecureString(KEY_GOOGLE_MAPS_API_KEY, value)
 
     var activePersonaId: String
         get() = prefs.getString(KEY_ACTIVE_PERSONA_ID, "default") ?: "default"
@@ -85,6 +99,8 @@ class PreferencesManager(context: Context) {
 
     fun exportKeysJson(): String {
         val obj = org.json.JSONObject().apply {
+            put("_security_notice", "OmniChat Confidential Credentials. Treat as sensitive secrets.")
+            put("_exported_at", System.currentTimeMillis())
             put("gemini", geminiApiKey)
             put("groq", groqApiKey)
             put("openrouter", openRouterApiKey)
@@ -120,7 +136,7 @@ class PreferencesManager(context: Context) {
 
     var geminiApiKey: String
         get() {
-            val saved = prefs.getString(KEY_GEMINI_API_KEY, "") ?: ""
+            val saved = getSecureString(KEY_GEMINI_API_KEY)
             if (saved.isNotBlank()) return saved
             return try {
                 val buildConfigKey = BuildConfig.GEMINI_API_KEY
@@ -129,11 +145,11 @@ class PreferencesManager(context: Context) {
                 ""
             }
         }
-        set(value) = prefs.edit().putString(KEY_GEMINI_API_KEY, value.trim()).apply()
+        set(value) = putSecureString(KEY_GEMINI_API_KEY, value)
 
     var groqApiKey: String
         get() {
-            val saved = prefs.getString(KEY_GROQ_API_KEY, "") ?: ""
+            val saved = getSecureString(KEY_GROQ_API_KEY)
             if (saved.isNotBlank()) return saved
             return try {
                 val buildConfigKey = BuildConfig.GROQ_API_KEY
@@ -142,11 +158,11 @@ class PreferencesManager(context: Context) {
                 ""
             }
         }
-        set(value) = prefs.edit().putString(KEY_GROQ_API_KEY, value.trim()).apply()
+        set(value) = putSecureString(KEY_GROQ_API_KEY, value)
 
     var openRouterApiKey: String
         get() {
-            val saved = prefs.getString(KEY_OPENROUTER_API_KEY, "") ?: ""
+            val saved = getSecureString(KEY_OPENROUTER_API_KEY)
             if (saved.isNotBlank()) return saved
             return try {
                 val buildConfigKey = BuildConfig.OPENROUTER_API_KEY
@@ -155,15 +171,15 @@ class PreferencesManager(context: Context) {
                 ""
             }
         }
-        set(value) = prefs.edit().putString(KEY_OPENROUTER_API_KEY, value.trim()).apply()
+        set(value) = putSecureString(KEY_OPENROUTER_API_KEY, value)
 
     var customBaseUrl: String
         get() = prefs.getString(KEY_CUSTOM_BASE_URL, "https://api.openai.com/v1/chat/completions") ?: ""
         set(value) = prefs.edit().putString(KEY_CUSTOM_BASE_URL, value.trim()).apply()
 
     var customApiKey: String
-        get() = prefs.getString(KEY_CUSTOM_API_KEY, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_CUSTOM_API_KEY, value.trim()).apply()
+        get() = getSecureString(KEY_CUSTOM_API_KEY)
+        set(value) = putSecureString(KEY_CUSTOM_API_KEY, value)
 
     var customModel: String
         get() = prefs.getString(KEY_CUSTOM_MODEL, "gpt-4o-mini") ?: "gpt-4o-mini"

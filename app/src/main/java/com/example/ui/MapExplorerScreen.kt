@@ -293,8 +293,11 @@ fun MapExplorerScreen(
                 // 1. If Google Maps API key is configured, query Google Maps Geocoding API first
                 if (hasGoogleMapsKey) {
                     try {
-                        val googleUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=$encoded&key=$googleMapsApiKey"
-                        val req = Request.Builder().url(googleUrl).build()
+                        val googleUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=$encoded"
+                        val req = Request.Builder()
+                            .url(googleUrl)
+                            .addHeader("x-goog-api-key", googleMapsApiKey)
+                            .build()
                         val res = withContext(Dispatchers.IO) { client.newCall(req).execute() }
                         if (res.isSuccessful) {
                             val body = res.body?.string().orEmpty()

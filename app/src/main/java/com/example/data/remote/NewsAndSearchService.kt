@@ -274,7 +274,7 @@ object WebSearchService {
         query: String,
         category: SearchCategory = SearchCategory.ALL
     ): Result<List<WebSearchResult>> = withContext(Dispatchers.IO) {
-        val trimmed = query.trim()
+        val trimmed = query.trim().take(300)
         if (trimmed.isEmpty()) return@withContext Result.success(emptyList())
 
         val results = mutableListOf<WebSearchResult>()

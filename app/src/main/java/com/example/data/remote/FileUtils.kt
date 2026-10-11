@@ -589,17 +589,19 @@ object FileUtils {
      * Reads up to maxChars characters from the current zip stream entry safely, preventing zip-bomb OOM.
      */
     fun readZipEntryText(zip: ZipInputStream, maxChars: Int = 100_000): String {
-        val reader = zip.bufferedReader(Charsets.UTF_8)
-        val buffer = CharArray(4096)
-        val sb = StringBuilder()
-        var read = reader.read(buffer)
-        while (read != -1 && sb.length < maxChars) {
-            val toAppend = minOf(read, maxChars - sb.length)
-            sb.append(buffer, 0, toAppend)
-            if (sb.length >= maxChars) break
-            read = reader.read(buffer)
+        val baos = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(4096)
+        var totalRead = 0
+        var read = zip.read(buffer)
+        while (read != -1 && totalRead < maxChars * 4) {
+            val toWrite = minOf(read, (maxChars * 4) - totalRead)
+            baos.write(buffer, 0, toWrite)
+            totalRead += toWrite
+            if (totalRead >= maxChars * 4) break
+            read = zip.read(buffer)
         }
-        return sb.toString()
+        val text = baos.toString("UTF-8")
+        return if (text.length > maxChars) text.substring(0, maxChars) else text
     }
 
     /**

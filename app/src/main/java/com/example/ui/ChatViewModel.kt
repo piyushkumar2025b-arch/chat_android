@@ -94,7 +94,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val ragDocuments: StateFlow<List<KnowledgeDocumentEntity>> = database.ragDao().getAllDocuments()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _isRagEnabled = MutableStateFlow(true)
+    private val _isRagEnabled = MutableStateFlow(false)
     val isRagEnabled: StateFlow<Boolean> = _isRagEnabled.asStateFlow()
 
     fun toggleRag() {
@@ -809,6 +809,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     model.id
                 }
 
+                val webContext = if (_isWebSearchEnabled.value && userMessage.content.isNotBlank()) {
+                    try {
+                        val searchResults = WebSearchService.search(userMessage.content).getOrNull()
+                        if (!searchResults.isNullOrEmpty()) {
+                            "\n\n[Live Real-Time Web Search Results & Sources for '${userMessage.content}']:\n" +
+                                    searchResults.take(5).joinToString("\n") { "• [${it.source}] ${it.title} (${it.pubDate}): ${it.snippet} (Source: ${it.url})" } +
+                                    "\n\nNote for Assistant: You have live real-time internet access active. Use the above verified live web sources to provide an accurate, up-to-date answer and cite the publisher/sources."
+                        } else ""
+                    } catch (_: Exception) { "" }
+                } else ""
+
                 val ragContext = if (_isRagEnabled.value && userMessage.content.isNotBlank()) {
                     try {
                         val geminiKey = preferencesManager.geminiApiKey
@@ -819,7 +830,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     } catch (_: Exception) { "" }
                 } else ""
 
-                val regenPrompt = userMessage.content + ragContext
+                val regenPrompt = userMessage.content + webContext + ragContext
 
                 val result = AiService.sendMessage(
                     provider = provider,

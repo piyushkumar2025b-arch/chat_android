@@ -225,9 +225,12 @@ fun YouTubeScreen(
         coroutineScope.launch {
             try {
                 val encoded = URLEncoder.encode(q, "UTF-8")
-                val url = "https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=$encoded&type=video&key=$key"
+                val url = "https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=$encoded&type=video"
                 val client = OkHttpClient.Builder().connectTimeout(12, TimeUnit.SECONDS).build()
-                val req = Request.Builder().url(url).build()
+                val req = Request.Builder()
+                    .url(url)
+                    .addHeader("x-goog-api-key", key)
+                    .build()
 
                 val (isSuccess, code, body) = withContext(Dispatchers.IO) {
                     client.newCall(req).execute().use { res ->
