@@ -67,7 +67,8 @@ enum class AppSection(val label: String) {
     CALENDAR("Calendar"),
     STEP_COUNTER("Step Counter"),
     GAME_2048("2048 Game"),
-    NOTIFICATIONS("Notifications")
+    NOTIFICATIONS("Notifications"),
+    MEDIA_PLAYER("Media Player")
 }
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {

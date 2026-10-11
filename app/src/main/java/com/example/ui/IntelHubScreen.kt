@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
@@ -64,7 +65,8 @@ fun IntelHubScreen(
         Triple("Step Counter", Icons.AutoMirrored.Filled.DirectionsWalk, 9),
         Triple("2048 Game", Icons.Default.SportsEsports, 10),
         Triple("Notifications", Icons.Default.NotificationsActive, 11),
-        Triple("Image Editor", Icons.Default.Image, 12)
+        Triple("Image Editor", Icons.Default.Image, 12),
+        Triple("Media Player", Icons.Default.GraphicEq, 13)
     )
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -130,6 +132,10 @@ fun IntelHubScreen(
                 10 -> Game2048Screen(onSendScoreToChat = onSendPromptToChat)
                 11 -> NotificationCenterScreen()
                 12 -> ImageEditorScreen(onSendImageToChat = onSendPromptToChat)
+                13 -> UniversalMediaPlayerScreen(
+                    onBack = { selectedHubTab = 0 },
+                    onSendToChat = onSendPromptToChat
+                )
             }
         }
     }

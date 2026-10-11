@@ -71,6 +71,7 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Psychology
@@ -935,6 +936,30 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         }
                     }
 
+                    // Any File Player (Video, Audio, Docs)
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                viewModel.navigateToSection(AppSection.MEDIA_PLAYER)
+                            }
+                            .testTag("drawer_media_player_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Movie, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color(0xFFE11D48))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Media & File Player", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Play any Video, Music, Audio & view all docs", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
                     // Artifacts Menu
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -1167,6 +1192,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                         AppSection.CALENDAR -> "Calendar & Planner"
                                         AppSection.NOTES -> "Notes Hub"
                                         AppSection.PASSWORDS -> "Password Vault"
+                                        AppSection.MEDIA_PLAYER -> "Media & File Player"
                                         else -> "OmniChat AI"
                                     },
                                     style = MaterialTheme.typography.titleMedium,
@@ -1786,6 +1812,16 @@ fun ChatScreen(viewModel: ChatViewModel) {
                     AppSection.NOTIFICATIONS -> {
                         NotificationCenterScreen(
                             onBack = { viewModel.navigateToSection(AppSection.CHAT) }
+                        )
+                    }
+
+                    AppSection.MEDIA_PLAYER -> {
+                        UniversalMediaPlayerScreen(
+                            onBack = { viewModel.navigateToSection(AppSection.CHAT) },
+                            onSendToChat = { prompt ->
+                                viewModel.sendMessage(prompt)
+                                viewModel.navigateToSection(AppSection.CHAT)
+                            }
                         )
                     }
 

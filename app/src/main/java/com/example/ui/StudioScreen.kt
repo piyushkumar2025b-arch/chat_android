@@ -48,7 +48,8 @@ fun StudioScreen(
         Triple("Music & Beats", Icons.Default.GraphicEq, 2),
         Triple("Code & HTML", Icons.Default.Code, 3),
         Triple("Markdown Hub", Icons.Default.Description, 4),
-        Triple("Video Motion", Icons.Default.Videocam, 5)
+        Triple("Video Motion", Icons.Default.Videocam, 5),
+        Triple("Media Player", Icons.Default.GraphicEq, 6)
     )
 
     Column(
@@ -85,6 +86,10 @@ fun StudioScreen(
                 3 -> CodeStudioScreen(preferencesManager = preferencesManager, onSendToChat = onSendPromptToChat)
                 4 -> MarkdownStudioScreen(onSendToChat = onSendPromptToChat)
                 5 -> VideoStudioScreen(onSendPromptToChat = onSendPromptToChat)
+                6 -> UniversalMediaPlayerScreen(
+                    onBack = { selectedStudioTab = 0 },
+                    onSendToChat = onSendPromptToChat
+                )
             }
         }
     }
