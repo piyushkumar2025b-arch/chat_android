@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.ChatRepository
@@ -29,6 +30,7 @@ import com.example.data.remote.RagEngine
 import com.example.data.remote.WebSearchService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -177,9 +179,23 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             _isRagProcessing.value = false
             refreshRagStats()
             if (res.isSuccess) {
-                onComplete(true, "Loaded ${res.getOrNull() ?: 0} starter knowledge base documents")
+                onComplete(true, "Loaded ${res.getOrNull() ?: 0} built-in internal knowledge sources")
             } else {
                 onComplete(false, res.exceptionOrNull()?.localizedMessage ?: "Failed to load starter docs")
+            }
+        }
+    }
+
+    fun ingestInternalSource(sourceId: String, onComplete: (Boolean, String) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            _isRagProcessing.value = true
+            val res = ragEngine.ingestSpecificInternalSource(sourceId, preferencesManager.geminiApiKey)
+            _isRagProcessing.value = false
+            refreshRagStats()
+            if (res.isSuccess) {
+                onComplete(true, "Ingested internal source: ${res.getOrNull()?.title}")
+            } else {
+                onComplete(false, res.exceptionOrNull()?.localizedMessage ?: "Failed to ingest source")
             }
         }
     }
@@ -323,6 +339,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         initTts(application)
+        usageTracker.refreshStats()
+
+        // Auto-initialize RAG knowledge base in background and fetch initial stats
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (database.ragDao().getDocumentCount() == 0) {
+                    ragEngine.populateStarterKnowledgeBase(preferencesManager.geminiApiKey)
+                }
+                refreshRagStats()
+            } catch (e: Exception) {
+                Log.w("ChatViewModel", "Could not auto-populate RAG on startup: ${e.message}")
+            }
+        }
+
         viewModelScope.launch {
             // Query DB once first to prevent empty session flash
             val initialList = repository.getAllSessionsOnce()
@@ -347,18 +377,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         _currentSessionId.value = first.id
                         _currentSession.value = first
                         syncSessionModel(first)
+                    } else {
+                        createNewSession()
                     }
-                }
-            }
-            // Auto-initialize RAG knowledge base if empty and fetch stats
-            launch {
-                try {
-                    if (database.ragDao().getDocumentCount() == 0) {
-                        ragEngine.populateStarterKnowledgeBase(preferencesManager.geminiApiKey)
-                    }
-                    refreshRagStats()
-                } catch (e: Exception) {
-                    e.printStackTrace()
+                } else if (list.isNotEmpty()) {
+                    val first = list.first()
+                    _currentSessionId.value = first.id
+                    _currentSession.value = first
+                    syncSessionModel(first)
                 }
             }
         }
@@ -398,8 +424,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.deleteSession(sessionId)
             if (_currentSessionId.value == sessionId) {
-                _currentSessionId.value = null
-                _currentSession.value = null
+                val remaining = repository.getAllSessionsOnce()
+                if (remaining.isNotEmpty()) {
+                    val next = remaining.first()
+                    _currentSessionId.value = next.id
+                    _currentSession.value = next
+                    syncSessionModel(next)
+                } else {
+                    createNewSession()
+                }
             }
         }
     }
@@ -532,7 +565,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     modelId = model.id,
                     isError = true
                 )
-                if (explicitAttachments == null) _pendingAttachments.value = emptyList()
+                // Keep pending attachments so the user does not lose them on refused sends (L7)
             }
             return true
         }
@@ -556,7 +589,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     modelId = model.id,
                     isError = true
                 )
-                if (explicitAttachments == null) _pendingAttachments.value = emptyList()
+                // Keep pending attachments on limit reached (L7)
             }
             return true
         }
@@ -580,7 +613,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     modelId = model.id,
                     isError = true
                 )
-                if (explicitAttachments == null) _pendingAttachments.value = emptyList()
+                // Keep pending attachments so user can switch to a vision model without re-uploading (L7)
             }
             return true
         }
@@ -588,107 +621,136 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         activeJob?.cancel()
         activeJob = viewModelScope.launch {
             _isGenerating.value = true
-            val displayPrompt = trimmed.ifEmpty { "Analyze the attached file(s) and extract all key information, summary, and details." }
+            try {
+                val displayPrompt = trimmed.ifEmpty { "Analyze the attached file(s) and extract all key information, summary, and details." }
 
-            // Snapshot history BEFORE inserting the new user message (excludes errors & placeholders)
-            val historySnapshot = currentMessages.value.filter {
-                !it.isError && it.content.isNotBlank() && it.content != "Regenerating response..."
-            }
-
-            // Insert user message in database
-            repository.addMessage(
-                sessionId = sessionId,
-                role = "user",
-                content = displayPrompt,
-                providerId = provider.id,
-                modelId = model.id,
-                attachments = attachments
-            )
-
-            // Update title if first message
-            val existing = currentMessages.value
-            if (existing.isEmpty() || existing.size <= 1) {
-                val titleSnippet = if (displayPrompt.length > 28) displayPrompt.take(28) + "..." else displayPrompt
-                repository.updateSessionTitle(sessionId, titleSnippet)
-            }
-
-            // Clear pending attachments for next message
-            if (explicitAttachments == null) {
-                _pendingAttachments.value = emptyList()
-            }
-
-            // Call AI Service with optional live web grounding
-            val apiKey = getApiKeyForProvider(provider)
-
-            val webContext = if (_isWebSearchEnabled.value && trimmed.isNotBlank()) {
-                try {
-                    val searchResults = WebSearchService.search(trimmed).getOrNull()
-                    if (!searchResults.isNullOrEmpty()) {
-                        "\n\n[Live Real-Time Web Search Results & Sources for '$trimmed']:\n" +
-                                searchResults.take(5).joinToString("\n") { "• [${it.source}] ${it.title} (${it.pubDate}): ${it.snippet} (Source: ${it.url})" } +
-                                "\n\nNote for Assistant: You have live real-time internet access active. Use the above verified live web sources to provide an accurate, up-to-date answer and cite the publisher/sources."
-                    } else ""
-                } catch (_: Exception) { "" }
-            } else ""
-
-            val ragContext = if (_isRagEnabled.value && trimmed.isNotBlank()) {
-                try {
-                    val geminiKey = preferencesManager.geminiApiKey
-                    val retrieved = ragEngine.search(trimmed, topK = 4, geminiApiKey = geminiKey)
-                    if (retrieved.isNotEmpty()) {
-                        ragEngine.formatRagGroundingPrompt(retrieved)
-                    } else ""
-                } catch (_: Exception) { "" }
-            } else ""
-
-            val promptWithGrounding = displayPrompt + webContext + ragContext
-            val effectiveModelId = if (provider == ProviderType.CUSTOM) {
-                preferencesManager.customModel.trim().ifEmpty { "gpt-4o-mini" }
-            } else {
-                model.id
-            }
-
-            val result = AiService.sendMessage(
-                provider = provider,
-                modelId = effectiveModelId,
-                prompt = promptWithGrounding,
-                attachments = attachments,
-                history = historySnapshot,
-                apiKey = apiKey,
-                systemPrompt = preferencesManager.systemPrompt,
-                temperature = preferencesManager.temperature,
-                customBaseUrl = preferencesManager.customBaseUrl,
-                supportsVision = model.supportsVision || provider == ProviderType.CUSTOM,
-                maxTokens = preferencesManager.maxOutputTokens
-            )
-
-            result.onSuccess { responseText ->
-                repository.addMessage(
-                    sessionId = sessionId,
-                    role = "assistant",
-                    content = responseText,
-                    providerId = provider.id,
-                    modelId = model.id,
-                    isError = false
-                )
-                val estTokens = (displayPrompt.length + responseText.length) / 4
-                usageTracker.recordRequest(provider.id, maxOf(50, estTokens))
-            }.onFailure { error ->
-                val isCancelled = !isActive || error is kotlinx.coroutines.CancellationException || error.message?.contains("Canceled", ignoreCase = true) == true
-                if (isCancelled) {
-                    return@onFailure
+                // Snapshot history BEFORE inserting the new user message (excludes errors & placeholders)
+                val historySnapshot = currentMessages.value.filter {
+                    !it.isError && it.content.isNotBlank() && it.content != "Regenerating response..."
                 }
-                repository.addMessage(
-                    sessionId = sessionId,
-                    role = "assistant",
-                    content = "Error from ${provider.displayName}: ${error.localizedMessage ?: "Unknown error"}",
-                    providerId = provider.id,
-                    modelId = model.id,
-                    isError = true
-                )
-            }
 
-            _isGenerating.value = false
+                // Insert user message in database
+                try {
+                    repository.addMessage(
+                        sessionId = sessionId,
+                        role = "user",
+                        content = displayPrompt,
+                        providerId = provider.id,
+                        modelId = model.id,
+                        attachments = attachments
+                    )
+                } catch (e: Exception) {
+                    Log.e("ChatViewModel", "Failed to persist user message: ${e.message}", e)
+                }
+
+                // Update title if session still has placeholder title
+                val sessionObj = repository.getSession(sessionId)
+                if (sessionObj != null && (sessionObj.title == "New Chat" || sessionObj.title.isBlank())) {
+                    val titleSnippet = if (displayPrompt.length > 28) displayPrompt.take(28) + "..." else displayPrompt
+                    repository.updateSessionTitle(sessionId, titleSnippet)
+                }
+
+                // Clear pending attachments for next message
+                if (explicitAttachments == null) {
+                    _pendingAttachments.value = emptyList()
+                }
+
+                // Call AI Service with optional live web grounding
+                val apiKey = getApiKeyForProvider(provider)
+
+                val webContext = if (_isWebSearchEnabled.value && trimmed.isNotBlank()) {
+                    try {
+                        val searchResults = WebSearchService.search(trimmed).getOrNull()
+                        if (!searchResults.isNullOrEmpty()) {
+                            "\n\n[Live Real-Time Web Search Results & Sources for '$trimmed']:\n" +
+                                    searchResults.take(5).joinToString("\n") { "• [${it.source}] ${it.title} (${it.pubDate}): ${it.snippet} (Source: ${it.url})" } +
+                                    "\n\nNote for Assistant: You have live real-time internet access active. Use the above verified live web sources to provide an accurate, up-to-date answer and cite the publisher/sources."
+                        } else ""
+                    } catch (_: Exception) { "" }
+                } else ""
+
+                val ragContext = if (_isRagEnabled.value && trimmed.isNotBlank()) {
+                    try {
+                        val geminiKey = preferencesManager.geminiApiKey
+                        val retrieved = ragEngine.search(trimmed, topK = 4, geminiApiKey = geminiKey)
+                        if (retrieved.isNotEmpty()) {
+                            ragEngine.formatRagGroundingPrompt(retrieved)
+                        } else ""
+                    } catch (_: Exception) { "" }
+                } else ""
+
+                val promptWithGrounding = displayPrompt + webContext + ragContext
+                val effectiveModelId = if (provider == ProviderType.CUSTOM) {
+                    preferencesManager.customModel.trim().ifEmpty { "gpt-4o-mini" }
+                } else {
+                    model.id
+                }
+
+                val result = AiService.sendMessage(
+                    provider = provider,
+                    modelId = effectiveModelId,
+                    prompt = promptWithGrounding,
+                    attachments = attachments,
+                    history = historySnapshot,
+                    apiKey = apiKey,
+                    systemPrompt = preferencesManager.systemPrompt,
+                    temperature = preferencesManager.temperature,
+                    customBaseUrl = preferencesManager.customBaseUrl,
+                    supportsVision = model.supportsVision || provider == ProviderType.CUSTOM,
+                    maxTokens = preferencesManager.maxOutputTokens
+                )
+
+                result.onSuccess { responseText ->
+                    try {
+                        repository.addMessage(
+                            sessionId = sessionId,
+                            role = "assistant",
+                            content = responseText,
+                            providerId = provider.id,
+                            modelId = model.id,
+                            isError = false
+                        )
+                    } catch (e: Exception) {
+                        Log.e("ChatViewModel", "Failed to persist assistant reply: ${e.message}", e)
+                    }
+                    val estTokens = (displayPrompt.length + responseText.length) / 4
+                    usageTracker.recordRequest(provider.id, maxOf(50, estTokens))
+                }.onFailure { error ->
+                    val isCancelled = !isActive || error is kotlinx.coroutines.CancellationException || error.message?.contains("Canceled", ignoreCase = true) == true
+                    if (isCancelled) {
+                        return@onFailure
+                    }
+                    try {
+                        repository.addMessage(
+                            sessionId = sessionId,
+                            role = "assistant",
+                            content = "Error from ${provider.displayName}: ${error.localizedMessage ?: "Unknown error"}",
+                            providerId = provider.id,
+                            modelId = model.id,
+                            isError = true
+                        )
+                    } catch (e: Exception) {
+                        Log.e("ChatViewModel", "Failed to persist error message: ${e.message}", e)
+                    }
+                }
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                // Cancelled
+            } catch (e: Exception) {
+                try {
+                    repository.addMessage(
+                        sessionId = sessionId,
+                        role = "assistant",
+                        content = "Error: ${e.localizedMessage ?: "Unexpected error"}",
+                        providerId = provider.id,
+                        modelId = model.id,
+                        isError = true
+                    )
+                } catch (_: Exception) {}
+            } finally {
+                withContext(NonCancellable) {
+                    _isGenerating.value = false
+                }
+            }
         }
         return true
     }
@@ -732,58 +794,78 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         activeJob?.cancel()
         activeJob = viewModelScope.launch {
             _isGenerating.value = true
-            repository.updateMessageContent(assistantMessage.id, "Regenerating response...")
+            var completedNormally = false
+            try {
+                repository.updateMessageContent(assistantMessage.id, "Regenerating response...")
 
-            val apiKey = getApiKeyForProvider(provider)
-            val history = allMsgs.take(msgIndex).filter {
-                !it.isError && it.id != assistantMessage.id && it.content != "Regenerating response..."
-            }
-            val effectiveModelId = if (provider == ProviderType.CUSTOM) {
-                preferencesManager.customModel.trim().ifEmpty { "gpt-4o-mini" }
-            } else {
-                model.id
-            }
+                val apiKey = getApiKeyForProvider(provider)
+                // History only includes messages BEFORE the user prompt to avoid duplicate user turns
+                val history = allMsgs.take(msgIndex - 1).filter {
+                    !it.isError && it.id != assistantMessage.id && it.content != "Regenerating response..."
+                }
+                val effectiveModelId = if (provider == ProviderType.CUSTOM) {
+                    preferencesManager.customModel.trim().ifEmpty { "gpt-4o-mini" }
+                } else {
+                    model.id
+                }
 
-            val ragContext = if (_isRagEnabled.value && userMessage.content.isNotBlank()) {
-                try {
-                    val geminiKey = preferencesManager.geminiApiKey
-                    val retrieved = ragEngine.search(userMessage.content, topK = 4, geminiApiKey = geminiKey)
-                    if (retrieved.isNotEmpty()) {
-                        ragEngine.formatRagGroundingPrompt(retrieved)
-                    } else ""
-                } catch (_: Exception) { "" }
-            } else ""
+                val ragContext = if (_isRagEnabled.value && userMessage.content.isNotBlank()) {
+                    try {
+                        val geminiKey = preferencesManager.geminiApiKey
+                        val retrieved = ragEngine.search(userMessage.content, topK = 4, geminiApiKey = geminiKey)
+                        if (retrieved.isNotEmpty()) {
+                            ragEngine.formatRagGroundingPrompt(retrieved)
+                        } else ""
+                    } catch (_: Exception) { "" }
+                } else ""
 
-            val regenPrompt = userMessage.content + ragContext
+                val regenPrompt = userMessage.content + ragContext
 
-            val result = AiService.sendMessage(
-                provider = provider,
-                modelId = effectiveModelId,
-                prompt = regenPrompt,
-                attachments = attachments,
-                history = history,
-                apiKey = apiKey,
-                systemPrompt = preferencesManager.systemPrompt,
-                temperature = preferencesManager.temperature,
-                customBaseUrl = preferencesManager.customBaseUrl,
-                supportsVision = model.supportsVision || provider == ProviderType.CUSTOM,
-                maxTokens = preferencesManager.maxOutputTokens
-            )
-
-            result.onSuccess { responseText ->
-                repository.updateMessageContent(assistantMessage.id, responseText, isError = false)
-                val estTokens = (userMessage.content.length + responseText.length) / 4
-                usageTracker.recordRequest(provider.id, maxOf(50, estTokens))
-            }.onFailure { error ->
-                val isCancelled = !isActive || error is kotlinx.coroutines.CancellationException || error is java.util.concurrent.CancellationException || error.message?.contains("Canceled", ignoreCase = true) == true
-                repository.updateMessageContent(
-                    assistantMessage.id,
-                    if (isCancelled) originalContent else "Error: ${error.localizedMessage ?: "Failed to regenerate"}",
-                    isError = !isCancelled
+                val result = AiService.sendMessage(
+                    provider = provider,
+                    modelId = effectiveModelId,
+                    prompt = regenPrompt,
+                    attachments = attachments,
+                    history = history,
+                    apiKey = apiKey,
+                    systemPrompt = preferencesManager.systemPrompt,
+                    temperature = preferencesManager.temperature,
+                    customBaseUrl = preferencesManager.customBaseUrl,
+                    supportsVision = model.supportsVision || provider == ProviderType.CUSTOM,
+                    maxTokens = preferencesManager.maxOutputTokens
                 )
-            }
 
-            _isGenerating.value = false
+                result.onSuccess { responseText ->
+                    completedNormally = true
+                    repository.updateMessageContent(assistantMessage.id, responseText, isError = false)
+                    val estTokens = (userMessage.content.length + responseText.length) / 4
+                    usageTracker.recordRequest(provider.id, maxOf(50, estTokens))
+                }.onFailure { error ->
+                    val isCancelled = !isActive || error is kotlinx.coroutines.CancellationException || error is java.util.concurrent.CancellationException || error.message?.contains("Canceled", ignoreCase = true) == true
+                    completedNormally = !isCancelled
+                    repository.updateMessageContent(
+                        assistantMessage.id,
+                        if (isCancelled) originalContent else "Error: ${error.localizedMessage ?: "Failed to regenerate"}",
+                        isError = !isCancelled
+                    )
+                }
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                // Cancelled
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Unexpected error during regeneration: ${e.message}", e)
+            } finally {
+                withContext(NonCancellable) {
+                    _isGenerating.value = false
+                    if (!completedNormally) {
+                        try {
+                            val currentInDb = repository.getMessage(assistantMessage.id)
+                            if (currentInDb?.content == "Regenerating response...") {
+                                repository.updateMessageContent(assistantMessage.id, originalContent, isError = false)
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
         }
     }
 

@@ -238,6 +238,7 @@ fun WebSearchScreen(
                             SearchCategory.SCIENCE -> listOf("Large Language Models", "Superconductivity", "Gravitational Waves", "Neural Architecture")
                             SearchCategory.CODE -> listOf("Kotlin Coroutines", "Jetpack Compose", "PyTorch 2.0", "FastAPI Framework")
                             SearchCategory.BOOKS -> listOf("Artificial Intelligence Books", "Science Fiction Classics", "Dune Frank Herbert", "Philosophy of Mind")
+                            SearchCategory.TRAVEL -> listOf("Tokyo Itinerary", "Paris Highlights", "Kyoto Temples", "Rome Architecture", "Swiss Alps")
                             SearchCategory.ALL -> listOf("Gemini 1.5 Pro", "Quantum Computing", "Kotlin 2.0", "Latest AI News", "SpaceX Starship")
                         }
                         items(suggestions) { topic ->
@@ -256,7 +257,7 @@ fun WebSearchScreen(
 
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "🌐 16 Free Sources: Wikipedia • DuckDuckGo • StackOverflow • GitHub • DEV.to • PubMed • arXiv • OpenAlex • OpenLibrary • Internet Archive • HackerNews • Bing News • CrossRef • Wikiquote • Wikinews • Wiktionary",
+                        text = "🌐 22+ Free Sources: Wikipedia • DuckDuckGo • StackOverflow • GitHub • DEV.to • PubMed • arXiv • NASA Archives • NPM • Wikibooks • Wikiversity • Wikivoyage • Wikimedia Commons • OpenLibrary • Internet Archive • HackerNews • Bing News • OpenAlex • CrossRef • Wikiquote • Wikinews • Wiktionary",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                     )
@@ -456,6 +457,12 @@ private fun getSourceBadgeColor(source: String): Color {
         "wikiquote" -> Color(0xFF4F46E5) // Indigo
         "wikinews" -> Color(0xFF0284C7) // Sky Blue
         "wiktionary" -> Color(0xFF0D9488) // Teal
+        "wikibooks" -> Color(0xFF0284C7) // Blue
+        "wikiversity" -> Color(0xFF7C3AED) // Purple
+        "wikivoyage" -> Color(0xFF0D9488) // Teal
+        "wikimedia commons" -> Color(0xFF6366F1) // Indigo
+        "npm registry", "npm" -> Color(0xFFDC2626) // Red
+        "nasa archives", "nasa" -> Color(0xFF2563EB) // Blue
         else -> MaterialTheme.colorScheme.tertiary
     }
 }
@@ -477,6 +484,12 @@ private fun getSourceEmoji(source: String): String {
         "wikiquote" -> "💬"
         "wikinews" -> "📢"
         "wiktionary" -> "📝"
+        "wikibooks" -> "📖"
+        "wikiversity" -> "🎓"
+        "wikivoyage" -> "🗺️"
+        "wikimedia commons" -> "🖼️"
+        "npm registry", "npm" -> "📦"
+        "nasa archives", "nasa" -> "🚀"
         else -> "📰"
     }
 }

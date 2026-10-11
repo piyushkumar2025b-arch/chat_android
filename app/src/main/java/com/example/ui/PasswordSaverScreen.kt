@@ -92,6 +92,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.ProductivityDao
+import com.example.data.local.VaultSecurityManager
 import com.example.data.model.PasswordItemEntity
 import kotlinx.coroutines.launch
 import java.security.SecureRandom
@@ -107,6 +108,7 @@ fun PasswordSaverScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val vaultSecurity = remember { VaultSecurityManager.getInstance(context) }
 
     val passwords by productivityDao.getAllPasswordsFlow().collectAsState(initial = emptyList())
 
@@ -119,11 +121,103 @@ fun PasswordSaverScreen(
     var editingItem by remember { mutableStateOf<PasswordItemEntity?>(null) }
     var itemToDelete by remember { mutableStateOf<PasswordItemEntity?>(null) }
 
-    // Master PIN lock simulation
-    var isVaultUnlocked by remember { mutableStateOf(true) }
+    // Master PIN lock
+    var isVaultUnlocked by remember { mutableStateOf(!vaultSecurity.isMasterPinSet()) }
+    var enteredPin by remember { mutableStateOf("") }
+    var pinError by remember { mutableStateOf<String?>(null) }
+    var showPinSettingsDialog by remember { mutableStateOf(false) }
 
     // Revealed passwords set
     var revealedIds by remember { mutableStateOf(setOf<String>()) }
+
+    // Master PIN Lock Gate
+    if (!isVaultUnlocked) {
+        Surface(
+            modifier = modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Password Vault Locked",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Hardware-backed AES-256-GCM encryption.\nEnter your Master PIN to unlock.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                OutlinedTextField(
+                    value = enteredPin,
+                    onValueChange = {
+                        if (it.length <= 8) {
+                            enteredPin = it
+                            pinError = null
+                        }
+                    },
+                    label = { Text("Master PIN") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    isError = pinError != null,
+                    supportingText = pinError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+                    modifier = Modifier
+                        .fillMaxWidth(0.8f)
+                        .testTag("master_pin_input")
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        if (vaultSecurity.verifyMasterPin(enteredPin)) {
+                            isVaultUnlocked = true
+                            enteredPin = ""
+                            pinError = null
+                        } else {
+                            pinError = "Incorrect PIN"
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth(0.8f)
+                        .height(48.dp)
+                        .testTag("unlock_vault_btn")
+                ) {
+                    Icon(Icons.Default.LockOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Unlock Vault")
+                }
+                if (onBack != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(onClick = onBack) {
+                        Text("Back to Chat")
+                    }
+                }
+            }
+        }
+        return
+    }
 
     // Filtered passwords
     val filteredPasswords = remember(passwords, searchQuery, selectedCategory) {
@@ -189,7 +283,19 @@ fun PasswordSaverScreen(
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { isVaultUnlocked = false },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(Icons.Default.Lock, contentDescription = "Lock Vault", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(
+                        onClick = { showPinSettingsDialog = true },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(Icons.Default.Shield, contentDescription = "Security Settings", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     FilledTonalButton(
                         onClick = {
                             editingItem = null
@@ -312,8 +418,12 @@ fun PasswordSaverScreen(
             ) {
                 items(filteredPasswords, key = { it.id }) { item ->
                     val isRevealed = revealedIds.contains(item.id)
+                    val decryptedPassword = remember(item.encryptedPassword) {
+                        vaultSecurity.decrypt(item.encryptedPassword)
+                    }
                     PasswordCard(
                         item = item,
+                        decryptedPassword = decryptedPassword,
                         isRevealed = isRevealed,
                         onToggleReveal = {
                             revealedIds = if (isRevealed) {
@@ -323,10 +433,8 @@ fun PasswordSaverScreen(
                             }
                         },
                         onCopyPassword = {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("Password", item.encryptedPassword)
-                            clipboard.setPrimaryClip(clip)
-                            Toast.makeText(context, "Password copied to clipboard!", Toast.LENGTH_SHORT).show()
+                            vaultSecurity.copyPasswordToClipboard(decryptedPassword)
+                            Toast.makeText(context, "Password copied to clipboard (auto-clears in 30s) 🔒", Toast.LENGTH_SHORT).show()
                         },
                         onCopyUsername = {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -351,7 +459,7 @@ fun PasswordSaverScreen(
                         },
                         onSendAuditToChat = {
                             onSendToChat?.invoke(
-                                "Analyze password security: My account is for '${item.serviceName}' with password length ${item.encryptedPassword.length}. Give modern NIST security recommendations for storing credentials safely."
+                                "Analyze password security: My account is for '${item.serviceName}' with password length ${decryptedPassword.length}. Give modern NIST security recommendations for storing credentials safely."
                             )
                         }
                     )
@@ -366,19 +474,36 @@ fun PasswordSaverScreen(
 
     // Add / Edit Dialog
     if (showAddDialog) {
+        val initialPlaintext = remember(editingItem) {
+            editingItem?.let { vaultSecurity.decrypt(it.encryptedPassword) } ?: ""
+        }
         PasswordEditorDialog(
             initialItem = editingItem,
+            initialPlaintextPassword = initialPlaintext,
             onDismiss = {
                 showAddDialog = false
                 editingItem = null
             },
-            onSave = { savedItem ->
+            onSave = { savedItem, plainPassword ->
                 coroutineScope.launch {
-                    productivityDao.insertPassword(savedItem)
-                    Toast.makeText(context, "Saved ${savedItem.serviceName}", Toast.LENGTH_SHORT).show()
+                    val encrypted = vaultSecurity.encrypt(plainPassword)
+                    productivityDao.insertPassword(savedItem.copy(encryptedPassword = encrypted))
+                    Toast.makeText(context, "Saved & encrypted ${savedItem.serviceName} 🔒", Toast.LENGTH_SHORT).show()
                 }
                 showAddDialog = false
                 editingItem = null
+            }
+        )
+    }
+
+    // PIN Settings Dialog
+    if (showPinSettingsDialog) {
+        MasterPinSettingsDialog(
+            vaultSecurity = vaultSecurity,
+            onDismiss = { showPinSettingsDialog = false },
+            onUpdated = {
+                Toast.makeText(context, "Security settings updated", Toast.LENGTH_SHORT).show()
+                showPinSettingsDialog = false
             }
         )
     }
@@ -417,6 +542,7 @@ fun PasswordSaverScreen(
 @Composable
 private fun PasswordCard(
     item: PasswordItemEntity,
+    decryptedPassword: String,
     isRevealed: Boolean,
     onToggleReveal: () -> Unit,
     onCopyPassword: () -> Unit,
@@ -547,12 +673,12 @@ private fun PasswordCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Password",
+                        text = "Password (AES-256-GCM)",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = if (isRevealed) item.encryptedPassword else "••••••••••••",
+                        text = if (isRevealed) decryptedPassword else "••••••••••••",
                         style = MaterialTheme.typography.bodyMedium,
                         fontFamily = if (isRevealed) FontFamily.Monospace else FontFamily.Default,
                         fontWeight = FontWeight.Bold
@@ -608,12 +734,13 @@ private fun PasswordCard(
 @Composable
 private fun PasswordEditorDialog(
     initialItem: PasswordItemEntity?,
+    initialPlaintextPassword: String = "",
     onDismiss: () -> Unit,
-    onSave: (PasswordItemEntity) -> Unit
+    onSave: (PasswordItemEntity, String) -> Unit
 ) {
     var serviceName by remember { mutableStateOf(initialItem?.serviceName ?: "") }
     var username by remember { mutableStateOf(initialItem?.usernameOrEmail ?: "") }
-    var password by remember { mutableStateOf(initialItem?.encryptedPassword ?: "") }
+    var password by remember { mutableStateOf(initialPlaintextPassword) }
     var category by remember { mutableStateOf(initialItem?.category ?: "Logins") }
     var websiteUrl by remember { mutableStateOf(initialItem?.websiteUrl ?: "") }
     var notes by remember { mutableStateOf(initialItem?.notes ?: "") }
@@ -828,12 +955,12 @@ private fun PasswordEditorDialog(
                             notes = notes.trim(),
                             updatedAt = System.currentTimeMillis()
                         )
-                        onSave(item)
+                        onSave(item, password)
                     }
                 },
                 enabled = serviceName.isNotBlank() && password.isNotBlank()
             ) {
-                Text("Save")
+                Text("Save & Encrypt")
             }
         },
         dismissButton = {
@@ -887,4 +1014,115 @@ private fun getCategoryColor(category: String): Color {
         "entertainment" -> Color(0xFF8B5CF6)
         else -> Color(0xFFF59E0B)
     }
+}
+
+@Composable
+private fun MasterPinSettingsDialog(
+    vaultSecurity: VaultSecurityManager,
+    onDismiss: () -> Unit,
+    onUpdated: () -> Unit
+) {
+    val isPinSet = remember { vaultSecurity.isMasterPinSet() }
+    var currentPin by remember { mutableStateOf("") }
+    var newPin by remember { mutableStateOf("") }
+    var confirmPin by remember { mutableStateOf("") }
+    var errorText by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (isPinSet) "Master PIN Settings" else "Set Master PIN") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = if (isPinSet) {
+                        "Your vault is protected by a Master PIN. Enter your current PIN to change or remove it."
+                    } else {
+                        "Set a 4 to 8 digit Master PIN to require authentication whenever opening the password vault."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (isPinSet) {
+                    OutlinedTextField(
+                        value = currentPin,
+                        onValueChange = { currentPin = it; errorText = null },
+                        label = { Text("Current Master PIN") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                OutlinedTextField(
+                    value = newPin,
+                    onValueChange = { newPin = it; errorText = null },
+                    label = { Text("New PIN (min 4 digits)") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = confirmPin,
+                    onValueChange = { confirmPin = it; errorText = null },
+                    label = { Text("Confirm New PIN") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (errorText != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(errorText!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (isPinSet && !vaultSecurity.verifyMasterPin(currentPin)) {
+                        errorText = "Current PIN is incorrect"
+                        return@Button
+                    }
+                    if (newPin.length < 4) {
+                        errorText = "PIN must be at least 4 digits"
+                        return@Button
+                    }
+                    if (newPin != confirmPin) {
+                        errorText = "PIN confirmation does not match"
+                        return@Button
+                    }
+                    vaultSecurity.setMasterPin(newPin)
+                    onUpdated()
+                }
+            ) {
+                Text(if (isPinSet) "Update PIN" else "Set PIN")
+            }
+        },
+        dismissButton = {
+            Row {
+                if (isPinSet) {
+                    TextButton(
+                        onClick = {
+                            if (vaultSecurity.verifyMasterPin(currentPin)) {
+                                vaultSecurity.disableMasterPin()
+                                onUpdated()
+                            } else {
+                                errorText = "Enter current PIN to remove lock"
+                            }
+                        }
+                    ) {
+                        Text("Remove PIN", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+            }
+        }
+    )
 }

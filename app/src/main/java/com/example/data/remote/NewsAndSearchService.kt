@@ -59,6 +59,8 @@ object NewsFeedService {
                 "The Guardian" to "https://www.theguardian.com/world/rss",
                 "Deutsche Welle" to "https://rss.dw.com/rdf/rss-en-all",
                 "Al Jazeera" to "https://www.aljazeera.com/xml/rss/all.xml",
+                "NPR News" to "https://feeds.npr.org/1001/rss.xml",
+                "France 24" to "https://www.france24.com/en/rss",
                 "CNBC News" to "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114",
                 "Reuters / Yahoo" to "https://news.yahoo.com/rss/"
             )
@@ -67,12 +69,15 @@ object NewsFeedService {
             "Tech & AI",
             listOf(
                 "BBC Tech" to "https://feeds.bbci.co.uk/news/technology/rss.xml",
+                "The Verge" to "https://www.theverge.com/rss/index.xml",
                 "Ars Technica" to "https://feeds.arstechnica.com/arstechnica/index",
                 "NYT Tech" to "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
                 "The Guardian Tech" to "https://www.theguardian.com/technology/rss",
                 "TechCrunch" to "https://feeds.feedburner.com/TechCrunch/",
                 "Wired News" to "https://www.wired.com/feed/rss",
                 "MIT Tech Review" to "https://www.technologyreview.com/feed/",
+                "Engadget" to "https://www.engadget.com/rss.xml",
+                "Hacker News" to "https://news.ycombinator.com/rss",
                 "CNBC Tech" to "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=19854910"
             )
         ),
@@ -83,13 +88,18 @@ object NewsFeedService {
                 "NYT World" to "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
                 "The Guardian World" to "https://www.theguardian.com/world/rss",
                 "Deutsche Welle" to "https://rss.dw.com/rdf/rss-en-all",
-                "Al Jazeera" to "https://www.aljazeera.com/xml/rss/all.xml"
+                "Al Jazeera" to "https://www.aljazeera.com/xml/rss/all.xml",
+                "NPR World" to "https://feeds.npr.org/1004/rss.xml",
+                "France 24" to "https://www.france24.com/en/world/rss"
             )
         ),
         SCIENCE(
             "Science",
             listOf(
                 "BBC Science" to "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
+                "ScienceDaily" to "https://www.sciencedaily.com/rss/all.xml",
+                "Phys.org" to "https://phys.org/rss-feed/",
+                "Nature News" to "https://www.nature.com/nature.rss",
                 "NYT Science" to "https://rss.nytimes.com/services/xml/rss/nyt/Science.xml",
                 "The Guardian Science" to "https://www.theguardian.com/science/rss",
                 "NASA Releases" to "https://www.nasa.gov/news-release/feed/"
@@ -102,6 +112,7 @@ object NewsFeedService {
                 "NYT Business" to "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
                 "The Guardian Business" to "https://www.theguardian.com/business/rss",
                 "CNBC Markets" to "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114",
+                "MarketWatch" to "https://feeds.content.dowjones.io/public/rss/mw_topstories",
                 "Yahoo Finance" to "https://finance.yahoo.com/news/rssindex"
             )
         ),
@@ -118,6 +129,7 @@ object NewsFeedService {
             listOf(
                 "BBC Health" to "https://feeds.bbci.co.uk/news/health/rss.xml",
                 "NYT Health" to "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
+                "Harvard Health" to "https://www.health.harvard.edu/rss",
                 "The Guardian Health" to "https://www.theguardian.com/lifeandstyle/health-and-wellbeing/rss"
             )
         ),

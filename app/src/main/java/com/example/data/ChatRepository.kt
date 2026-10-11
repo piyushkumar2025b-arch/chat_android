@@ -115,6 +115,10 @@ class ChatRepository(private val chatDao: ChatDao) {
         return message
     }
 
+    suspend fun getMessage(messageId: String): ChatMessageEntity? {
+        return chatDao.getMessageById(messageId)
+    }
+
     suspend fun updateMessageContent(messageId: String, content: String, isError: Boolean = false) {
         chatDao.updateMessageContent(messageId, content, isError)
     }

@@ -215,21 +215,25 @@ class RagEngine(private val ragDao: RagDao) {
         val allChunks = ragDao.getAllChunks()
         if (allChunks.isEmpty()) return@withContext emptyList()
 
-        // 1. Generate query embedding
-        val queryEmbedding = if (geminiApiKey.isNotBlank()) {
+        // 1. Generate query embeddings
+        val geminiQueryEmbedding = if (geminiApiKey.isNotBlank()) {
             fetchGeminiEmbedding(trimmedQuery, geminiApiKey)
-                ?: generateLocalTfidfVector(trimmedQuery)
-        } else {
-            generateLocalTfidfVector(trimmedQuery)
-        }
+        } else null
+        val localQueryEmbedding = generateLocalTfidfVector(trimmedQuery)
 
         val queryTerms = tokenize(trimmedQuery)
 
-        // 2. Score each chunk
+        // 2. Score each chunk matching its native embedding space
         val scoredChunks = allChunks.map { chunk ->
             val chunkEmbedding = parseEmbedding(chunk.embeddingJson)
-            val vectorScore = if (chunkEmbedding.isNotEmpty() && queryEmbedding.isNotEmpty()) {
-                cosineSimilarity(queryEmbedding, chunkEmbedding).coerceIn(0f, 1f)
+            val vectorScore = if (chunkEmbedding.isNotEmpty()) {
+                if (geminiQueryEmbedding != null && chunkEmbedding.size == geminiQueryEmbedding.size) {
+                    cosineSimilarity(geminiQueryEmbedding, chunkEmbedding).coerceIn(0f, 1f)
+                } else if (chunkEmbedding.size == localQueryEmbedding.size) {
+                    cosineSimilarity(localQueryEmbedding, chunkEmbedding).coerceIn(0f, 1f)
+                } else {
+                    0f
+                }
             } else {
                 0f
             }
@@ -237,7 +241,8 @@ class RagEngine(private val ragDao: RagDao) {
             val bm25Score = calculateKeywordScore(queryTerms, chunk.content).coerceIn(0f, 1f)
 
             // Hybrid weighting: 65% dense semantic vector + 35% exact keyword match
-            val hybridScore = if (chunkEmbedding.isNotEmpty() && queryEmbedding.size > 20) {
+            val isDenseVector = geminiQueryEmbedding != null && chunkEmbedding.size == geminiQueryEmbedding.size
+            val hybridScore = if (isDenseVector) {
                 (vectorScore * 0.65f) + (bm25Score * 0.35f)
             } else {
                 // If local fallback vectors, give balanced weight
@@ -305,51 +310,18 @@ class RagEngine(private val ragDao: RagDao) {
     }
 
     /**
-     * Populates comprehensive starter documentation so RAG is functional out of the box.
+     * Populates all comprehensive built-in internal knowledge documents so RAG is functional out of the box.
      */
     suspend fun populateStarterKnowledgeBase(geminiApiKey: String = ""): Result<Int> = withContext(Dispatchers.IO) {
         try {
-            val starterDocs = listOf(
-                Pair(
-                    "OmniChat AI Core Architecture & Capabilities.md",
-                    """
-# OmniChat AI Architecture & Operational Guide
-OmniChat is an all-in-one artificial intelligence workbench featuring:
-1. Multi-Provider AI Routing: Supports Gemini 3.5, Groq Llama-3, OpenRouter Claude/DeepSeek, Cerebras 8000+ tok/s, and Pollinations.
-2. Local RAG Engine: Offline and cloud-powered Retrieval-Augmented Generation utilizing vector embeddings, semantic sentence chunking, and reciprocal rank fusion.
-3. Universal Scoped Storage: Direct file generation, code downloads, camera/audio persistence to native Android MediaStore directories (Pictures/OmniChat, Movies/OmniChat, Music/OmniChat, Download/OmniChat).
-4. Media Synthesizers: Integrated text-to-speech, canvas waveform audio synthesis, and AI video studio generators.
-5. Live Internet Grounding: Multi-source web search with real publisher citations via Google News RSS and Wikipedia search APIs.
-                    """.trimIndent()
-                ),
-                Pair(
-                    "Android Jetpack Compose & Clean Architecture Specs.txt",
-                    """
-Android Jetpack Compose Guidelines for OmniChat:
-- Edge-to-edge layout with full WindowInsets handling and Scaffold components.
-- State management through AndroidViewModel and StateFlow with StateFlow.collectAsState().
-- Clean database layer utilizing Room Database with Room KSP code generation and automated destructive migration.
-- Zero-permission MediaStore API integration for Scoped Storage compliance on Android 10+ (API 29+) with legacy storage fallback for Android 9.
-- Material 3 design tokens: ColorScheme dynamic theming, AssistChips, FilterChips, ModalBottomSheet, and animated transitions.
-                    """.trimIndent()
-                ),
-                Pair(
-                    "RAG & Semantic Retrieval Mathematics.md",
-                    """
-RAG Technical Specification:
-Retrieval-Augmented Generation optimizes language model responses by indexing external domain documents.
-Process Flow:
-1. Text Ingestion: Raw documents are parsed into UTF-8 text and segmented into overlapping windows (500 characters with 100 character overlap).
-2. Dense Embedding Vector: 768-dimensional floating point representation computed via Gemini Embeddings or 128-dimensional TF-IDF vectors.
-3. Similarity Metric: Cosine Similarity computed as DotProduct(A, B) / (Magnitude(A) * Magnitude(B)).
-4. Hybrid Rank Fusion: Linear weighted combination of vector semantic closeness and BM25 token frequency for maximum accuracy.
-                    """.trimIndent()
-                )
-            )
-
             var count = 0
-            for ((title, content) in starterDocs) {
-                val res = ingestDocument(title, content, sourceType = "SAMPLE", geminiApiKey = geminiApiKey)
+            for (sourceItem in InternalKnowledgeSources.sources) {
+                val res = ingestDocument(
+                    title = sourceItem.fileName,
+                    content = sourceItem.content,
+                    sourceType = "SAMPLE",
+                    geminiApiKey = geminiApiKey
+                )
                 if (res.isSuccess) count++
             }
 
@@ -360,12 +332,26 @@ Process Flow:
         }
     }
 
+    /**
+     * Ingests a single selected internal source by its unique ID.
+     */
+    suspend fun ingestSpecificInternalSource(sourceId: String, geminiApiKey: String = ""): Result<KnowledgeDocumentEntity> = withContext(Dispatchers.IO) {
+        val item = InternalKnowledgeSources.sources.find { it.id == sourceId }
+            ?: return@withContext Result.failure(Exception("Internal knowledge source '$sourceId' not found."))
+        ingestDocument(
+            title = item.fileName,
+            content = item.content,
+            sourceType = "SAMPLE",
+            geminiApiKey = geminiApiKey
+        )
+    }
+
     // --- Vector & Embedding Internal Helpers ---
 
     private fun fetchGeminiEmbedding(text: String, apiKey: String): List<Float>? {
         if (apiKey.isBlank()) return null
         return try {
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=$apiKey"
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent"
             val bodyJson = JSONObject().apply {
                 put("model", "models/text-embedding-004")
                 put("content", JSONObject().apply {
@@ -375,6 +361,7 @@ Process Flow:
 
             val request = Request.Builder()
                 .url(url)
+                .addHeader("x-goog-api-key", apiKey)
                 .post(bodyJson.toString().toRequestBody(jsonMediaType))
                 .build()
 
@@ -403,7 +390,7 @@ Process Flow:
 
     private fun fetchFallbackEmbedding(text: String, apiKey: String): List<Float>? {
         return try {
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent?key=$apiKey"
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent"
             val bodyJson = JSONObject().apply {
                 put("model", "models/embedding-001")
                 put("content", JSONObject().apply {
@@ -413,6 +400,7 @@ Process Flow:
 
             val request = Request.Builder()
                 .url(url)
+                .addHeader("x-goog-api-key", apiKey)
                 .post(bodyJson.toString().toRequestBody(jsonMediaType))
                 .build()
 
@@ -447,10 +435,13 @@ Process Flow:
         for (token in tokens) {
             val hash = (token.hashCode() and 0x7FFFFFFF) % dimensions
             vector[hash] += 1f
-            // Bigram hashing
-            if (token.length > 3) {
-                val subHash = (token.substring(0, 3).hashCode() and 0x7FFFFFFF) % dimensions
-                vector[subHash] += 0.5f
+            // Character n-gram hashing
+            if (token.length >= 2) {
+                for (j in 0 until token.length - 1) {
+                    val bigram = token.substring(j, j + 2)
+                    val subHash = (bigram.hashCode() and 0x7FFFFFFF) % dimensions
+                    vector[subHash] += 0.5f
+                }
             }
         }
 
@@ -471,12 +462,12 @@ Process Flow:
 
     private fun cosineSimilarity(v1: List<Float>, v2: List<Float>): Float {
         if (v1.isEmpty() || v2.isEmpty()) return 0f
-        val len = minOf(v1.size, v2.size)
+        if (v1.size != v2.size) return 0f // Incompatible dimensions cannot be compared
         var dot = 0f
         var mag1 = 0f
         var mag2 = 0f
 
-        for (i in 0 until len) {
+        for (i in v1.indices) {
             val a = v1[i]
             val b = v2[i]
             dot += a * b

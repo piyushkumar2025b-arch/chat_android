@@ -391,7 +391,17 @@ object FileUtils {
         } catch (_: Exception) {}
 
         try {
-            val bytes = file.readBytes()
+            val maxBytes = 8 * 1024 * 1024
+            val bytes = file.inputStream().use { input ->
+                val buffer = ByteArray(minOf(file.length(), maxBytes.toLong()).toInt())
+                var totalRead = 0
+                while (totalRead < buffer.size) {
+                    val read = input.read(buffer, totalRead, buffer.size - totalRead)
+                    if (read == -1) break
+                    totalRead += read
+                }
+                if (totalRead == buffer.size) buffer else buffer.copyOf(totalRead)
+            }
 
             // 1. First, search for and decompress FlateDecode streams
             val decompressedStreams = mutableListOf<String>()
@@ -576,6 +586,23 @@ object FileUtils {
     }
 
     /**
+     * Reads up to maxChars characters from the current zip stream entry safely, preventing zip-bomb OOM.
+     */
+    fun readZipEntryText(zip: ZipInputStream, maxChars: Int = 100_000): String {
+        val reader = zip.bufferedReader(Charsets.UTF_8)
+        val buffer = CharArray(4096)
+        val sb = StringBuilder()
+        var read = reader.read(buffer)
+        while (read != -1 && sb.length < maxChars) {
+            val toAppend = minOf(read, maxChars - sb.length)
+            sb.append(buffer, 0, toAppend)
+            if (sb.length >= maxChars) break
+            read = reader.read(buffer)
+        }
+        return sb.toString()
+    }
+
+    /**
      * Extracts text from Microsoft Word documents (.docx) including body, tables, and notes.
      */
     fun extractTextFromDocx(file: File): String {
@@ -589,7 +616,7 @@ object FileUtils {
                 val name = entry.name
                 if (name == "word/document.xml" || name == "content.xml" || name.startsWith("word/header") || name.startsWith("word/footer")) {
                     found = true
-                    val xml = zip.bufferedReader(Charsets.UTF_8).readText()
+                    val xml = readZipEntryText(zip, 250_000)
 
                     // Parse paragraphs and tables
                     val paragraphs = Regex("<w:p[ >]([\\s\\S]*?)</w:p>").findAll(xml)
@@ -638,14 +665,14 @@ object FileUtils {
             while (entry != null) {
                 val name = entry.name
                 if (name == "xl/sharedStrings.xml") {
-                    val xml = zip.bufferedReader(Charsets.UTF_8).readText()
+                    val xml = readZipEntryText(zip, 250_000)
                     val tMatches = Regex("<t[^>]*>([\\s\\S]*?)</t>").findAll(xml)
                     for (m in tMatches) {
                         sharedStrings.add(unescapeXml(m.groupValues[1]))
                     }
                 } else if (name.startsWith("xl/worksheets/sheet") && name.endsWith(".xml")) {
                     val sheetName = name.substringAfterLast('/').substringBefore('.')
-                    val xml = zip.bufferedReader(Charsets.UTF_8).readText()
+                    val xml = readZipEntryText(zip, 250_000)
                     sheetDataMap[sheetName] = xml
                 }
                 entry = zip.nextEntry
@@ -724,7 +751,7 @@ object FileUtils {
                 val name = entry.name
                 if (name.startsWith("ppt/slides/slide") && name.endsWith(".xml")) {
                     val slideNum = Regex("slide(\\d+)\\.xml").find(name)?.groupValues?.get(1)?.toIntOrNull() ?: 999
-                    val xml = zip.bufferedReader(Charsets.UTF_8).readText()
+                    val xml = readZipEntryText(zip, 250_000)
                     val tMatches = Regex("<a:t[^>]*>([\\s\\S]*?)</a:t>").findAll(xml)
                     val slideText = tMatches.map { unescapeXml(it.groupValues[1]) }.joinToString(" ")
                     if (slideText.isNotBlank()) {
@@ -755,19 +782,29 @@ object FileUtils {
      */
     fun extractTextLegacyBinary(file: File): String {
         return try {
-            val bytes = file.readBytes()
             val sb = StringBuilder()
             var currentRun = StringBuilder()
+            val maxBytesToScan = 2 * 1024 * 1024 // Stream up to 2MB to avoid OOM on huge binaries
 
-            for (b in bytes) {
-                val ch = b.toInt().toChar()
-                if (ch in ' '..'~' || ch == '\n' || ch == '\t') {
-                    currentRun.append(ch)
-                } else {
-                    if (currentRun.length >= 4) {
-                        sb.append(currentRun.toString().trim()).append(" ")
+            file.inputStream().use { input ->
+                val buffer = ByteArray(8192)
+                var bytesReadTotal = 0
+                while (bytesReadTotal < maxBytesToScan) {
+                    val read = input.read(buffer)
+                    if (read == -1) break
+                    bytesReadTotal += read
+
+                    for (i in 0 until read) {
+                        val ch = buffer[i].toInt().toChar()
+                        if (ch in ' '..'~' || ch == '\n' || ch == '\t') {
+                            currentRun.append(ch)
+                        } else {
+                            if (currentRun.length >= 4) {
+                                sb.append(currentRun.toString().trim()).append(" ")
+                            }
+                            currentRun = StringBuilder()
+                        }
                     }
-                    currentRun = StringBuilder()
                 }
             }
             if (currentRun.length >= 4) {
@@ -914,7 +951,7 @@ object FileUtils {
 
                 val ext = name.substringAfterLast('.', "").lowercase()
                 if (samples.size < 3 && ext in listOf("txt", "md", "json", "py", "kt", "csv", "xml", "js")) {
-                    val sampleText = zip.bufferedReader(Charsets.UTF_8).readText().take(400)
+                    val sampleText = readZipEntryText(zip, 400)
                     samples.add("--- File: $name ---\n$sampleText\n")
                 }
                 entry = zip.nextEntry

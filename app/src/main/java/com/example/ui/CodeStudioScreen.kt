@@ -636,6 +636,9 @@ Status: SUCCESS (Code 0)
                                     WebView(ctx).apply {
                                         @SuppressLint("SetJavaScriptEnabled")
                                         settings.javaScriptEnabled = true
+                                        settings.allowFileAccess = false
+                                        settings.allowContentAccess = false
+                                        settings.setGeolocationEnabled(false)
                                         settings.domStorageEnabled = true
                                         settings.useWideViewPort = true
                                         settings.loadWithOverviewMode = true

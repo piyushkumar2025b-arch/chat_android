@@ -9,6 +9,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import com.example.ui.ColorPreset
 import com.example.ui.VisualizerMode
+import com.example.data.local.VaultSecurityManager
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -68,5 +71,34 @@ class NewFeaturesTest {
             val extracted = file.substringAfterLast('.')
             assertEquals(ext, extracted)
         }
+    }
+
+    @Test
+    fun testVaultEncryptionAndDecryption() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val vaultSecurity = VaultSecurityManager.getInstance(context)
+        val originalSecret = "SuperSecurePassword#2026!"
+        val encrypted = vaultSecurity.encrypt(originalSecret)
+
+        assertTrue("Encrypted text must not be plaintext", encrypted != originalSecret)
+        assertTrue("Encrypted text must have GCM prefix", encrypted.startsWith("ENC:GCM:"))
+
+        val decrypted = vaultSecurity.decrypt(encrypted)
+        assertEquals(originalSecret, decrypted)
+    }
+
+    @Test
+    fun testMasterPinVerification() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val vaultSecurity = VaultSecurityManager.getInstance(context)
+
+        vaultSecurity.setMasterPin("7391")
+        assertTrue(vaultSecurity.isMasterPinSet())
+        assertTrue(vaultSecurity.verifyMasterPin("7391"))
+        assertTrue(!vaultSecurity.verifyMasterPin("0000"))
+        assertTrue(!vaultSecurity.verifyMasterPin("1234"))
+
+        vaultSecurity.disableMasterPin()
+        assertTrue(!vaultSecurity.isMasterPinSet())
     }
 }

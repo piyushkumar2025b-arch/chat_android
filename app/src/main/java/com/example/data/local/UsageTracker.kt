@@ -115,6 +115,11 @@ class UsageTracker(private val context: Context, private val preferencesManager:
     }
 
     @Synchronized
+    fun refreshStats() {
+        _usageStats.value = loadStats()
+    }
+
+    @Synchronized
     fun isLimitReached(): Boolean {
         ensureCurrentDay()
         val limit = preferencesManager.dailyLimit

@@ -23,25 +23,26 @@ object AiService {
         .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    @Volatile
-    private var activeCall: okhttp3.Call? = null
+    private val activeCalls = java.util.concurrent.ConcurrentHashMap.newKeySet<okhttp3.Call>()
 
     fun cancelActiveRequest() {
         try {
-            activeCall?.cancel()
-            activeCall = null
+            val iterator = activeCalls.iterator()
+            while (iterator.hasNext()) {
+                val call = iterator.next()
+                call.cancel()
+                iterator.remove()
+            }
         } catch (_: Exception) {}
     }
 
     private fun executeRequest(request: Request): okhttp3.Response {
         val call = httpClient.newCall(request)
-        activeCall = call
+        activeCalls.add(call)
         return try {
             call.execute()
         } finally {
-            if (activeCall === call) {
-                activeCall = null
-            }
+            activeCalls.remove(call)
         }
     }
 
@@ -174,12 +175,33 @@ object AiService {
         // Build Gemini contents array
         val contentsArray = JSONArray()
 
-        // Include recent history (last 10 messages)
-        val recentHistory = history.takeLast(10)
-        for (msg in recentHistory) {
+        // Build Gemini contents array with strictly alternating user/model turns
+        val sanitizedTurns = mutableListOf<Pair<String, String>>()
+        for (msg in history.takeLast(10)) {
             val role = if (msg.role == "user") "user" else "model"
+            if (sanitizedTurns.isEmpty()) {
+                if (role == "user") {
+                    sanitizedTurns.add(role to msg.content)
+                }
+            } else {
+                val prev = sanitizedTurns.last()
+                if (prev.first == role) {
+                    // Merge consecutive turns with same role to avoid Gemini rejection
+                    sanitizedTurns[sanitizedTurns.lastIndex] = prev.first to "${prev.second}\n\n${msg.content}"
+                } else {
+                    sanitizedTurns.add(role to msg.content)
+                }
+            }
+        }
+
+        // Ensure the last history turn before the current user message is "model"
+        while (sanitizedTurns.isNotEmpty() && sanitizedTurns.last().first == "user") {
+            sanitizedTurns.removeAt(sanitizedTurns.lastIndex)
+        }
+
+        for ((role, content) in sanitizedTurns) {
             val partsArray = JSONArray()
-            partsArray.put(JSONObject().put("text", msg.content))
+            partsArray.put(JSONObject().put("text", content))
             contentsArray.put(JSONObject().put("role", role).put("parts", partsArray))
         }
 
@@ -234,7 +256,7 @@ object AiService {
             }
             put("generationConfig", JSONObject().apply {
                 put("temperature", temperature)
-                put("maxOutputTokens", maxTokens.coerceIn(1024, 8192))
+                put("maxOutputTokens", maxTokens.coerceIn(1024, 16384))
             })
         }
 
@@ -416,17 +438,9 @@ object AiService {
             if (!content.isNullOrBlank() && content != "null") {
                 return Result.success(content)
             }
-            val reasoning = if (msg != null && !msg.isNull("reasoning")) msg.optString("reasoning") else null
-            if (!reasoning.isNullOrBlank() && reasoning != "null") {
-                return Result.success(reasoning)
-            }
-            val reasoningContent = if (msg != null && !msg.isNull("reasoning_content")) msg.optString("reasoning_content") else null
-            if (!reasoningContent.isNullOrBlank() && reasoningContent != "null") {
-                return Result.success(reasoningContent)
-            }
         }
 
-        return Result.success("No response content received.")
+        return Result.failure(Exception("No response content received from model."))
     }
 
     private suspend fun callPollinations(
@@ -438,10 +452,7 @@ object AiService {
         temperature: Float,
         maxTokens: Int = 8192
     ): Result<String> {
-        val effectiveModel = when (modelId) {
-            "openai", "gpt-oss-20b", "openai-fast" -> modelId
-            else -> "openai-fast"
-        }
+        val effectiveModel = modelId.trim().ifEmpty { "openai-fast" }
 
         // First try the OpenAI-compatible endpoint
         val hasImages = attachments.any { it.isImage }
@@ -497,7 +508,11 @@ object AiService {
             val postText = executeRequest(postReq).use { resp ->
                 if (resp.isSuccessful) resp.body?.string().orEmpty() else ""
             }
-            if (postText.isNotBlank()) {
+            val isHtmlOrError = postText.trimStart().startsWith("<!DOCTYPE", ignoreCase = true) ||
+                postText.trimStart().startsWith("<html", ignoreCase = true) ||
+                postText.contains("502 Bad Gateway", ignoreCase = true) ||
+                postText.contains("Internal Server Error", ignoreCase = true)
+            if (postText.isNotBlank() && !isHtmlOrError) {
                 return Result.success(postText)
             }
 
@@ -510,7 +525,11 @@ object AiService {
             val text = executeRequest(req).use { resp ->
                 if (resp.isSuccessful) resp.body?.string().orEmpty() else ""
             }
-            if (text.isNotBlank()) {
+            val textIsHtmlOrError = text.trimStart().startsWith("<!DOCTYPE", ignoreCase = true) ||
+                text.trimStart().startsWith("<html", ignoreCase = true) ||
+                text.contains("502 Bad Gateway", ignoreCase = true) ||
+                text.contains("Internal Server Error", ignoreCase = true)
+            if (text.isNotBlank() && !textIsHtmlOrError) {
                 Result.success(text)
             } else {
                 openAiRes // Return original error
