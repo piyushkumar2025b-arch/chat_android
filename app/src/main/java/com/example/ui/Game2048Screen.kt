@@ -517,7 +517,7 @@ private fun spawnTile(board: Array<IntArray>) {
     }
 }
 
-private fun isBoardFull(board: Array<IntArray>): Boolean {
+internal fun isBoardFull(board: Array<IntArray>): Boolean {
     for (r in 0..3) {
         for (c in 0..3) {
             if (board[r][c] == 0) return false
@@ -526,7 +526,7 @@ private fun isBoardFull(board: Array<IntArray>): Boolean {
     return true
 }
 
-private fun hasMovesLeft(board: Array<IntArray>): Boolean {
+internal fun hasMovesLeft(board: Array<IntArray>): Boolean {
     for (r in 0..3) {
         for (c in 0..3) {
             val v = board[r][c]
@@ -538,7 +538,7 @@ private fun hasMovesLeft(board: Array<IntArray>): Boolean {
     return false
 }
 
-private fun boardHas2048(board: Array<IntArray>): Boolean {
+internal fun boardHas2048(board: Array<IntArray>): Boolean {
     for (r in 0..3) {
         for (c in 0..3) {
             if (board[r][c] >= 2048) return true
@@ -547,7 +547,7 @@ private fun boardHas2048(board: Array<IntArray>): Boolean {
     return false
 }
 
-private fun applyMove(board: Array<IntArray>, dir: Direction): Triple<Array<IntArray>, Int, Boolean> {
+internal fun applyMove(board: Array<IntArray>, dir: Direction): Triple<Array<IntArray>, Int, Boolean> {
     val newBoard = Array(4) { IntArray(4) }
     var score = 0
     var changed = false
@@ -604,7 +604,7 @@ private fun applyMove(board: Array<IntArray>, dir: Direction): Triple<Array<IntA
     return Triple(newBoard, score, changed)
 }
 
-private fun slideAndMergeLine(line: List<Int>): Pair<List<Int>, Int> {
+internal fun slideAndMergeLine(line: List<Int>): Pair<List<Int>, Int> {
     val nonZero = line.filter { it != 0 }
     val result = mutableListOf<Int>()
     var score = 0

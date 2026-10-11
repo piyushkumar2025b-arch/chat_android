@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Loop
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
@@ -53,17 +54,20 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -72,6 +76,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -131,6 +136,7 @@ fun UniversalMediaPlayerScreen(
 
     // Audio playback state
     var audioPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var videoMediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
     var currentPosMs by remember { mutableLongStateOf(0L) }
     var totalDurationMs by remember { mutableLongStateOf(0L) }
@@ -140,6 +146,8 @@ fun UniversalMediaPlayerScreen(
 
     // VideoView holder
     var videoViewInstance by remember { mutableStateOf<VideoView?>(null) }
+    var showAddUrlDialog by remember { mutableStateOf(false) }
+    var streamUrlInput by remember { mutableStateOf("") }
 
     // Pre-populate demo / bundled items if empty
     LaunchedEffect(Unit) {
@@ -340,21 +348,39 @@ fun UniversalMediaPlayerScreen(
                     }
                 }
 
-                Button(
-                    onClick = { filePickerLauncher.launch("*/*") },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.testTag("open_any_file_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.FolderOpen,
-                        contentDescription = "Open File",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Open File", fontSize = 13.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    FilledTonalButton(
+                        onClick = { showAddUrlDialog = true },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.testTag("add_stream_url_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Link,
+                            contentDescription = "Stream URL",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Add URL", fontSize = 12.sp)
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Button(
+                        onClick = { filePickerLauncher.launch("*/*") },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.testTag("open_any_file_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FolderOpen,
+                            contentDescription = "Open File",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Open File", fontSize = 12.sp)
+                    }
                 }
             }
         }
@@ -398,32 +424,45 @@ fun UniversalMediaPlayerScreen(
                 when (item.kind) {
                     MediaKind.VIDEO -> {
                         // Native Android VideoView with MediaController controls
-                        AndroidView(
-                            factory = { ctx ->
-                                VideoView(ctx).apply {
-                                    val mc = MediaController(ctx)
-                                    mc.setAnchorView(this)
-                                    setMediaController(mc)
-                                    setVideoURI(item.uri)
-                                    setOnPreparedListener { mp ->
-                                        mp.isLooping = isLooping
-                                        totalDurationMs = mp.duration.toLong()
-                                        start()
-                                        isPlaying = true
+                        key(item.uri) {
+                            AndroidView(
+                                factory = { ctx ->
+                                    VideoView(ctx).apply {
+                                        val mc = MediaController(ctx)
+                                        mc.setAnchorView(this)
+                                        setMediaController(mc)
+                                        setVideoURI(item.uri)
+                                        setOnPreparedListener { mp ->
+                                            videoMediaPlayer = mp
+                                            mp.isLooping = isLooping
+                                            applySpeed(mp, playbackSpeed)
+                                            totalDurationMs = mp.duration.toLong()
+                                            start()
+                                            isPlaying = true
+                                        }
+                                        setOnCompletionListener {
+                                            if (isLooping) {
+                                                start()
+                                            } else {
+                                                isPlaying = false
+                                            }
+                                        }
+                                        setOnErrorListener { _, what, extra ->
+                                            Toast.makeText(ctx, "Video playback note: ($what, $extra)", Toast.LENGTH_SHORT).show()
+                                            isPlaying = false
+                                            true
+                                        }
+                                        videoViewInstance = this
                                     }
-                                    setOnCompletionListener {
-                                        if (!isLooping) isPlaying = false
-                                    }
-                                    videoViewInstance = this
-                                }
-                            },
-                            update = { vv ->
-                                videoViewInstance = vv
-                            },
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .testTag("video_surface_view")
-                        )
+                                },
+                                update = { vv ->
+                                    videoViewInstance = vv
+                                },
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .testTag("video_surface_view")
+                            )
+                        }
                     }
 
                     MediaKind.AUDIO -> {
@@ -544,7 +583,7 @@ fun UniversalMediaPlayerScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = formatDuration(currentPosMs),
+                            text = formatMediaDuration(currentPosMs),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -565,7 +604,7 @@ fun UniversalMediaPlayerScreen(
                                 .testTag("media_seek_bar")
                         )
                         Text(
-                            text = formatDuration(totalDurationMs),
+                            text = formatMediaDuration(totalDurationMs),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -639,6 +678,7 @@ fun UniversalMediaPlayerScreen(
                         IconButton(onClick = {
                             isLooping = !isLooping
                             audioPlayer?.isLooping = isLooping
+                            videoMediaPlayer?.isLooping = isLooping
                         }) {
                             Icon(
                                 Icons.Default.Loop,
@@ -647,7 +687,7 @@ fun UniversalMediaPlayerScreen(
                             )
                         }
 
-                        // Speed Cycle (0.5x, 1x, 1.25x, 1.5x, 2.0x)
+                        // Speed Cycle (0.75x, 1x, 1.25x, 1.5x, 2.0x)
                         TextButton(onClick = {
                             playbackSpeed = when (playbackSpeed) {
                                 1.0f -> 1.25f
@@ -657,6 +697,7 @@ fun UniversalMediaPlayerScreen(
                                 else -> 1.0f
                             }
                             audioPlayer?.let { applySpeed(it, playbackSpeed) }
+                            videoMediaPlayer?.let { applySpeed(it, playbackSpeed) }
                         }) {
                             Text("${playbackSpeed}x", fontWeight = FontWeight.Bold)
                         }
@@ -693,7 +734,7 @@ fun UniversalMediaPlayerScreen(
                         OutlinedButton(
                             onClick = {
                                 activeMedia?.let {
-                                    val summary = "Media File: ${it.displayName}\nType: ${it.mimeType}\nSize: ${formatFileSize(it.sizeBytes)}\nDuration: ${formatDuration(it.durationMs)}"
+                                    val summary = "Media File: ${it.displayName}\nType: ${it.mimeType}\nSize: ${formatFileSize(it.sizeBytes)}\nDuration: ${formatMediaDuration(it.durationMs)}"
                                     onSendToChat(summary)
                                     Toast.makeText(context, "Sent file info to chat", Toast.LENGTH_SHORT).show()
                                 }
@@ -765,7 +806,7 @@ fun UniversalMediaPlayerScreen(
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = "${item.kind.name} • ${formatFileSize(item.sizeBytes)} • ${if (item.durationMs > 0) formatDuration(item.durationMs) else item.mimeType}",
+                                        text = "${item.kind.name} • ${formatFileSize(item.sizeBytes)} • ${if (item.durationMs > 0) formatMediaDuration(item.durationMs) else item.mimeType}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontSize = 11.sp
@@ -786,6 +827,56 @@ fun UniversalMediaPlayerScreen(
                 }
             }
         }
+
+        if (showAddUrlDialog) {
+            AlertDialog(
+                onDismissRequest = { showAddUrlDialog = false },
+                title = { Text("Stream Any Media URL") },
+                text = {
+                    Column {
+                        Text(
+                            "Paste any video, music, or stream URL (MP4, MP3, HLS, WebM, etc.):",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = streamUrlInput,
+                            onValueChange = { streamUrlInput = it },
+                            placeholder = { Text("https://example.com/media.mp4") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("stream_url_input")
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val trimmed = streamUrlInput.trim()
+                            if (trimmed.isNotBlank()) {
+                                val uri = Uri.parse(trimmed)
+                                val item = resolveMediaItemFromUri(context, uri)
+                                playlist.add(0, item)
+                                activeMedia = item
+                                showAddUrlDialog = false
+                                streamUrlInput = ""
+                                Toast.makeText(context, "Added stream: ${item.displayName}", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.testTag("confirm_stream_url_btn")
+                    ) {
+                        Text("Play Stream")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAddUrlDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -797,13 +888,7 @@ private fun applySpeed(player: MediaPlayer, speed: Float) {
     } catch (_: Exception) {}
 }
 
-private fun setOnPreparedEffect(mp: MediaPlayer, onPrepared: (Int) -> Unit) {
-    mp.setOnPreparedListener {
-        onPrepared(it.duration)
-    }
-}
-
-private fun formatDuration(ms: Long): String {
+internal fun formatMediaDuration(ms: Long): String {
     if (ms <= 0L) return "00:00"
     val seconds = (ms / 1000) % 60
     val minutes = (ms / (1000 * 60)) % 60
@@ -815,7 +900,7 @@ private fun formatDuration(ms: Long): String {
     }
 }
 
-private fun formatFileSize(bytes: Long): String {
+internal fun formatFileSize(bytes: Long): String {
     if (bytes <= 0L) return "0 B"
     val kb = bytes / 1024.0
     val mb = kb / 1024.0
@@ -828,21 +913,38 @@ private fun formatFileSize(bytes: Long): String {
     }
 }
 
-private fun resolveMediaItemFromUri(context: Context, uri: Uri): PlayableMediaItem {
-    var displayName = "Opened File"
+internal fun resolveMediaItemFromUri(context: Context, uri: Uri): PlayableMediaItem {
+    var displayName = uri.lastPathSegment ?: "Media File"
     var sizeBytes = 0L
-    val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+    var mimeType: String? = null
 
-    try {
-        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-            if (cursor.moveToFirst()) {
-                if (nameIndex != -1) displayName = cursor.getString(nameIndex) ?: displayName
-                if (sizeIndex != -1) sizeBytes = cursor.getLong(sizeIndex)
+    if (uri.scheme == "content") {
+        try {
+            mimeType = context.contentResolver.getType(uri)
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (cursor.moveToFirst()) {
+                    if (nameIndex != -1) displayName = cursor.getString(nameIndex) ?: displayName
+                    if (sizeIndex != -1) sizeBytes = cursor.getLong(sizeIndex)
+                }
             }
+        } catch (_: Exception) {}
+    }
+
+    if (mimeType.isNullOrBlank()) {
+        val uriStr = uri.toString().lowercase(Locale.ROOT)
+        mimeType = when {
+            uriStr.endsWith(".mp4") || uriStr.endsWith(".mkv") || uriStr.endsWith(".webm") || uriStr.endsWith(".mov") || uriStr.endsWith(".3gp") || uriStr.endsWith(".m3u8") -> "video/mp4"
+            uriStr.endsWith(".mp3") || uriStr.endsWith(".wav") || uriStr.endsWith(".ogg") || uriStr.endsWith(".m4a") || uriStr.endsWith(".flac") || uriStr.endsWith(".aac") -> "audio/mpeg"
+            uriStr.endsWith(".png") || uriStr.endsWith(".jpg") || uriStr.endsWith(".jpeg") || uriStr.endsWith(".webp") || uriStr.endsWith(".gif") -> "image/jpeg"
+            uriStr.endsWith(".pdf") -> "application/pdf"
+            uriStr.endsWith(".txt") || uriStr.endsWith(".json") || uriStr.endsWith(".md") || uriStr.endsWith(".kt") || uriStr.endsWith(".html") -> "text/plain"
+            uriStr.contains("video") -> "video/mp4"
+            uriStr.contains("audio") || uriStr.contains("sound") -> "audio/mpeg"
+            else -> "application/octet-stream"
         }
-    } catch (_: Exception) {}
+    }
 
     val kind = when {
         mimeType.startsWith("video/") -> MediaKind.VIDEO
@@ -854,7 +956,7 @@ private fun resolveMediaItemFromUri(context: Context, uri: Uri): PlayableMediaIt
     }
 
     var textPreview: String? = null
-    if (kind == MediaKind.TEXT_DOCUMENT) {
+    if (kind == MediaKind.TEXT_DOCUMENT && uri.scheme == "content") {
         try {
             context.contentResolver.openInputStream(uri)?.use { stream ->
                 val reader = BufferedReader(InputStreamReader(stream))
@@ -874,7 +976,11 @@ private fun resolveMediaItemFromUri(context: Context, uri: Uri): PlayableMediaIt
     if (kind == MediaKind.VIDEO || kind == MediaKind.AUDIO) {
         try {
             val retriever = MediaMetadataRetriever()
-            retriever.setDataSource(context, uri)
+            if (uri.scheme == "content") {
+                retriever.setDataSource(context, uri)
+            } else if (uri.scheme == "http" || uri.scheme == "https") {
+                retriever.setDataSource(uri.toString(), HashMap())
+            }
             val durStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
             durationMs = durStr?.toLongOrNull() ?: 0L
             retriever.release()
