@@ -139,6 +139,24 @@ object NewsFeedService {
                 "BBC Sport" to "https://feeds.bbci.co.uk/sport/rss.xml",
                 "Yahoo Sports" to "https://sports.yahoo.com/rss/"
             )
+        ),
+        AI_RESEARCH(
+            "AI & Research",
+            listOf(
+                "MIT AI News" to "https://news.mit.edu/topic/mitartificial-intelligence2-rss.xml",
+                "ArXiv CS.AI" to "https://rss.arxiv.org/rss/cs.AI",
+                "Google AI Blog" to "https://blog.google/technology/ai/rss/",
+                "VentureBeat AI" to "https://venturebeat.com/category/ai/feed/"
+            )
+        ),
+        CYBER_SECURITY(
+            "Security & Dev",
+            listOf(
+                "The Hacker News" to "https://feeds.feedburner.com/TheHackersNews",
+                "BleepingComputer" to "https://www.bleepingcomputer.com/feed/",
+                "Dark Reading" to "https://www.darkreading.com/rss.xml",
+                "Krebs on Security" to "https://krebsonsecurity.com/feed/"
+            )
         )
     }
 

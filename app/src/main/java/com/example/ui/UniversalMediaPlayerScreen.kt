@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -148,6 +149,7 @@ fun UniversalMediaPlayerScreen(
     var videoViewInstance by remember { mutableStateOf<VideoView?>(null) }
     var showAddUrlDialog by remember { mutableStateOf(false) }
     var streamUrlInput by remember { mutableStateOf("") }
+    var selectedCategoryFilter by remember { mutableStateOf<MediaKind?>(null) }
 
     // Pre-populate demo / bundled items if empty
     LaunchedEffect(Unit) {
@@ -155,7 +157,7 @@ fun UniversalMediaPlayerScreen(
             val demoMedia = listOf(
                 PlayableMediaItem(
                     uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"),
-                    displayName = "Big Buck Bunny (HD Stream)",
+                    displayName = "Big Buck Bunny (1080p Stream)",
                     sizeBytes = 158_000_000L,
                     mimeType = "video/mp4",
                     kind = MediaKind.VIDEO,
@@ -168,6 +170,22 @@ fun UniversalMediaPlayerScreen(
                     mimeType = "video/mp4",
                     kind = MediaKind.VIDEO,
                     durationMs = 653_000L
+                ),
+                PlayableMediaItem(
+                    uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4"),
+                    displayName = "Sintel (Open-Source Animated Fantasy)",
+                    sizeBytes = 129_000_000L,
+                    mimeType = "video/mp4",
+                    kind = MediaKind.VIDEO,
+                    durationMs = 888_000L
+                ),
+                PlayableMediaItem(
+                    uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"),
+                    displayName = "Tears of Steel (Sci-Fi VFX Short)",
+                    sizeBytes = 168_000_000L,
+                    mimeType = "video/mp4",
+                    kind = MediaKind.VIDEO,
+                    durationMs = 734_000L
                 ),
                 PlayableMediaItem(
                     uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"),
@@ -184,6 +202,75 @@ fun UniversalMediaPlayerScreen(
                     mimeType = "audio/mpeg",
                     kind = MediaKind.AUDIO,
                     durationMs = 423_000L
+                ),
+                PlayableMediaItem(
+                    uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"),
+                    displayName = "Progressive Electronic Odyssey (MP3 Audio)",
+                    sizeBytes = 9_400_000L,
+                    mimeType = "audio/mpeg",
+                    kind = MediaKind.AUDIO,
+                    durationMs = 512_000L
+                ),
+                PlayableMediaItem(
+                    uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"),
+                    displayName = "Classical Piano & Symphony (MP3 Audio)",
+                    sizeBytes = 6_800_000L,
+                    mimeType = "audio/mpeg",
+                    kind = MediaKind.AUDIO,
+                    durationMs = 345_000L
+                ),
+                PlayableMediaItem(
+                    uri = Uri.parse("content://omnichat/docs/architecture_spec.md"),
+                    displayName = "OmniChat AI Core Architecture & Specs.md",
+                    sizeBytes = 48_500L,
+                    mimeType = "text/markdown",
+                    kind = MediaKind.TEXT_DOCUMENT,
+                    textPreview = """
+# OmniChat AI Core Architecture Specification
+- Multi-Provider LLM Routing: Gemini 2.5/3.5, Groq LLaMA-3.3, OpenRouter Claude/DeepSeek, Cerebras, Pollinations.
+- Scoped MediaStore Storage: Standard Pictures/OmniChat, Movies/OmniChat, Music/OmniChat paths.
+- Local Vector Engine: 768-d dense embeddings + BM25 keyword rank fusion.
+- Edge-to-Edge Jetpack Compose with Material 3 dynamic color scheme and touch-target compliance.
+                    """.trimIndent()
+                ),
+                PlayableMediaItem(
+                    uri = Uri.parse("content://omnichat/data/neural_weights_schema.json"),
+                    displayName = "Neural Transformer Weights Schema.json",
+                    sizeBytes = 32_100L,
+                    mimeType = "application/json",
+                    kind = MediaKind.TEXT_DOCUMENT,
+                    textPreview = """
+{
+  "model_architecture": "Transformer-Decoder",
+  "hidden_dimension": 4096,
+  "attention_heads": 32,
+  "layers": 32,
+  "rotary_embedding_dim": 128,
+  "quantization": "AWQ-4bit",
+  "context_window_tokens": 131072
+}
+                    """.trimIndent()
+                ),
+                PlayableMediaItem(
+                    uri = Uri.parse("content://omnichat/code/ConcurrencyEngine.kt"),
+                    displayName = "Kotlin Concurrency Engine.kt",
+                    sizeBytes = 24_300L,
+                    mimeType = "text/x-kotlin",
+                    kind = MediaKind.TEXT_DOCUMENT,
+                    textPreview = """
+package com.example.engine
+
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+
+class ConcurrencyPipeline(
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+) {
+    suspend fun executeParallelTasks(tasks: List<suspend () -> Unit>) = coroutineScope {
+        tasks.map { async(dispatcher) { it() } }.awaitAll()
+    }
+}
+                    """.trimIndent()
                 )
             )
             playlist.addAll(demoMedia)
@@ -191,8 +278,19 @@ fun UniversalMediaPlayerScreen(
         }
     }
 
-    // Picker for ANY file (*/*)
-    val filePickerLauncher = rememberLauncherForActivityResult(
+    // Picker for multiple files or single file (*/*)
+    val multipleFilePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            val items = uris.map { resolveMediaItemFromUri(context, it) }
+            playlist.addAll(0, items)
+            activeMedia = items.first()
+            Toast.makeText(context, "Imported ${items.size} file(s) into playlist", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val singleFilePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
@@ -366,7 +464,7 @@ fun UniversalMediaPlayerScreen(
                     Spacer(modifier = Modifier.width(8.dp))
 
                     Button(
-                        onClick = { filePickerLauncher.launch("*/*") },
+                        onClick = { multipleFilePickerLauncher.launch("*/*") },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
                         ),
@@ -375,11 +473,11 @@ fun UniversalMediaPlayerScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.FolderOpen,
-                            contentDescription = "Open File",
+                            contentDescription = "Import Files",
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Open File", fontSize = 12.sp)
+                        Text("Import Files", fontSize = 12.sp)
                     }
                 }
             }
@@ -749,11 +847,63 @@ fun UniversalMediaPlayerScreen(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
+                // Category Filter Chips
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    item {
+                        FilterChip(
+                            selected = selectedCategoryFilter == null,
+                            onClick = { selectedCategoryFilter = null },
+                            label = { Text("All (${playlist.size})", fontSize = 11.sp) }
+                        )
+                    }
+                    item {
+                        val count = playlist.count { it.kind == MediaKind.VIDEO }
+                        FilterChip(
+                            selected = selectedCategoryFilter == MediaKind.VIDEO,
+                            onClick = { selectedCategoryFilter = if (selectedCategoryFilter == MediaKind.VIDEO) null else MediaKind.VIDEO },
+                            label = { Text("🎬 Videos ($count)", fontSize = 11.sp) }
+                        )
+                    }
+                    item {
+                        val count = playlist.count { it.kind == MediaKind.AUDIO }
+                        FilterChip(
+                            selected = selectedCategoryFilter == MediaKind.AUDIO,
+                            onClick = { selectedCategoryFilter = if (selectedCategoryFilter == MediaKind.AUDIO) null else MediaKind.AUDIO },
+                            label = { Text("🎵 Music ($count)", fontSize = 11.sp) }
+                        )
+                    }
+                    item {
+                        val count = playlist.count { it.kind == MediaKind.TEXT_DOCUMENT || it.kind == MediaKind.PDF_DOCUMENT }
+                        FilterChip(
+                            selected = selectedCategoryFilter == MediaKind.TEXT_DOCUMENT,
+                            onClick = { selectedCategoryFilter = if (selectedCategoryFilter == MediaKind.TEXT_DOCUMENT) null else MediaKind.TEXT_DOCUMENT },
+                            label = { Text("📄 Docs & Code ($count)", fontSize = 11.sp) }
+                        )
+                    }
+                    item {
+                        val count = playlist.count { it.kind == MediaKind.IMAGE }
+                        FilterChip(
+                            selected = selectedCategoryFilter == MediaKind.IMAGE,
+                            onClick = { selectedCategoryFilter = if (selectedCategoryFilter == MediaKind.IMAGE) null else MediaKind.IMAGE },
+                            label = { Text("🖼️ Images ($count)", fontSize = 11.sp) }
+                        )
+                    }
+                }
+
+                val filteredList = when (selectedCategoryFilter) {
+                    null -> playlist
+                    MediaKind.TEXT_DOCUMENT -> playlist.filter { it.kind == MediaKind.TEXT_DOCUMENT || it.kind == MediaKind.PDF_DOCUMENT }
+                    else -> playlist.filter { it.kind == selectedCategoryFilter }
+                }
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    items(playlist) { item ->
+                    items(filteredList) { item ->
                         val isSelected = activeMedia?.uri == item.uri
                         Card(
                             onClick = { activeMedia = item },

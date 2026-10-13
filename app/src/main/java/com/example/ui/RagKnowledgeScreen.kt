@@ -531,7 +531,7 @@ fun RagKnowledgeScreen(
                             ) {
                                 Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Load All 12 Sources")
+                                Text("Load All ${InternalKnowledgeSources.sources.size} Sources")
                             }
 
                             if (documents.isNotEmpty()) {

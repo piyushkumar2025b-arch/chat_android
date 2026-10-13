@@ -200,4 +200,46 @@ class ToolFunctionalityTest {
         val hasPermission = AppNotificationManager.hasNotificationPermission(context)
         assertNotNull(hasPermission)
     }
+
+    // --- Knowledge Sources & News Feeds Tests ---
+
+    @Test
+    fun testKnowledgeSourcesCompleteness() {
+        val sources = com.example.data.remote.InternalKnowledgeSources.sources
+        assertTrue("Must have at least 18 curated sources", sources.size >= 18)
+        
+        // Verify unique IDs
+        val ids = sources.map { it.id }.toSet()
+        assertEquals("All source IDs must be unique", sources.size, ids.size)
+
+        // Verify key domains are covered
+        assertTrue(sources.any { it.id == "quantum_computing" })
+        assertTrue(sources.any { it.id == "distributed_systems" })
+        assertTrue(sources.any { it.id == "data_structures_algorithms" })
+        assertTrue(sources.any { it.id == "linux_os_internals" })
+        assertTrue(sources.any { it.id == "modern_web_networking" })
+        assertTrue(sources.any { it.id == "ai_agents_reasoning" })
+
+        // Check content validity
+        for (source in sources) {
+            assertTrue("Title must not be blank", source.title.isNotBlank())
+            assertTrue("Category must not be blank", source.category.isNotBlank())
+            assertTrue("Content must be detailed (> 200 chars)", source.content.length > 200)
+        }
+    }
+
+    @Test
+    fun testNewsCategoriesCompleteness() {
+        val categories = com.example.data.remote.NewsFeedService.NewsCategory.values()
+        assertTrue(categories.size >= 10)
+        assertTrue(categories.any { it.name == "AI_RESEARCH" })
+        assertTrue(categories.any { it.name == "CYBER_SECURITY" })
+
+        val aiCategory = com.example.data.remote.NewsFeedService.NewsCategory.AI_RESEARCH
+        assertTrue(aiCategory.feeds.isNotEmpty())
+        for ((name, url) in aiCategory.feeds) {
+            assertTrue(name.isNotBlank())
+            assertTrue(url.startsWith("http"))
+        }
+    }
 }

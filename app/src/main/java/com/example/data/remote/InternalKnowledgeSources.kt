@@ -379,6 +379,201 @@ Frameworks for high-velocity cognitive output, habit maintenance, and calendar m
    - Protect high-energy morning hours for complex analytical tasks (deep work).
    - Consolidate administrative tasks (email, updates) into designated afternoon batch blocks.
             """.trimIndent()
+        ),
+
+        InternalKnowledgeSourceItem(
+            id = "quantum_computing",
+            title = "Quantum Computing, Qubits & Quantum Algorithms",
+            fileName = "Quantum Computing, Qubits & Quantum Algorithms.md",
+            category = "Quantum Science",
+            iconEmoji = "⚛️",
+            summary = "Qubit superposition, Bloch sphere, quantum entanglement, Hadamard/CNOT gates, Shor's and Grover's algorithms.",
+            content = """
+# Quantum Computing Principles & Algorithmic Foundations
+Quantum computation leverages the fundamental postulates of quantum mechanics to solve select computational problems exponentially faster than classical computers:
+
+1. Qubit State & Superposition:
+   Unlike a classical binary bit (0 or 1), a quantum bit exists in a continuous linear superposition:
+   |ψ⟩ = α|0⟩ + β|1⟩
+   where α, β ∈ ℂ are probability amplitudes satisfying the normalization constraint |α|² + |β|² = 1.
+   Upon measurement in the computational basis, the state collapses to |0⟩ with probability |α|² and |1⟩ with probability |β|².
+   Geometrically, single-qubit pure states are mapped onto the surface of the three-dimensional Bloch Sphere:
+   |ψ⟩ = cos(θ/2)|0⟩ + e^(iφ)sin(θ/2)|1⟩
+
+2. Quantum Entanglement & Bell States:
+   Non-separable multi-qubit states where the quantum state of each particle cannot be described independently of the others:
+   |Φ⁺⟩ = (|00⟩ + |11⟩) / √2
+   Measurement on one entangled qubit instantaneously determines the state of the coupled qubit regardless of spatial separation (EPR paradox, verified by Bell's inequalities).
+
+3. Fundamental Quantum Logic Gates:
+   - Pauli-X (NOT): Flips |0⟩ ↔ |1⟩ (corresponds to π rotation around X-axis).
+   - Pauli-Z (Phase Flip): Maps |1⟩ to -|1⟩, leaving |0⟩ invariant.
+   - Hadamard Gate (H): Creates equal superposition: H|0⟩ = (|0⟩ + |1⟩)/√2 and H|1⟩ = (|0⟩ - |1⟩)/√2.
+   - Controlled-NOT (CNOT): 2-qubit entangling gate flipping the target qubit if and only if the control qubit is |1⟩.
+   - Toffoli (CCNOT): Universal classical reversible gate.
+
+4. Groundbreaking Quantum Algorithms:
+   - Shor's Algorithm (1994): Factors integers in polynomial time O((log N)³) via Quantum Phase Estimation and Quantum Fourier Transform (QFT), threatening standard RSA and Elliptic Curve Cryptography.
+   - Grover's Algorithm (1996): Searches an unstructured database of N items with quadratic speedup O(√N), utilizing amplitude amplification and phase inversion.
+   - Variational Quantum Eigensolver (VQE): Hybrid classical-quantum algorithm designed for NISQ (Noisy Intermediate-Scale Quantum) devices to simulate molecular electronic ground states in quantum chemistry.
+            """.trimIndent()
+        ),
+
+        InternalKnowledgeSourceItem(
+            id = "distributed_systems",
+            title = "Distributed Systems, Consensus Protocols & Cloud Architecture",
+            fileName = "Distributed Systems, Consensus Protocols & Cloud Architecture.md",
+            category = "Cloud & Backend",
+            iconEmoji = "🌐",
+            summary = "CAP Theorem, PACELC, Raft & Paxos consensus, Vector Clocks, Eventual Consistency, and Gossip protocols.",
+            content = """
+# Distributed Systems Engineering & Scalability Reference
+Building robust, fault-tolerant systems across networked, asynchronous machines:
+
+1. The CAP Theorem (Brewer, 2000):
+   In any asynchronous network prone to network partitions (P), a distributed data store can guarantee at most two of three properties:
+   - Consistency (C): Every read receives the most recent write or an error.
+   - Availability (A): Every non-failing node returns a non-error response for every request.
+   - Partition Tolerance (P): The system continues operating despite arbitrary dropped or delayed messages between nodes.
+   Since physical networks inevitably partition (fiber cuts, router reboots), modern distributed architectures must choose between CP (e.g., Raft, Spanner, Zookeeper) and AP (e.g., Cassandra, DynamoDB, CouchDB).
+
+2. PACELC Theorem (Abadi, 2012):
+   Extends CAP: If there is a Partition (P), choose between Availability (A) and Consistency (C); Else (E), choose between Latency (L) and Consistency (C).
+
+3. Consensus Protocols (Raft & Multi-Paxos):
+   - Leader Election: Randomized election timers ensure a single leader is elected via quorum majority (N/2 + 1 votes).
+   - Log Replication: The leader accepts client write requests, appends log entries, and commits once a quorum of followers acknowledges replication.
+   - Safety Invariant: If a leader has committed a log entry at a given index, no other node will ever commit a different entry for that index.
+
+4. Logical Clocks & Causal Ordering:
+   - Lamport Timestamps: Assigns scalar numbers to events such that if A happens-before B (A → B), then L(A) < L(B).
+   - Vector Clocks: Array of integer clocks across all N processes, allowing detection of concurrent events and conflict resolution in decentralized multi-master systems.
+
+5. Gossip Protocols & Failure Detection:
+   - Nodes periodically exchange state summaries with random peers, achieving exponential epidemiological spread of membership metadata.
+   - Phi Accrual Failure Detectors measure inter-heartbeat latency variance to output a dynamic suspicion probability rather than a brittle binary timeout.
+            """.trimIndent()
+        ),
+
+        InternalKnowledgeSourceItem(
+            id = "data_structures_algorithms",
+            title = "Advanced Data Structures, Graph Algorithms & Big-O Optimization",
+            fileName = "Advanced Data Structures, Graph Algorithms & Big-O Optimization.md",
+            category = "Computer Science",
+            iconEmoji = "🌲",
+            summary = "Asymptotic analysis, Trie, Red-Black Trees, Segment Trees, Dijkstra, A* search, and Dynamic Programming.",
+            content = """
+# Advanced Algorithms & Data Structures Reference Manual
+Computational efficiency and structural optimization guidelines:
+
+1. Asymptotic Complexity Hierarchy:
+   O(1) Constant < O(log N) Logarithmic < O(√N) Sub-linear < O(N) Linear < O(N log N) Linearithmic < O(N²) Quadratic < O(2^N) Exponential < O(N!) Factorial.
+
+2. Advanced Tree & Range Query Structures:
+   - Red-Black Tree: Self-balancing Binary Search Tree ensuring O(log N) worst-case search, insertion, and deletion via color invariants and tree rotations.
+   - Trie (Prefix Tree): O(L) string retrieval and autocomplete, where L is key length, independent of total dataset size N.
+   - Segment Tree & Fenwick Tree (Binary Indexed Tree): Enables range sum/min/max queries and point updates in O(log N) time with O(N) memory overhead.
+   - Disjoint Set Union (DSU / Union-Find): Employs Path Compression and Union by Rank to achieve nearly constant amortized inverse Ackermann complexity O(α(N)).
+
+3. Essential Graph Algorithms:
+   - Dijkstra's Shortest Path: O((V + E) log V) on non-negative weighted graphs using a min-heap priority queue.
+   - A* Heuristic Search: f(n) = g(n) + h(n), where g(n) is exact cost from start and h(n) is an admissible heuristic estimate to the goal, drastically reducing explored states.
+   - Bellman-Ford: O(V * E) detects negative weight cycles and computes single-source shortest paths.
+   - Tarjan's Strongly Connected Components (SCC): O(V + E) single-pass DFS identifying directed cycles via discovery low-link values.
+
+4. Dynamic Programming (DP) Paradigms:
+   - Optimal Substructure: Solution to problem can be constructed from optimal solutions to its subproblems.
+   - Overlapping Subproblems: Space-time tradeoff via memoization (top-down) or tabulation (bottom-up).
+   - Classical canonical patterns: 0/1 Knapsack, Longest Common Subsequence (LCS), Matrix Chain Multiplication, Edit Distance (Levenshtein), and Bitmask DP for TSP.
+            """.trimIndent()
+        ),
+
+        InternalKnowledgeSourceItem(
+            id = "linux_os_internals",
+            title = "Linux Operating System Architecture, Kernel & POSIX Internals",
+            fileName = "Linux Operating System Architecture, Kernel & POSIX Internals.md",
+            category = "Operating Systems",
+            iconEmoji = "🐧",
+            summary = "Virtual memory, MMU page tables, system calls, epoll I/O multiplexing, cgroups, and process namespaces.",
+            content = """
+# Linux Kernel Architecture & Systems Programming Specification
+Deep technical overview of Linux kernel subsystems and low-level runtime execution:
+
+1. Process & Memory Management:
+   - Virtual Memory Subsystem: 4KB standard pages mapped through multi-level hierarchical Page Tables (PGD, P4D, PUD, PMD, PTE) managed by the hardware Memory Management Unit (MMU).
+   - Copy-on-Write (CoW): fork() clones parent page tables with write-protect flags; physical memory duplication occurs only when a process modifies a page, enabling instant process spawning.
+   - Completely Fair Scheduler (CFS): Schedules runnable tasks using red-black trees ordered by virtual runtime (vruntime), guaranteeing fair CPU time shares based on nice values.
+
+2. High-Performance I/O Multiplexing:
+   - select() & poll(): O(N) scaling; re-scans entire file descriptor array on every event.
+   - epoll (Event Poll): O(1) event readiness notification. Utilizes kernel red-black tree to store monitored descriptors and an in-kernel ready-list populated by hardware interrupt callbacks.
+   - Edge-Triggered (EPOLLET) vs. Level-Triggered (EPOLLIN): Edge-triggered delivers events only when state transitions occur, requiring non-blocking sockets and drain-to-EAGAIN loops.
+   - io_uring: Asynchronous ring buffers (Submission Queue & Completion Queue) shared between user space and kernel space, eliminating system call overhead entirely via SQPOLL kernel threads.
+
+3. Linux Containers (LXC / Docker Primitives):
+   - Namespaces: Isolate system resources per process tree: PID (processes), NET (interfaces & routing), MNT (mount points), IPC (message queues), UTS (hostnames), and USER (UID mappings).
+   - Control Groups (cgroups v2): Enforce strict resource quotas, throttling, and accounting for CPU, memory, blkio, and pids.
+   - Seccomp-BPF: Restricts available system calls for sandboxing untrusted executable workloads.
+            """.trimIndent()
+        ),
+
+        InternalKnowledgeSourceItem(
+            id = "modern_web_networking",
+            title = "Modern Internet Networking Protocols: HTTP/3, QUIC & WebSockets",
+            fileName = "Modern Internet Networking Protocols: HTTP/3, QUIC & WebSockets.md",
+            category = "Networking",
+            iconEmoji = "⚡",
+            summary = "HTTP/1.1 vs HTTP/2 multiplexing, QUIC over UDP, 0-RTT TLS 1.3 handshake, and WebSockets.",
+            content = """
+# Modern Networking Architecture & Transport Layer Protocols
+Evolution of web protocols powering real-time low-latency mobile and cloud applications:
+
+1. HTTP/1.1 vs HTTP/2 vs HTTP/3:
+   - HTTP/1.1: Plaintext protocol with Head-of-Line (HoL) blocking; requires multiple TCP connections (domain sharding) for concurrent resource downloads.
+   - HTTP/2: Binary framing layer; multiplexes concurrent requests and responses over a single TCP connection. However, single TCP packet loss stalls all concurrent streams (TCP-level HoL blocking).
+   - HTTP/3 (QUIC): Replaces TCP with UDP. Independent multiplexed byte streams ensure packet loss on stream A never impacts transmission of stream B.
+
+2. QUIC Protocol Architecture:
+   - Integrated TLS 1.3 Encryption: Eliminates redundant TCP 3-way handshake + TLS handshake round trips.
+   - 0-RTT Connection Resumption: Returning clients can transmit encrypted application data in the very first flight.
+   - Connection Migration: QUIC connections use a 64-bit Connection ID instead of IP:Port tuple, enabling seamless roaming between Wi-Fi and 5G cellular without dropped downloads or TCP reconnects.
+
+3. Real-Time Streaming (WebSockets & WebRTC):
+   - WebSockets (RFC 6455): Full-duplex bidirectional persistent connection established via HTTP/1.1 Upgrade header, with minimal 2–10 byte framing overhead per message.
+   - Server-Sent Events (SSE): Unidirectional text/event-stream over standard HTTP, ideal for LLM token streaming with automatic reconnection handling.
+   - WebRTC: Peer-to-peer real-time media exchange utilizing SRTP (Secure Real-time Transport Protocol) and SCTP for data channels negotiated via ICE/STUN/TURN.
+            """.trimIndent()
+        ),
+
+        InternalKnowledgeSourceItem(
+            id = "ai_agents_reasoning",
+            title = "Autonomous AI Agents, Tool Use & Cognitive Reasoning Frameworks",
+            fileName = "Autonomous AI Agents, Tool Use & Cognitive Reasoning Frameworks.md",
+            category = "Artificial Intelligence",
+            iconEmoji = "🦾",
+            summary = "ReAct (Reasoning + Acting) loop, Chain-of-Thought, Tool/Function Calling, Tree of Thoughts, and Self-Reflection.",
+            content = """
+# Cognitive AI Agent Architecture & Multi-Step Reasoning
+Operational paradigms for constructing reliable, autonomous LLM agents equipped with tools:
+
+1. The ReAct Framework (Yao et al., 2022):
+   Interleaves reasoning traces and task-specific actions in an iterative execution loop:
+   - Thought: Deconstruct current state, evaluate sub-goals, and formulate next action.
+   - Action: Emit structured tool invocation (e.g., searchWeb(query), calculate(expr), runCode(script)).
+   - Observation: Ingest tool execution output into conversational working memory.
+   - Repeat until goal verification produces Final Answer.
+
+2. Structured Tool / Function Calling:
+   - Schema Definition: Models receive JSON-Schema definitions specifying function signatures, parameter types, enums, and required fields.
+   - Grammar-Constrained Decoding: Ensures model token generation adheres strictly to syntactic JSON grammar, eliminating parsing errors.
+   - Grounding & Anti-Hallucination: Tool execution outputs serve as ground-truth anchor context, preventing fictitious assertions.
+
+3. Advanced Reasoning Strategies:
+   - Chain-of-Thought (CoT): Elicits step-by-step intermediate tokens before outputting conclusions, utilizing more forward-pass compute on complex problems.
+   - Self-Consistency (Wang et al.): Samples multiple reasoning paths at high temperature and selects the majority consensus answer.
+   - Tree of Thoughts (ToT): Explores deliberate reasoning trees using BFS/DFS with heuristic self-evaluations and backtracking.
+   - Reflexion & Self-Correction: Agents critique their own past tool failures in retrospective memory to correct errors in subsequent attempts.
+            """.trimIndent()
         )
     )
 }
