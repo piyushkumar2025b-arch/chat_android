@@ -252,7 +252,7 @@ class ToolFunctionalityTest {
     @Test
     fun testKnowledgeSourcesCompleteness() {
         val sources = com.example.data.remote.InternalKnowledgeSources.sources
-        assertTrue("Must have at least 18 curated sources", sources.size >= 18)
+        assertTrue("Must have at least 25 curated sources", sources.size >= 25)
         
         // Verify unique IDs
         val ids = sources.map { it.id }.toSet()
@@ -265,6 +265,8 @@ class ToolFunctionalityTest {
         assertTrue(sources.any { it.id == "linux_os_internals" })
         assertTrue(sources.any { it.id == "modern_web_networking" })
         assertTrue(sources.any { it.id == "ai_agents_reasoning" })
+        assertTrue(sources.any { it.id == "synthetic_biology_genomics" })
+        assertTrue(sources.any { it.id == "cryptography_blockchain" })
 
         // Check content validity
         for (source in sources) {

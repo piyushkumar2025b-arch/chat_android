@@ -1235,6 +1235,77 @@ SMB Accounts,John Smith,650000,610000,-6.1%,Under Review
 Govt & Edu,Dr. Aris,850000,920000,+8.2%,Met
 Global Partners,Elena Rostova,2100000,2400000,+14.3%,Exceeded""".trimIndent()
             )
+            "yaml" -> Triple(
+                "Cluster_Deployment.yaml",
+                "text/plain",
+                """apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: omnichat-production-cluster
+spec:
+  replicas: 8
+  template:
+    spec:
+      containers:
+      - name: neural-worker
+        image: omnichat/worker:v4.0
+        resources:
+          limits:
+            cpu: "8"
+            memory: "16Gi"""".trimIndent()
+            )
+            "sql" -> Triple(
+                "Analytics_Schema.sql",
+                "text/plain",
+                """-- Relational Schema & Partitioned Tables
+CREATE TABLE sessions (
+    session_id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    tokens_consumed BIGINT DEFAULT 0
+);
+
+CREATE INDEX idx_sessions_user ON sessions(user_id, created_at DESC);""".trimIndent()
+            )
+            "rust" -> Triple(
+                "SIMD_Vector_Engine.rs",
+                "text/plain",
+                """// Rust High-Performance SIMD Vector Calculations
+pub fn dot_product(a: &[f32], b: &[f32]) -> f32 {
+    a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
+}
+
+fn main() {
+    let vec_a = vec![1.0, 2.0, 3.0, 4.0];
+    let vec_b = vec![0.5, 1.5, 2.5, 3.5];
+    println!("Dot product: {}", dot_product(&vec_a, &vec_b));
+}""".trimIndent()
+            )
+            "go" -> Triple(
+                "Concurrent_Worker_Pool.go",
+                "text/plain",
+                """package main
+
+import (
+    "fmt"
+    "sync"
+)
+
+func worker(id int, jobs <-chan int, wg *sync.WaitGroup) {
+    defer wg.Done()
+    for j := range jobs {
+        fmt.Printf("Worker %d executed job %d\n", id, j)
+    }
+}""".trimIndent()
+            )
+            "markdown" -> Triple(
+                "Executive_Summary.md",
+                "text/markdown",
+                """# Executive AI Technical Architecture
+- **Distributed LLM Ingress**: Real-time failover between multi-cloud backends.
+- **Client Cache**: Zero-latency local SQLite persistence and Vector embeddings.
+- **Multimodal Pipeline**: Vision OCR, media playback, and live code sandbox execution.""".trimIndent()
+            )
             else -> Triple(
                 "Project_Architecture_Notes.txt",
                 "text/plain",

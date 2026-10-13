@@ -42,6 +42,11 @@ import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.PushPin
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -81,7 +86,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.ProductivityDao
 import com.example.data.model.NoteItemEntity
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -107,6 +114,51 @@ fun NotesScreen(
     var showEditorDialog by remember { mutableStateOf(false) }
     var editingNote by remember { mutableStateOf<NoteItemEntity?>(null) }
     var noteToDelete by remember { mutableStateOf<NoteItemEntity?>(null) }
+
+    // File picker launcher for importing notes from documents, text, markdown, json, csv
+    val importNotePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            coroutineScope.launch {
+                var importedCount = 0
+                for (u in uris) {
+                    try {
+                        val text = withContext(Dispatchers.IO) {
+                            context.contentResolver.openInputStream(u)?.bufferedReader()?.use { it.readText() }
+                        }
+                        if (!text.isNullOrBlank()) {
+                            val fileName = u.lastPathSegment?.substringAfterLast('/') ?: "Imported Note"
+                            val title = fileName.substringBeforeLast('.')
+                            val category = when {
+                                fileName.endsWith(".md", true) -> "Ideas"
+                                fileName.endsWith(".json", true) || fileName.endsWith(".csv", true) -> "Work"
+                                fileName.endsWith(".todo", true) || fileName.endsWith(".task", true) -> "To-Do"
+                                else -> "Personal"
+                            }
+                            productivityDao.insertNote(
+                                NoteItemEntity(
+                                    id = UUID.randomUUID().toString(),
+                                    title = title,
+                                    content = text,
+                                    category = category,
+                                    colorHex = "#2196F3",
+                                    isPinned = false,
+                                    updatedAt = System.currentTimeMillis()
+                                )
+                            )
+                            importedCount++
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+                if (importedCount > 0) {
+                    Toast.makeText(context, "Imported $importedCount note(s) successfully!", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     val filteredNotes = remember(notes, searchQuery, selectedCategory) {
         notes.filter { note ->
@@ -173,16 +225,31 @@ fun NotesScreen(
                     }
                 }
 
-                FilledTonalButton(
-                    onClick = {
-                        editingNote = null
-                        showEditorDialog = true
-                    },
-                    modifier = Modifier.testTag("new_note_btn")
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("New Note")
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilledTonalButton(
+                        onClick = {
+                            importNotePickerLauncher.launch(
+                                arrayOf("text/*", "application/json", "text/plain", "text/markdown", "*/*")
+                            )
+                        },
+                        modifier = Modifier.testTag("import_notes_btn")
+                    ) {
+                        Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Import")
+                    }
+
+                    Button(
+                        onClick = {
+                            editingNote = null
+                            showEditorDialog = true
+                        },
+                        modifier = Modifier.testTag("new_note_btn")
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("New Note")
+                    }
                 }
             }
         }

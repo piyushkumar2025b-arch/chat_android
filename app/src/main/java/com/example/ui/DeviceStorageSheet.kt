@@ -382,6 +382,61 @@ fun DeviceStorageSheet(
                         }
                     )
                 }
+                item {
+                    SampleFileChip(
+                        name = "Cluster_Config.yaml",
+                        type = "YAML Spec",
+                        icon = Icons.Default.Description,
+                        onClick = {
+                            onDismiss()
+                            onAddSampleFile("yaml")
+                        }
+                    )
+                }
+                item {
+                    SampleFileChip(
+                        name = "Analytics_Schema.sql",
+                        type = "SQL Schema",
+                        icon = Icons.Default.TableChart,
+                        onClick = {
+                            onDismiss()
+                            onAddSampleFile("sql")
+                        }
+                    )
+                }
+                item {
+                    SampleFileChip(
+                        name = "SIMD_Math.rs",
+                        type = "Rust Source",
+                        icon = Icons.Default.Code,
+                        onClick = {
+                            onDismiss()
+                            onAddSampleFile("rust")
+                        }
+                    )
+                }
+                item {
+                    SampleFileChip(
+                        name = "Worker_Pool.go",
+                        type = "Go Code",
+                        icon = Icons.Default.Code,
+                        onClick = {
+                            onDismiss()
+                            onAddSampleFile("go")
+                        }
+                    )
+                }
+                item {
+                    SampleFileChip(
+                        name = "Summary.md",
+                        type = "Markdown Doc",
+                        icon = Icons.Default.Description,
+                        onClick = {
+                            onDismiss()
+                            onAddSampleFile("markdown")
+                        }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))

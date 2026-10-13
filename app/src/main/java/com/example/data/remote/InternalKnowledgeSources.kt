@@ -745,6 +745,51 @@ Algorithmic paradigms for high-efficiency computational processing and combinato
    - Segment Trees & Fenwick Trees (Binary Indexed Tree): Range sum/minimum queries and point updates in O(log N) time with lazy propagation for range updates.
    - Disjoint Set Union (DSU / Union-Find): Near-constant time amortized O(α(N)) set connectivity operations with path compression and union by rank.
             """.trimIndent()
+        ),
+
+        InternalKnowledgeSourceItem(
+            id = "synthetic_biology_genomics",
+            title = "Synthetic Biology, CRISPR Gene Editing & Genomics",
+            fileName = "Synthetic Biology, CRISPR Gene Editing & Genomics.md",
+            category = "Biotechnology",
+            iconEmoji = "🧬",
+            summary = "CRISPR-Cas9 endonuclease mechanics, base editing, prime editing, NGS genomic sequencing and computational biology.",
+            content = """
+# Synthetic Biology, CRISPR Gene Editing & Molecular Genomics
+Core principles of modern molecular biotechnology and genomic engineering:
+
+1. CRISPR-Cas Gene Editing Systems:
+   - Cas9 Endonuclease: Directed by single guide RNA (sgRNA) targeting ~20nt sequence adjacent to Protospacer Adjacent Motif (PAM, 5'-NGG-3').
+   - Double-Strand Breaks (DSB): Repaired via Non-Homologous End Joining (NHEJ, causing gene knockout indels) or Homology-Directed Repair (HDR, precise sequence insertion using donor template).
+   - Base Editing & Prime Editing: Deaminase-fused Cas nickases enabling C->T or A->G transitions without DSBs; prime editing couples reverse transcriptase to pegRNA for arbitrary insertions and deletions.
+
+2. Next-Generation Sequencing (NGS) & Bio-computation:
+   - High-Throughput Sequencing: Illumina reversible dye-terminator SBS, Pacific Biosciences long-read SMRT sequencing, and Oxford Nanopore strand translocation.
+   - Computational Alignment: Burrows-Wheeler Aligner (BWA), De Bruijn graph de novo assembly, and Variant Call Format (VCF) analysis.
+   - Structural Biology: AlphaFold 3 and ESMFold predicting atomic coordinates and ligand interactions from primary amino acid sequences.
+            """.trimIndent()
+        ),
+
+        InternalKnowledgeSourceItem(
+            id = "cryptography_blockchain",
+            title = "Modern Cryptography, Zero-Knowledge Proofs & zk-SNARKs",
+            fileName = "Modern Cryptography, Zero-Knowledge Proofs & zk-SNARKs.md",
+            category = "Cryptography",
+            iconEmoji = "🔐",
+            summary = "Post-quantum lattice cryptography, elliptic curve pairings, zero-knowledge proofs (zk-SNARKs/STARKs), and verifiable computation.",
+            content = """
+# Modern Cryptography, Zero-Knowledge Proofs & Verifiable Computation
+Mathematical foundations of state-of-the-art cryptographic protocols:
+
+1. Zero-Knowledge Proofs (ZKP):
+   - Fundamental Properties: Completeness (honest verifier convinced by honest prover), Soundness (malicious prover cannot convince verifier of falsehood with non-negligible probability), Zero-Knowledge (verifier learns nothing beyond truth of statement).
+   - zk-SNARKs (Succinct Non-Interactive Arguments of Knowledge): Arithmetic circuit compilation (R1CS, QAP), elliptic curve pairings (BLS12-381), and sub-millisecond verification.
+   - zk-STARKs: Scalable and transparent ZKPs relying strictly on collision-resistant hash functions (FRI protocol) with no trusted setup and post-quantum resistance.
+
+2. Post-Quantum Cryptography (NIST Standardized):
+   - Lattice-Based Cryptography: Module Learning With Errors (M-LWE) and Shortest Vector Problem (SVP); standardized in ML-KEM (Kyber) and ML-DSA (Dilithium).
+   - State-Machine Replication: Byzantine Fault Tolerant (BFT) consensus, verifiable random functions (VRF), and Merkle Patricia Tries.
+            """.trimIndent()
         )
     )
 }
