@@ -150,7 +150,9 @@ fun MarkdownStudioScreen(
         MarkdownTemplate("Project Spec", "🚀", getProjectSpecTemplate()),
         MarkdownTemplate("README.md", "📦", getSampleMarkdownTemplate()),
         MarkdownTemplate("Task List", "✅", getTodoListTemplate()),
-        MarkdownTemplate("AI Prompt Guide", "🧠", getPromptGuideTemplate())
+        MarkdownTemplate("AI Prompt Guide", "🧠", getPromptGuideTemplate()),
+        MarkdownTemplate("Research Paper", "📑", getResearchPaperTemplate()),
+        MarkdownTemplate("API Reference", "⚡", getApiReferenceTemplate())
     )
 
     Column(
@@ -620,4 +622,53 @@ Always prioritize clean architecture, accessible components, and resilient error
 ## 2. Few-Shot Pattern
 - **Input**: "How do I optimize bitmap memory?"
 - **Output**: "Use `BitmapFactory.Options.inSampleSize` and recycle when finished."
+""".trimIndent()
+
+private fun getResearchPaperTemplate(): String = """
+# 📑 Attention Is All You Need: Modern Synthesis & Implementation
+
+## Abstract
+We present a rigorous analysis of multi-head self-attention mechanisms and dense feed-forward architectures for mobile-edge compute.
+
+## 1. Methodology
+- **Scaled Dot-Product Attention**:
+  $$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
+- **Positional Embeddings**: Rotary Positional Embeddings (RoPE) applied directly in complex coordinate planes.
+
+## 2. Experimental Results
+| Benchmark | BLEU-4 | Latency (ms) | Peak RAM (MB) |
+| :--- | :--- | :--- | :--- |
+| WMT-14 En-De | 28.4 | 14.2 | 118 |
+| HumanEval-Python | 72.1% | 18.5 | 142 |
+""".trimIndent()
+
+private fun getApiReferenceTemplate(): String = """
+# ⚡ OmniChat REST & GraphQL Protocol Reference
+
+## Base Endpoints
+- **Production Gateway**: `https://api.omnichat.internal/v1`
+- **Streaming Socket**: `wss://api.omnichat.internal/v1/stream`
+
+### 1. Ingest Knowledge Document
+`POST /rag/documents`
+
+#### Request Payload
+```json
+{
+  "title": "Quantum Systems Whitepaper",
+  "mime_type": "text/markdown",
+  "chunk_size": 512,
+  "overlap": 64
+}
+```
+
+#### Response (201 Created)
+```json
+{
+  "document_id": "doc_98a7bc",
+  "status": "indexed",
+  "total_chunks": 18,
+  "embeddings_dimension": 768
+}
+```
 """.trimIndent()

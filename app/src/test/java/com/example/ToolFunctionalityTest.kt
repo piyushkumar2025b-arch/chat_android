@@ -99,12 +99,24 @@ class ToolFunctionalityTest {
         val pyUri = Uri.parse("https://example.com/scripts/simulator.py")
         val pyItem = resolveMediaItemFromUri(context, pyUri)
         assertEquals(MediaKind.TEXT_DOCUMENT, pyItem.kind)
+
+        val yamlUri = Uri.parse("https://example.com/configs/deployment.yaml")
+        val yamlItem = resolveMediaItemFromUri(context, yamlUri)
+        assertEquals(MediaKind.TEXT_DOCUMENT, yamlItem.kind)
+
+        val rustUri = Uri.parse("https://example.com/code/engine.rs")
+        val rustItem = resolveMediaItemFromUri(context, rustUri)
+        assertEquals(MediaKind.TEXT_DOCUMENT, rustItem.kind)
+
+        val svgUri = Uri.parse("https://example.com/images/icon.svg")
+        val svgItem = resolveMediaItemFromUri(context, svgUri)
+        assertEquals(MediaKind.IMAGE, svgItem.kind)
     }
 
     @Test
     fun testCuratedMediaSourcesCompleteness() {
         val sources = com.example.ui.CuratedMediaSources.sampleSources
-        assertTrue("Must contain at least 15 curated sample sources", sources.size >= 15)
+        assertTrue("Must contain at least 20 curated sample sources", sources.size >= 20)
         assertTrue(sources.any { it.kind == MediaKind.VIDEO })
         assertTrue(sources.any { it.kind == MediaKind.AUDIO })
         assertTrue(sources.any { it.kind == MediaKind.TEXT_DOCUMENT })

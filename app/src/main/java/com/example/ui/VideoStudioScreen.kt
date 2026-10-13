@@ -21,10 +21,14 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -32,6 +36,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -109,6 +114,25 @@ fun VideoStudioScreen(
     val durations = listOf("3s", "5s", "10s")
 
     val videoHistory = remember { mutableStateListOf<VideoGenerationItem>() }
+
+    val videoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val name = uri.lastPathSegment?.substringAfterLast('/') ?: "Custom Video"
+            val item = VideoGenerationItem(
+                id = System.currentTimeMillis().toString(),
+                prompt = "Imported Video: $name",
+                motionType = selectedMotion,
+                style = "Imported Video File",
+                videoPreviewUrl = uri.toString()
+            )
+            currentVideoItem = item
+            videoHistory.add(0, item)
+            promptText = "Video Clip: $name"
+            Toast.makeText(context, "Loaded video: $name", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     fun generateVideo() {
         val rawPrompt = promptText.trim()
@@ -256,19 +280,31 @@ fun VideoStudioScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Button(
-                            onClick = {
-                                promptText = "A neon-lit sports car drifting around a sharp rainy corner in neo-Tokyo with purple tire smoke and lens reflections"
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                            ),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Sample Scene", style = MaterialTheme.typography.labelMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            FilledTonalButton(
+                                onClick = { videoPickerLauncher.launch("video/*") },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.testTag("import_video_button")
+                            ) {
+                                Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Import Video", style = MaterialTheme.typography.labelMedium)
+                            }
+
+                            Button(
+                                onClick = {
+                                    promptText = "A neon-lit sports car drifting around a sharp rainy corner in neo-Tokyo with purple tire smoke and lens reflections"
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                ),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Sample", style = MaterialTheme.typography.labelMedium)
+                            }
                         }
 
                         Button(

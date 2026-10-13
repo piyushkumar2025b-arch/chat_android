@@ -325,6 +325,173 @@ class QuantumState:
             mimeType = "application/vnd.android.package-archive",
             kind = MediaKind.ARCHIVE,
             textPreview = "Android Application Package (APK)\nPackage: com.aistudio.omnichat\nMinSDK: 26 • TargetSDK: 34\nSigned with V2/V3 Scheme • Verified Clean"
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"),
+            displayName = "Live Mux Test Stream (HLS Video)",
+            sizeBytes = 34_000_000L,
+            mimeType = "video/mp4",
+            kind = MediaKind.VIDEO,
+            durationMs = 612_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackSeeTheWorld.mp4"),
+            displayName = "Nature Expedition: See The World",
+            sizeBytes = 28_000_000L,
+            mimeType = "video/mp4",
+            kind = MediaKind.VIDEO,
+            durationMs = 28_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3"),
+            displayName = "Lo-Fi Coffee Shop Study Session (MP3 Audio)",
+            sizeBytes = 8_900_000L,
+            mimeType = "audio/mpeg",
+            kind = MediaKind.AUDIO,
+            durationMs = 440_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3"),
+            displayName = "Classical Symphony in G Minor (MP3 Audio)",
+            sizeBytes = 7_900_000L,
+            mimeType = "audio/mpeg",
+            kind = MediaKind.AUDIO,
+            durationMs = 390_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("content://omnichat/sql/ecommerce_database.sql"),
+            displayName = "E-Commerce Database Schema.sql",
+            sizeBytes = 12_800L,
+            mimeType = "text/plain",
+            kind = MediaKind.TEXT_DOCUMENT,
+            textPreview = """
+-- OmniChat Core Production Database Schema
+CREATE TABLE users (
+    id VARCHAR(36) PRIMARY KEY,
+    username VARCHAR(64) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE media_files (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) REFERENCES users(id),
+    file_name VARCHAR(255) NOT NULL,
+    file_size_bytes BIGINT NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    storage_uri TEXT NOT NULL
+);
+            """.trimIndent()
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("content://omnichat/subtitles/english_captions.srt"),
+            displayName = "English Captions Track.srt",
+            sizeBytes = 8_400L,
+            mimeType = "text/plain",
+            kind = MediaKind.TEXT_DOCUMENT,
+            textPreview = """
+1
+00:00:01,000 --> 00:00:04,500
+Welcome to OmniChat Universal Media & Audio Studio.
+
+2
+00:00:05,000 --> 00:00:09,200
+Playing video, music, code, documents, and streaming any URL format.
+            """.trimIndent()
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"),
+            displayName = "Sci-Fi Action: Tears of Steel Open Movie",
+            sizeBytes = 72_000_000L,
+            mimeType = "video/mp4",
+            kind = MediaKind.VIDEO,
+            durationMs = 734_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4"),
+            displayName = "Fantasy Animation: Sintel Open Movie",
+            sizeBytes = 52_000_000L,
+            mimeType = "video/mp4",
+            kind = MediaKind.VIDEO,
+            durationMs = 52_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"),
+            displayName = "Cyberpunk Synthwave Odyssey (MP3 Audio)",
+            sizeBytes = 9_100_000L,
+            mimeType = "audio/mpeg",
+            kind = MediaKind.AUDIO,
+            durationMs = 455_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3"),
+            displayName = "Acoustic Classical Nocturne (MP3 Audio)",
+            sizeBytes = 8_300_000L,
+            mimeType = "audio/mpeg",
+            kind = MediaKind.AUDIO,
+            durationMs = 415_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("content://omnichat/infra/kubernetes_deployment.yaml"),
+            displayName = "Kubernetes Cluster Deployment.yaml",
+            sizeBytes = 16_400L,
+            mimeType = "text/plain",
+            kind = MediaKind.TEXT_DOCUMENT,
+            textPreview = """
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: omnichat-cluster-pod
+  labels:
+    app: omnichat
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: omnichat
+  template:
+    metadata:
+      labels:
+        app: omnichat
+    spec:
+      containers:
+      - name: omnichat-runtime
+        image: omnichat/neural-engine:v3.2
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+            """.trimIndent()
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("content://omnichat/infra/Dockerfile"),
+            displayName = "Docker Multi-Stage Production Container.dockerfile",
+            sizeBytes = 9_800L,
+            mimeType = "text/plain",
+            kind = MediaKind.TEXT_DOCUMENT,
+            textPreview = """
+# Multi-stage production container build
+FROM eclipse-temurin:21-jdk-alpine AS builder
+WORKDIR /workspace
+COPY . .
+RUN ./gradlew assembleRelease --no-daemon
+
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY --from=builder /workspace/app/build/libs/*.jar /app/runner.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-XX:+UseZGC", "-jar", "/app/runner.jar"]
+            """.trimIndent()
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("content://omnichat/archives/open_source_repo.zip"),
+            displayName = "Open Source Framework Repository.zip",
+            sizeBytes = 44_200_000L,
+            mimeType = "application/zip",
+            kind = MediaKind.ARCHIVE,
+            textPreview = "Compressed Archive (ZIP)\nFiles: 1,420 source files\nCompressed Ratio: 68.4%\nStructure: src/main/kotlin, assets, resources"
         )
     )
 }
@@ -370,9 +537,19 @@ fun UniversalMediaPlayerScreen(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris: List<Uri> ->
         if (uris.isNotEmpty()) {
-            val items = uris.map { resolveMediaItemFromUri(context, it) }
+            val items = mutableListOf<PlayableMediaItem>()
+            for (u in uris) {
+                val uStr = u.toString().lowercase(Locale.ROOT)
+                if (uStr.endsWith(".m3u") || uStr.endsWith(".m3u8")) {
+                    val m3uTracks = parseM3uPlaylist(context, u)
+                    if (m3uTracks.isNotEmpty()) items.addAll(m3uTracks)
+                    else items.add(resolveMediaItemFromUri(context, u))
+                } else {
+                    items.add(resolveMediaItemFromUri(context, u))
+                }
+            }
             playlist.addAll(0, items)
-            activeMedia = items.first()
+            if (items.isNotEmpty()) activeMedia = items.first()
             Toast.makeText(context, "Imported ${items.size} file(s) into playlist", Toast.LENGTH_SHORT).show()
         }
     }
@@ -1390,7 +1567,8 @@ internal fun resolveMediaItemFromUri(context: Context, uri: Uri): PlayableMediaI
             matchesExt(".xml") || matchesExt(".csv") || matchesExt(".tsv") || matchesExt(".yaml") || matchesExt(".yml") ||
             matchesExt(".py") || matchesExt(".js") || matchesExt(".ts") || matchesExt(".java") || matchesExt(".c") || matchesExt(".cpp") ||
             matchesExt(".h") || matchesExt(".cs") || matchesExt(".rs") || matchesExt(".go") || matchesExt(".sh") || matchesExt(".sql") ||
-            matchesExt(".log") || matchesExt(".properties") || matchesExt(".gradle") || matchesExt(".toml") || matchesExt(".css") || matchesExt(".ini") || matchesExt(".env")
+            matchesExt(".log") || matchesExt(".properties") || matchesExt(".gradle") || matchesExt(".toml") || matchesExt(".css") || matchesExt(".ini") || matchesExt(".env") ||
+            matchesExt(".srt") || matchesExt(".vtt") || matchesExt(".m3u") || matchesExt(".pls") || matchesExt(".geojson")
 
     val isArchive = matchesExt(".zip") || matchesExt(".tar") || matchesExt(".gz") || matchesExt(".tgz") || matchesExt(".bz2") || matchesExt(".rar") || matchesExt(".7z") || matchesExt(".apk") || matchesExt(".jar")
 
@@ -1400,10 +1578,11 @@ internal fun resolveMediaItemFromUri(context: Context, uri: Uri): PlayableMediaI
             isAudio -> "audio/mpeg"
             isImage -> "image/jpeg"
             isPdf -> "application/pdf"
-            matchesExt(".json") -> "application/json"
+            matchesExt(".json") || matchesExt(".geojson") -> "application/json"
             matchesExt(".csv") -> "text/csv"
             matchesExt(".xml") -> "application/xml"
             matchesExt(".md") -> "text/markdown"
+            matchesExt(".m3u") || matchesExt(".m3u8") -> "application/x-mpegurl"
             matchesExt(".apk") -> "application/vnd.android.package-archive"
             matchesExt(".zip") -> "application/zip"
             isArchive -> "application/x-archive"
@@ -1475,4 +1654,34 @@ internal fun resolveMediaItemFromUri(context: Context, uri: Uri): PlayableMediaI
         durationMs = durationMs,
         textPreview = textPreview
     )
+}
+
+internal fun parseM3uPlaylist(context: Context, uri: Uri): List<PlayableMediaItem> {
+    val items = mutableListOf<PlayableMediaItem>()
+    try {
+        val stream = if (uri.scheme == "content") {
+            context.contentResolver.openInputStream(uri)
+        } else if (uri.scheme == "file") {
+            File(uri.path ?: "").inputStream()
+        } else null
+
+        stream?.bufferedReader()?.use { reader ->
+            var currentTitle: String? = null
+            reader.forEachLine { line ->
+                val trimmed = line.trim()
+                if (trimmed.startsWith("#EXTINF:", ignoreCase = true)) {
+                    currentTitle = trimmed.substringAfter(",").trim()
+                } else if (trimmed.isNotBlank() && !trimmed.startsWith("#")) {
+                    try {
+                        val trackUri = Uri.parse(trimmed)
+                        val resolved = resolveMediaItemFromUri(context, trackUri)
+                        val item = if (!currentTitle.isNullOrBlank()) resolved.copy(displayName = currentTitle!!) else resolved
+                        items.add(item)
+                    } catch (_: Exception) {}
+                    currentTitle = null
+                }
+            }
+        }
+    } catch (_: Exception) {}
+    return items
 }

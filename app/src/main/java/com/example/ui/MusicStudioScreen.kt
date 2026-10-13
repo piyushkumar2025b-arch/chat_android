@@ -169,7 +169,11 @@ fun MusicStudioScreen(
             BuiltInSong("track_2", "Midnight Lo-Fi Chill", "Atmosphere AI", "Lo-Fi Hip Hop", 85, SoundPreset.SOOTHING_RAIN),
             BuiltInSong("track_3", "Deep 432Hz Resonance", "Zen Harmonics", "Ambient Meditation", 60, SoundPreset.AMBIENT_DRONE),
             BuiltInSong("track_4", "Sub-Bass Heavy Impact", "Bass Nation", "Future Bass", 140, SoundPreset.BASS_DROP),
-            BuiltInSong("track_5", "Cosmic Starlight Pad", "Galaxy Beats", "Space Synth", 110, SoundPreset.COSMIC_PAD)
+            BuiltInSong("track_5", "Cosmic Starlight Pad", "Galaxy Beats", "Space Synth", 110, SoundPreset.COSMIC_PAD),
+            BuiltInSong("track_6", "Ocean Waves Surf Harmonics", "Pacific Nature", "Organic Ambient", 68, SoundPreset.OCEAN_SURF),
+            BuiltInSong("track_7", "Warm Vintage Vinyl Organ", "Analog Retro", "Lo-Fi Soul", 90, SoundPreset.ANALOG_WARMTH),
+            BuiltInSong("track_8", "Retro 8-Bit Arcade Run", "Pixel Audio", "Chiptune", 132, SoundPreset.RETRO_COIN),
+            BuiltInSong("track_9", "Crystal Harmonic Chimes", "Ethereal Bells", "New Age", 76, SoundPreset.CHIME_TRIAD)
         )
     }
 

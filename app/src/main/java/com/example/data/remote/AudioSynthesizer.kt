@@ -22,7 +22,9 @@ enum class SoundPreset(
     SOOTHING_RAIN("Gentle Rain & White Noise", "Relaxing continuous rain ambiance", "🌧️", 5.0f),
     RETRO_COIN("8-Bit Retro Coin", "Nostalgic arcade square-wave chirp", "🎮", 0.4f),
     BASS_DROP("Sub-Bass Impact", "Deep sub-harmonic bass drop resonance", "💥", 2.0f),
-    COSMIC_PAD("Cosmic Synth Pad", "Modulated dual sine wave space texture", "🌌", 4.0f)
+    COSMIC_PAD("Cosmic Synth Pad", "Modulated dual sine wave space texture", "🌌", 4.0f),
+    OCEAN_SURF("Ocean Waves & Surf", "Gentle rhythmic surf noise with low-pass tidal modulation", "🌊", 5.0f),
+    ANALOG_WARMTH("Warm Vinyl Crackle & Organ", "Subtle analog crackle with warm organ drone", "📻", 4.5f)
 }
 
 object AudioSynthesizer {
@@ -151,6 +153,32 @@ object AudioSynthesizer {
                     val envelope = sin(PI * (i.toDouble() / totalSamples))
                     val sample = (0.5 * s1 + 0.5 * s2) * envelope
                     buffer[i] = (sample * 29000).toInt().coerceIn(-32768, 32767).toShort()
+                }
+            }
+
+            SoundPreset.OCEAN_SURF -> {
+                var lastVal = 0.0
+                for (i in 0 until totalSamples) {
+                    val white = (random.nextDouble() * 2.0 - 1.0)
+                    lastVal = (lastVal * 0.96) + (white * 0.04)
+                    val t = i.toDouble() / SAMPLE_RATE
+                    val swell = 0.4 + 0.6 * sin(2.0 * PI * 0.2 * t).coerceAtLeast(0.0)
+                    val envelope = sin(PI * (i.toDouble() / totalSamples))
+                    val sample = lastVal * swell * envelope * 3.0
+                    buffer[i] = (sample * 27000).toInt().coerceIn(-32768, 32767).toShort()
+                }
+            }
+
+            SoundPreset.ANALOG_WARMTH -> {
+                val f1 = 220.0 // A3 warm organ
+                val f2 = 330.0 // E4
+                for (i in 0 until totalSamples) {
+                    val t = i.toDouble() / SAMPLE_RATE
+                    val crackle = if (random.nextDouble() < 0.003) (random.nextDouble() * 2.0 - 1.0) * 0.3 else 0.0
+                    val envelope = sin(PI * (i.toDouble() / totalSamples))
+                    val organ = (0.6 * sin(2.0 * PI * f1 * t) + 0.4 * sin(2.0 * PI * f2 * t))
+                    val sample = (organ * 0.8 + crackle) * envelope
+                    buffer[i] = (sample * 26000).toInt().coerceIn(-32768, 32767).toShort()
                 }
             }
         }

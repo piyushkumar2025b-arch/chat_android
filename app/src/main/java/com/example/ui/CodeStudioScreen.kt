@@ -139,7 +139,7 @@ fun CodeStudioScreen(
 
     // Language dropdown
     var showLangDropdown by remember { mutableStateOf(false) }
-    val languages = listOf("HTML/JS", "Python", "Kotlin", "JavaScript", "TypeScript", "JSON", "C++", "SQL", "Bash")
+    val languages = listOf("HTML/JS", "Python", "Kotlin", "Rust", "Go", "Java", "JavaScript", "TypeScript", "JSON", "YAML", "C++", "SQL", "Bash")
 
     // File Picker for any code file
     val codeFilePickerLauncher = rememberLauncherForActivityResult(
@@ -156,18 +156,22 @@ fun CodeStudioScreen(
                         val name = uri.lastPathSegment?.substringAfterLast('/') ?: "code_file"
                         fileName = name
                         selectedLanguage = when {
-                            name.endsWith(".html", ignoreCase = true) -> "HTML/JS"
+                            name.endsWith(".html", ignoreCase = true) || name.endsWith(".htm", ignoreCase = true) -> "HTML/JS"
                             name.endsWith(".py", ignoreCase = true) -> "Python"
-                            name.endsWith(".kt", ignoreCase = true) -> "Kotlin"
+                            name.endsWith(".kt", ignoreCase = true) || name.endsWith(".kts", ignoreCase = true) -> "Kotlin"
+                            name.endsWith(".rs", ignoreCase = true) -> "Rust"
+                            name.endsWith(".go", ignoreCase = true) -> "Go"
+                            name.endsWith(".java", ignoreCase = true) -> "Java"
                             name.endsWith(".js", ignoreCase = true) -> "JavaScript"
                             name.endsWith(".ts", ignoreCase = true) -> "TypeScript"
                             name.endsWith(".json", ignoreCase = true) -> "JSON"
-                            name.endsWith(".cpp", ignoreCase = true) || name.endsWith(".c", ignoreCase = true) -> "C++"
+                            name.endsWith(".yaml", ignoreCase = true) || name.endsWith(".yml", ignoreCase = true) -> "YAML"
+                            name.endsWith(".cpp", ignoreCase = true) || name.endsWith(".c", ignoreCase = true) || name.endsWith(".h", ignoreCase = true) -> "C++"
                             name.endsWith(".sql", ignoreCase = true) -> "SQL"
-                            name.endsWith(".sh", ignoreCase = true) -> "Bash"
+                            name.endsWith(".sh", ignoreCase = true) || name.endsWith(".bash", ignoreCase = true) -> "Bash"
                             else -> "Code"
                         }
-                        if (name.endsWith(".html", ignoreCase = true)) {
+                        if (name.endsWith(".html", ignoreCase = true) || name.endsWith(".htm", ignoreCase = true)) {
                             selectedTab = 1 // Switch to web preview
                         } else {
                             selectedTab = 0
@@ -186,7 +190,10 @@ fun CodeStudioScreen(
         CodeTemplate("Neon Calculator", "HTML/JS", "🧮", getHtmlCalculatorTemplate()),
         CodeTemplate("Python Data Alg", "Python", "🐍", getPythonAlgorithmTemplate()),
         CodeTemplate("Kotlin Coroutines", "Kotlin", "⚡", getKotlinDemoTemplate()),
-        CodeTemplate("JS Async Fetcher", "JavaScript", "📜", getJsDemoTemplate())
+        CodeTemplate("JS Async Fetcher", "JavaScript", "📜", getJsDemoTemplate()),
+        CodeTemplate("Rust Vector SIMD", "Rust", "🦀", getRustDemoTemplate()),
+        CodeTemplate("Go Worker Pool", "Go", "🐹", getGoDemoTemplate()),
+        CodeTemplate("SQL Analytics Engine", "SQL", "📊", getSqlDemoTemplate())
     )
 
     fun executeCodeWithAi() {
@@ -368,11 +375,16 @@ Status: SUCCESS (Code 0)
                                     "HTML/JS" -> "html"
                                     "Python" -> "py"
                                     "Kotlin" -> "kt"
+                                    "Rust" -> "rs"
+                                    "Go" -> "go"
+                                    "Java" -> "java"
                                     "JavaScript" -> "js"
                                     "TypeScript" -> "ts"
                                     "JSON" -> "json"
+                                    "YAML" -> "yaml"
                                     "C++" -> "cpp"
                                     "SQL" -> "sql"
+                                    "Bash" -> "sh"
                                     else -> "txt"
                                 }
                                 MediaSaver.saveDocumentToDownloads(
@@ -1108,3 +1120,79 @@ async function fetchAsyncTokens() {
 fetchAsyncTokens().then(res => console.log("Execution Done:", res));
 """.trimIndent()
 }
+
+private fun getRustDemoTemplate(): String = """
+// Rust High-Performance SIMD Vector Calculations
+fn main() {
+    println!("🦀 Initializing Rust SIMD Vector Pipeline...");
+    let vector_a: Vec<f64> = (0..10_000).map(|i| i as f64 * 1.5).collect();
+    let vector_b: Vec<f64> = (0..10_000).map(|i| i as f64 * 2.5).collect();
+
+    let dot_product: f64 = vector_a.iter().zip(vector_b.iter()).map(|(a, b)| a * b).sum();
+    println!("Calculated 10,000-dimensional Dot Product: {:.4}", dot_product);
+    println!("Status: Memory Safe Zero-Cost Abstraction [Code 0]");
+}
+""".trimIndent()
+
+private fun getGoDemoTemplate(): String = """
+package main
+
+import (
+    "fmt"
+    "sync"
+    "time"
+)
+
+// Go Concurrent Worker Pool Architecture
+func worker(id int, jobs <-chan int, results chan<- int, wg *sync.WaitGroup) {
+    defer wg.Done()
+    for j := range jobs {
+        time.Sleep(20 * time.Millisecond)
+        results <- j * 2
+    }
+}
+
+func main() {
+    fmt.Println("🐹 Starting Go Concurrency Worker Pool...")
+    numJobs := 10
+    jobs := make(chan int, numJobs)
+    results := make(chan int, numJobs)
+    var wg sync.WaitGroup
+
+    for w := 1; w <= 3; w++ {
+        wg.Add(1)
+        go worker(w, jobs, results, &wg)
+    }
+
+    for j := 1; j <= numJobs; j++ {
+        jobs <- j
+    }
+    close(jobs)
+    wg.Wait()
+    close(results)
+
+    fmt.Printf("Processed %d jobs concurrently with 3 goroutines.\n", numJobs)
+}
+""".trimIndent()
+
+private fun getSqlDemoTemplate(): String = """
+-- Analytical Window Aggregations and Cohort Retention
+WITH daily_metrics AS (
+    SELECT 
+        DATE(created_at) as event_date,
+        COUNT(DISTINCT user_id) as active_users,
+        SUM(amount_usd) as daily_revenue
+    FROM transactions
+    WHERE created_at >= NOW() - INTERVAL '30 days'
+    GROUP BY 1
+)
+SELECT 
+    event_date,
+    active_users,
+    daily_revenue,
+    AVG(daily_revenue) OVER (ORDER BY event_date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) as rolling_7d_avg,
+    RANK() OVER (ORDER BY daily_revenue DESC) as revenue_rank
+FROM daily_metrics
+ORDER BY event_date DESC;
+""".trimIndent()
+
