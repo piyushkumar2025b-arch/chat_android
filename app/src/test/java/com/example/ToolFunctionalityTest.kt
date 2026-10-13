@@ -79,6 +79,40 @@ class ToolFunctionalityTest {
         val imageUri = Uri.parse("https://example.com/photos/avatar.png")
         val imageItem = resolveMediaItemFromUri(context, imageUri)
         assertEquals(MediaKind.IMAGE, imageItem.kind)
+
+        // Archive / APK URI
+        val apkUri = Uri.parse("https://example.com/packages/bundle.apk")
+        val apkItem = resolveMediaItemFromUri(context, apkUri)
+        assertEquals(MediaKind.ARCHIVE, apkItem.kind)
+
+        val zipUri = Uri.parse("https://example.com/archive/backup.zip")
+        val zipItem = resolveMediaItemFromUri(context, zipUri)
+        assertEquals(MediaKind.ARCHIVE, zipItem.kind)
+        assertEquals("application/zip", zipItem.mimeType)
+
+        // Code / CSV / Python URI
+        val csvUri = Uri.parse("https://example.com/data/metrics.csv")
+        val csvItem = resolveMediaItemFromUri(context, csvUri)
+        assertEquals(MediaKind.TEXT_DOCUMENT, csvItem.kind)
+        assertEquals("text/csv", csvItem.mimeType)
+
+        val pyUri = Uri.parse("https://example.com/scripts/simulator.py")
+        val pyItem = resolveMediaItemFromUri(context, pyUri)
+        assertEquals(MediaKind.TEXT_DOCUMENT, pyItem.kind)
+    }
+
+    @Test
+    fun testCuratedMediaSourcesCompleteness() {
+        val sources = com.example.ui.CuratedMediaSources.sampleSources
+        assertTrue("Must contain at least 15 curated sample sources", sources.size >= 15)
+        assertTrue(sources.any { it.kind == MediaKind.VIDEO })
+        assertTrue(sources.any { it.kind == MediaKind.AUDIO })
+        assertTrue(sources.any { it.kind == MediaKind.TEXT_DOCUMENT })
+        assertTrue(sources.any { it.kind == MediaKind.ARCHIVE })
+        for (item in sources) {
+            assertTrue(item.displayName.isNotBlank())
+            assertTrue(item.mimeType.isNotBlank())
+        }
     }
 
     // --- 2048 Game Engine Tests ---

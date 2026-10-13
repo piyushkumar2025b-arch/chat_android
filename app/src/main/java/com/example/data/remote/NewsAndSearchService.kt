@@ -155,7 +155,26 @@ object NewsFeedService {
                 "The Hacker News" to "https://feeds.feedburner.com/TheHackersNews",
                 "BleepingComputer" to "https://www.bleepingcomputer.com/feed/",
                 "Dark Reading" to "https://www.darkreading.com/rss.xml",
-                "Krebs on Security" to "https://krebsonsecurity.com/feed/"
+                "Krebs on Security" to "https://krebsonsecurity.com/feed/",
+                "Schneier on Security" to "https://www.schneier.com/feed/atom/"
+            )
+        ),
+        OPEN_SOURCE_DEV(
+            "Open Source & Code",
+            listOf(
+                "GitHub Blog" to "https://github.blog/feed/",
+                "Dev.to" to "https://dev.to/feed",
+                "InfoQ Dev" to "https://feed.infoq.com/",
+                "Kotlin Blog" to "https://blog.jetbrains.com/kotlin/feed/"
+            )
+        ),
+        SPACE_ASTRONOMY(
+            "Space & Universe",
+            listOf(
+                "NASA Breaking News" to "https://www.nasa.gov/news-release/feed/",
+                "Space.com" to "https://www.space.com/feeds/all",
+                "European Space Agency" to "https://www.esa.int/rssfeed/Our_Activities/Space_News",
+                "Astronomy Magazine" to "https://www.astronomy.com/feed/"
             )
         )
     }

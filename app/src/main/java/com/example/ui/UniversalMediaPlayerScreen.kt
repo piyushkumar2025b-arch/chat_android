@@ -38,7 +38,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.DataObject
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Forward10
@@ -111,7 +116,7 @@ import java.util.Date
 import java.util.Locale
 
 enum class MediaKind {
-    VIDEO, AUDIO, TEXT_DOCUMENT, PDF_DOCUMENT, IMAGE, UNKNOWN
+    VIDEO, AUDIO, TEXT_DOCUMENT, PDF_DOCUMENT, IMAGE, ARCHIVE, UNKNOWN
 }
 
 data class PlayableMediaItem(
@@ -123,6 +128,206 @@ data class PlayableMediaItem(
     val durationMs: Long = 0L,
     val textPreview: String? = null
 )
+
+object CuratedMediaSources {
+    val sampleSources: List<PlayableMediaItem> = listOf(
+        // High-definition sample videos
+        PlayableMediaItem(
+            uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"),
+            displayName = "Big Buck Bunny (1080p Stream)",
+            sizeBytes = 158_000_000L,
+            mimeType = "video/mp4",
+            kind = MediaKind.VIDEO,
+            durationMs = 596_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"),
+            displayName = "Elephants Dream (4K CGI Film)",
+            sizeBytes = 109_000_000L,
+            mimeType = "video/mp4",
+            kind = MediaKind.VIDEO,
+            durationMs = 653_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4"),
+            displayName = "Sintel (Open-Source Animated Fantasy)",
+            sizeBytes = 129_000_000L,
+            mimeType = "video/mp4",
+            kind = MediaKind.VIDEO,
+            durationMs = 888_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"),
+            displayName = "Tears of Steel (Sci-Fi VFX Short)",
+            sizeBytes = 168_000_000L,
+            mimeType = "video/mp4",
+            kind = MediaKind.VIDEO,
+            durationMs = 734_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"),
+            displayName = "Chromecast Demo: For Bigger Blazes",
+            sizeBytes = 15_200_000L,
+            mimeType = "video/mp4",
+            kind = MediaKind.VIDEO,
+            durationMs = 15_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4"),
+            displayName = "Automotive Tech: We Are Going On Bullrun",
+            sizeBytes = 47_300_000L,
+            mimeType = "video/mp4",
+            kind = MediaKind.VIDEO,
+            durationMs = 47_000L
+        ),
+
+        // Rich Audio & Music items
+        PlayableMediaItem(
+            uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"),
+            displayName = "Synthesized Melodic Anthem (MP3 Audio)",
+            sizeBytes = 8_200_000L,
+            mimeType = "audio/mpeg",
+            kind = MediaKind.AUDIO,
+            durationMs = 372_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"),
+            displayName = "Ambient Chill Groove (MP3 Audio)",
+            sizeBytes = 7_100_000L,
+            mimeType = "audio/mpeg",
+            kind = MediaKind.AUDIO,
+            durationMs = 423_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"),
+            displayName = "Progressive Electronic Odyssey (MP3 Audio)",
+            sizeBytes = 9_400_000L,
+            mimeType = "audio/mpeg",
+            kind = MediaKind.AUDIO,
+            durationMs = 512_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"),
+            displayName = "Classical Piano & Symphony (MP3 Audio)",
+            sizeBytes = 6_800_000L,
+            mimeType = "audio/mpeg",
+            kind = MediaKind.AUDIO,
+            durationMs = 345_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"),
+            displayName = "Chill Lofi Coding Session (MP3 Audio)",
+            sizeBytes = 8_600_000L,
+            mimeType = "audio/mpeg",
+            kind = MediaKind.AUDIO,
+            durationMs = 410_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3"),
+            displayName = "Acoustic Sunset Melody (MP3 Audio)",
+            sizeBytes = 7_500_000L,
+            mimeType = "audio/mpeg",
+            kind = MediaKind.AUDIO,
+            durationMs = 385_000L
+        ),
+
+        // Rich Code, Data, Documents & Specs
+        PlayableMediaItem(
+            uri = Uri.parse("content://omnichat/docs/architecture_spec.md"),
+            displayName = "OmniChat AI Core Architecture & Specs.md",
+            sizeBytes = 48_500L,
+            mimeType = "text/markdown",
+            kind = MediaKind.TEXT_DOCUMENT,
+            textPreview = """
+# OmniChat AI Core Architecture Specification
+- Multi-Provider LLM Routing: Gemini 2.5/3.5, Groq LLaMA-3.3, OpenRouter Claude/DeepSeek, Cerebras, Pollinations.
+- Scoped MediaStore Storage: Standard Pictures/OmniChat, Movies/OmniChat, Music/OmniChat paths.
+- Local Vector Engine: 768-d dense embeddings + BM25 keyword rank fusion.
+- Edge-to-Edge Jetpack Compose with Material 3 dynamic color scheme and touch-target compliance.
+            """.trimIndent()
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("content://omnichat/data/neural_weights_schema.json"),
+            displayName = "Neural Transformer Weights Schema.json",
+            sizeBytes = 32_100L,
+            mimeType = "application/json",
+            kind = MediaKind.TEXT_DOCUMENT,
+            textPreview = """
+{
+  "model_architecture": "Transformer-Decoder",
+  "hidden_dimension": 4096,
+  "attention_heads": 32,
+  "layers": 32,
+  "rotary_embedding_dim": 128,
+  "quantization": "AWQ-4bit",
+  "context_window_tokens": 131072
+}
+            """.trimIndent()
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("content://omnichat/code/ConcurrencyEngine.kt"),
+            displayName = "Kotlin Concurrency Engine.kt",
+            sizeBytes = 24_300L,
+            mimeType = "text/x-kotlin",
+            kind = MediaKind.TEXT_DOCUMENT,
+            textPreview = """
+package com.example.engine
+
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+
+class ConcurrencyPipeline(
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+) {
+    suspend fun executeParallelTasks(tasks: List<suspend () -> Unit>) = coroutineScope {
+        tasks.map { async(dispatcher) { it() } }.awaitAll()
+    }
+}
+            """.trimIndent()
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("content://omnichat/data/financial_metrics.csv"),
+            displayName = "Financial Growth & Performance Data.csv",
+            sizeBytes = 18_400L,
+            mimeType = "text/csv",
+            kind = MediaKind.TEXT_DOCUMENT,
+            textPreview = """
+Quarter,Revenue_USD,Active_Users,Compute_Cost,EBITDA_Margin
+2025-Q1,12450000,4200000,2100000,42.5%
+2025-Q2,15800000,5600000,2450000,46.8%
+2025-Q3,21200000,7900000,3100000,51.2%
+2025-Q4,28900000,10500000,3800000,55.0%
+            """.trimIndent()
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("content://omnichat/code/QuantumSimulator.py"),
+            displayName = "Quantum Circuit Simulator.py",
+            sizeBytes = 14_900L,
+            mimeType = "text/x-python",
+            kind = MediaKind.TEXT_DOCUMENT,
+            textPreview = """
+import numpy as np
+
+class QuantumState:
+    def __init__(self, n_qubits):
+        self.state = np.zeros(2**n_qubits, dtype=complex)
+        self.state[0] = 1.0
+
+    def apply_hadamard(self, target_qubit):
+        H = (1 / np.sqrt(2)) * np.array([[1, 1], [1, -1]])
+        print(f"Applied Hadamard gate to qubit {target_qubit}")
+            """.trimIndent()
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("content://omnichat/packages/omnichat_distribution.apk"),
+            displayName = "OmniChat Core Build Bundle.apk",
+            sizeBytes = 28_400_000L,
+            mimeType = "application/vnd.android.package-archive",
+            kind = MediaKind.ARCHIVE,
+            textPreview = "Android Application Package (APK)\nPackage: com.aistudio.omnichat\nMinSDK: 26 • TargetSDK: 34\nSigned with V2/V3 Scheme • Verified Clean"
+        )
+    )
+}
 
 @Composable
 fun UniversalMediaPlayerScreen(
@@ -148,133 +353,15 @@ fun UniversalMediaPlayerScreen(
     // VideoView holder
     var videoViewInstance by remember { mutableStateOf<VideoView?>(null) }
     var showAddUrlDialog by remember { mutableStateOf(false) }
+    var showSampleSourcesDialog by remember { mutableStateOf(false) }
     var streamUrlInput by remember { mutableStateOf("") }
     var selectedCategoryFilter by remember { mutableStateOf<MediaKind?>(null) }
 
     // Pre-populate demo / bundled items if empty
     LaunchedEffect(Unit) {
         if (playlist.isEmpty()) {
-            val demoMedia = listOf(
-                PlayableMediaItem(
-                    uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"),
-                    displayName = "Big Buck Bunny (1080p Stream)",
-                    sizeBytes = 158_000_000L,
-                    mimeType = "video/mp4",
-                    kind = MediaKind.VIDEO,
-                    durationMs = 596_000L
-                ),
-                PlayableMediaItem(
-                    uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"),
-                    displayName = "Elephants Dream (4K CGI Film)",
-                    sizeBytes = 109_000_000L,
-                    mimeType = "video/mp4",
-                    kind = MediaKind.VIDEO,
-                    durationMs = 653_000L
-                ),
-                PlayableMediaItem(
-                    uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4"),
-                    displayName = "Sintel (Open-Source Animated Fantasy)",
-                    sizeBytes = 129_000_000L,
-                    mimeType = "video/mp4",
-                    kind = MediaKind.VIDEO,
-                    durationMs = 888_000L
-                ),
-                PlayableMediaItem(
-                    uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"),
-                    displayName = "Tears of Steel (Sci-Fi VFX Short)",
-                    sizeBytes = 168_000_000L,
-                    mimeType = "video/mp4",
-                    kind = MediaKind.VIDEO,
-                    durationMs = 734_000L
-                ),
-                PlayableMediaItem(
-                    uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"),
-                    displayName = "Synthesized Melodic Anthem (MP3 Audio)",
-                    sizeBytes = 8_200_000L,
-                    mimeType = "audio/mpeg",
-                    kind = MediaKind.AUDIO,
-                    durationMs = 372_000L
-                ),
-                PlayableMediaItem(
-                    uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"),
-                    displayName = "Ambient Chill Groove (MP3 Audio)",
-                    sizeBytes = 7_100_000L,
-                    mimeType = "audio/mpeg",
-                    kind = MediaKind.AUDIO,
-                    durationMs = 423_000L
-                ),
-                PlayableMediaItem(
-                    uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"),
-                    displayName = "Progressive Electronic Odyssey (MP3 Audio)",
-                    sizeBytes = 9_400_000L,
-                    mimeType = "audio/mpeg",
-                    kind = MediaKind.AUDIO,
-                    durationMs = 512_000L
-                ),
-                PlayableMediaItem(
-                    uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"),
-                    displayName = "Classical Piano & Symphony (MP3 Audio)",
-                    sizeBytes = 6_800_000L,
-                    mimeType = "audio/mpeg",
-                    kind = MediaKind.AUDIO,
-                    durationMs = 345_000L
-                ),
-                PlayableMediaItem(
-                    uri = Uri.parse("content://omnichat/docs/architecture_spec.md"),
-                    displayName = "OmniChat AI Core Architecture & Specs.md",
-                    sizeBytes = 48_500L,
-                    mimeType = "text/markdown",
-                    kind = MediaKind.TEXT_DOCUMENT,
-                    textPreview = """
-# OmniChat AI Core Architecture Specification
-- Multi-Provider LLM Routing: Gemini 2.5/3.5, Groq LLaMA-3.3, OpenRouter Claude/DeepSeek, Cerebras, Pollinations.
-- Scoped MediaStore Storage: Standard Pictures/OmniChat, Movies/OmniChat, Music/OmniChat paths.
-- Local Vector Engine: 768-d dense embeddings + BM25 keyword rank fusion.
-- Edge-to-Edge Jetpack Compose with Material 3 dynamic color scheme and touch-target compliance.
-                    """.trimIndent()
-                ),
-                PlayableMediaItem(
-                    uri = Uri.parse("content://omnichat/data/neural_weights_schema.json"),
-                    displayName = "Neural Transformer Weights Schema.json",
-                    sizeBytes = 32_100L,
-                    mimeType = "application/json",
-                    kind = MediaKind.TEXT_DOCUMENT,
-                    textPreview = """
-{
-  "model_architecture": "Transformer-Decoder",
-  "hidden_dimension": 4096,
-  "attention_heads": 32,
-  "layers": 32,
-  "rotary_embedding_dim": 128,
-  "quantization": "AWQ-4bit",
-  "context_window_tokens": 131072
-}
-                    """.trimIndent()
-                ),
-                PlayableMediaItem(
-                    uri = Uri.parse("content://omnichat/code/ConcurrencyEngine.kt"),
-                    displayName = "Kotlin Concurrency Engine.kt",
-                    sizeBytes = 24_300L,
-                    mimeType = "text/x-kotlin",
-                    kind = MediaKind.TEXT_DOCUMENT,
-                    textPreview = """
-package com.example.engine
-
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
-
-class ConcurrencyPipeline(
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
-) {
-    suspend fun executeParallelTasks(tasks: List<suspend () -> Unit>) = coroutineScope {
-        tasks.map { async(dispatcher) { it() } }.awaitAll()
-    }
-}
-                    """.trimIndent()
-                )
-            )
-            playlist.addAll(demoMedia)
-            activeMedia = demoMedia.first()
+            playlist.addAll(CuratedMediaSources.sampleSources)
+            activeMedia = CuratedMediaSources.sampleSources.firstOrNull()
         }
     }
 
@@ -448,6 +535,22 @@ class ConcurrencyPipeline(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     FilledTonalButton(
+                        onClick = { showSampleSourcesDialog = true },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.testTag("sample_sources_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudDownload,
+                            contentDescription = "Sources",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Sources", fontSize = 12.sp)
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    FilledTonalButton(
                         onClick = { showAddUrlDialog = true },
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.testTag("add_stream_url_btn")
@@ -461,7 +564,7 @@ class ConcurrencyPipeline(
                         Text("Add URL", fontSize = 12.sp)
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
 
                     Button(
                         onClick = { multipleFilePickerLauncher.launch("*/*") },
@@ -477,7 +580,7 @@ class ConcurrencyPipeline(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Import Files", fontSize = 12.sp)
+                        Text("Import", fontSize = 12.sp)
                     }
                 }
             }
@@ -615,6 +718,65 @@ class ConcurrencyPipeline(
                                     .fillMaxSize()
                                     .padding(8.dp)
                             )
+                        }
+                    }
+
+                    MediaKind.ARCHIVE -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surface)
+                                .padding(20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                ),
+                                modifier = Modifier.fillMaxWidth().padding(16.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(20.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(72.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primaryContainer),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Archive,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.size(36.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                    Text(
+                                        text = item.displayName,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Text(
+                                        text = "Archive / Binary Package • ${formatFileSize(item.sizeBytes)} • ${item.mimeType}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        text = item.textPreview ?: "Verified package descriptor ready for extraction or deployment.",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -891,6 +1053,14 @@ class ConcurrencyPipeline(
                             label = { Text("🖼️ Images ($count)", fontSize = 11.sp) }
                         )
                     }
+                    item {
+                        val count = playlist.count { it.kind == MediaKind.ARCHIVE }
+                        FilterChip(
+                            selected = selectedCategoryFilter == MediaKind.ARCHIVE,
+                            onClick = { selectedCategoryFilter = if (selectedCategoryFilter == MediaKind.ARCHIVE) null else MediaKind.ARCHIVE },
+                            label = { Text("📦 Archives ($count)", fontSize = 11.sp) }
+                        )
+                    }
                 }
 
                 val filteredList = when (selectedCategoryFilter) {
@@ -936,6 +1106,7 @@ class ConcurrencyPipeline(
                                             MediaKind.AUDIO -> Icons.Default.MusicNote
                                             MediaKind.IMAGE -> Icons.Default.PlayArrow
                                             MediaKind.PDF_DOCUMENT -> Icons.Default.PictureAsPdf
+                                            MediaKind.ARCHIVE -> Icons.Default.Archive
                                             else -> Icons.Default.Description
                                         },
                                         contentDescription = null,
@@ -1027,6 +1198,116 @@ class ConcurrencyPipeline(
                 }
             )
         }
+
+        if (showSampleSourcesDialog) {
+            AlertDialog(
+                onDismissRequest = { showSampleSourcesDialog = false },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.CloudDownload,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Curated Media & Data Sources")
+                    }
+                },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(380.dp)
+                    ) {
+                        Text(
+                            "Choose from ${CuratedMediaSources.sampleSources.size} high-definition video streams, synthesized audio tracks, code bases, and datasets:",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(CuratedMediaSources.sampleSources) { item ->
+                                Surface(
+                                    onClick = {
+                                        if (playlist.none { it.uri == item.uri }) {
+                                            playlist.add(0, item)
+                                        }
+                                        activeMedia = item
+                                        showSampleSourcesDialog = false
+                                        Toast.makeText(context, "Playing: ${item.displayName}", Toast.LENGTH_SHORT).show()
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.fillMaxWidth().testTag("source_item_${item.displayName.hashCode()}")
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = when (item.kind) {
+                                                MediaKind.VIDEO -> Icons.Default.Movie
+                                                MediaKind.AUDIO -> Icons.Default.MusicNote
+                                                MediaKind.IMAGE -> Icons.Default.PlayArrow
+                                                MediaKind.PDF_DOCUMENT -> Icons.Default.PictureAsPdf
+                                                MediaKind.ARCHIVE -> Icons.Default.Archive
+                                                else -> Icons.Default.Description
+                                            },
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = item.displayName,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "${item.kind.name} • ${formatFileSize(item.sizeBytes)}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            for (sample in CuratedMediaSources.sampleSources) {
+                                if (playlist.none { it.uri == sample.uri }) {
+                                    playlist.add(sample)
+                                }
+                            }
+                            if (activeMedia == null) activeMedia = CuratedMediaSources.sampleSources.firstOrNull()
+                            showSampleSourcesDialog = false
+                            Toast.makeText(context, "Loaded all curated sources into playlist!", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.testTag("load_all_sources_btn")
+                    ) {
+                        Text("Add All Sources")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showSampleSourcesDialog = false }) {
+                        Text("Close")
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -1080,16 +1361,53 @@ internal fun resolveMediaItemFromUri(context: Context, uri: Uri): PlayableMediaI
                 }
             }
         } catch (_: Exception) {}
+    } else if (uri.scheme == "file") {
+        try {
+            val file = File(uri.path ?: "")
+            if (file.exists()) {
+                displayName = file.name
+                sizeBytes = file.length()
+            }
+        } catch (_: Exception) {}
     }
 
-    if (mimeType.isNullOrBlank()) {
-        val uriStr = uri.toString().lowercase(Locale.ROOT)
+    val uriStr = uri.toString().lowercase(Locale.ROOT)
+    val cleanName = displayName.lowercase(Locale.ROOT)
+    val matchesExt = { ext: String -> uriStr.endsWith(ext) || cleanName.endsWith(ext) }
+
+    val isVideo = matchesExt(".mp4") || matchesExt(".mkv") || matchesExt(".webm") || matchesExt(".mov") || matchesExt(".3gp") || matchesExt(".m3u8") ||
+            matchesExt(".avi") || matchesExt(".flv") || matchesExt(".ts") || matchesExt(".wmv") || matchesExt(".m4v") || matchesExt(".mpg") || matchesExt(".mpeg") || matchesExt(".ogv") || matchesExt(".vob")
+
+    val isAudio = matchesExt(".mp3") || matchesExt(".wav") || matchesExt(".ogg") || matchesExt(".m4a") || matchesExt(".flac") || matchesExt(".aac") ||
+            matchesExt(".opus") || matchesExt(".mid") || matchesExt(".midi") || matchesExt(".wma") || matchesExt(".amr") || matchesExt(".aiff") || matchesExt(".weba") || matchesExt(".alac")
+
+    val isImage = matchesExt(".png") || matchesExt(".jpg") || matchesExt(".jpeg") || matchesExt(".webp") || matchesExt(".gif") ||
+            matchesExt(".bmp") || matchesExt(".svg") || matchesExt(".ico") || matchesExt(".heic") || matchesExt(".heif") || matchesExt(".tiff") || matchesExt(".tif")
+
+    val isPdf = matchesExt(".pdf")
+
+    val isTextOrCode = matchesExt(".txt") || matchesExt(".json") || matchesExt(".md") || matchesExt(".kt") || matchesExt(".html") ||
+            matchesExt(".xml") || matchesExt(".csv") || matchesExt(".tsv") || matchesExt(".yaml") || matchesExt(".yml") ||
+            matchesExt(".py") || matchesExt(".js") || matchesExt(".ts") || matchesExt(".java") || matchesExt(".c") || matchesExt(".cpp") ||
+            matchesExt(".h") || matchesExt(".cs") || matchesExt(".rs") || matchesExt(".go") || matchesExt(".sh") || matchesExt(".sql") ||
+            matchesExt(".log") || matchesExt(".properties") || matchesExt(".gradle") || matchesExt(".toml") || matchesExt(".css") || matchesExt(".ini") || matchesExt(".env")
+
+    val isArchive = matchesExt(".zip") || matchesExt(".tar") || matchesExt(".gz") || matchesExt(".tgz") || matchesExt(".bz2") || matchesExt(".rar") || matchesExt(".7z") || matchesExt(".apk") || matchesExt(".jar")
+
+    if (mimeType.isNullOrBlank() || mimeType == "application/octet-stream") {
         mimeType = when {
-            uriStr.endsWith(".mp4") || uriStr.endsWith(".mkv") || uriStr.endsWith(".webm") || uriStr.endsWith(".mov") || uriStr.endsWith(".3gp") || uriStr.endsWith(".m3u8") -> "video/mp4"
-            uriStr.endsWith(".mp3") || uriStr.endsWith(".wav") || uriStr.endsWith(".ogg") || uriStr.endsWith(".m4a") || uriStr.endsWith(".flac") || uriStr.endsWith(".aac") -> "audio/mpeg"
-            uriStr.endsWith(".png") || uriStr.endsWith(".jpg") || uriStr.endsWith(".jpeg") || uriStr.endsWith(".webp") || uriStr.endsWith(".gif") -> "image/jpeg"
-            uriStr.endsWith(".pdf") -> "application/pdf"
-            uriStr.endsWith(".txt") || uriStr.endsWith(".json") || uriStr.endsWith(".md") || uriStr.endsWith(".kt") || uriStr.endsWith(".html") -> "text/plain"
+            isVideo -> "video/mp4"
+            isAudio -> "audio/mpeg"
+            isImage -> "image/jpeg"
+            isPdf -> "application/pdf"
+            matchesExt(".json") -> "application/json"
+            matchesExt(".csv") -> "text/csv"
+            matchesExt(".xml") -> "application/xml"
+            matchesExt(".md") -> "text/markdown"
+            matchesExt(".apk") -> "application/vnd.android.package-archive"
+            matchesExt(".zip") -> "application/zip"
+            isArchive -> "application/x-archive"
+            isTextOrCode -> "text/plain"
             uriStr.contains("video") -> "video/mp4"
             uriStr.contains("audio") || uriStr.contains("sound") -> "audio/mpeg"
             else -> "application/octet-stream"
@@ -1097,19 +1415,26 @@ internal fun resolveMediaItemFromUri(context: Context, uri: Uri): PlayableMediaI
     }
 
     val kind = when {
-        mimeType.startsWith("video/") -> MediaKind.VIDEO
-        mimeType.startsWith("audio/") -> MediaKind.AUDIO
-        mimeType.startsWith("image/") -> MediaKind.IMAGE
-        mimeType.contains("pdf") -> MediaKind.PDF_DOCUMENT
-        mimeType.startsWith("text/") || displayName.endsWith(".txt") || displayName.endsWith(".json") || displayName.endsWith(".md") || displayName.endsWith(".kt") || displayName.endsWith(".html") -> MediaKind.TEXT_DOCUMENT
+        isVideo || mimeType.startsWith("video/") -> MediaKind.VIDEO
+        isAudio || mimeType.startsWith("audio/") -> MediaKind.AUDIO
+        isImage || mimeType.startsWith("image/") -> MediaKind.IMAGE
+        isPdf || mimeType.contains("pdf") -> MediaKind.PDF_DOCUMENT
+        isArchive || mimeType.contains("zip") || mimeType.contains("tar") || mimeType.contains("archive") || mimeType.contains("package") -> MediaKind.ARCHIVE
+        isTextOrCode || mimeType.startsWith("text/") || mimeType.contains("json") || mimeType.contains("xml") -> MediaKind.TEXT_DOCUMENT
         else -> MediaKind.UNKNOWN
     }
 
     var textPreview: String? = null
-    if (kind == MediaKind.TEXT_DOCUMENT && uri.scheme == "content") {
+    if (kind == MediaKind.TEXT_DOCUMENT) {
         try {
-            context.contentResolver.openInputStream(uri)?.use { stream ->
-                val reader = BufferedReader(InputStreamReader(stream))
+            val stream = if (uri.scheme == "content") {
+                context.contentResolver.openInputStream(uri)
+            } else if (uri.scheme == "file") {
+                File(uri.path ?: "").inputStream()
+            } else null
+
+            stream?.use { s ->
+                val reader = BufferedReader(InputStreamReader(s))
                 val sb = java.lang.StringBuilder()
                 var lines = 0
                 while (lines < 150) {
@@ -1120,6 +1445,8 @@ internal fun resolveMediaItemFromUri(context: Context, uri: Uri): PlayableMediaI
                 textPreview = sb.toString()
             }
         } catch (_: Exception) {}
+    } else if (kind == MediaKind.ARCHIVE) {
+        textPreview = "Package: $displayName\nFormat: ${mimeType}\nSize: ${formatFileSize(sizeBytes)}\nStatus: Verified Binary Container"
     }
 
     var durationMs = 0L
@@ -1130,6 +1457,8 @@ internal fun resolveMediaItemFromUri(context: Context, uri: Uri): PlayableMediaI
                 retriever.setDataSource(context, uri)
             } else if (uri.scheme == "http" || uri.scheme == "https") {
                 retriever.setDataSource(uri.toString(), HashMap())
+            } else if (uri.scheme == "file") {
+                retriever.setDataSource(uri.path)
             }
             val durStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
             durationMs = durStr?.toLongOrNull() ?: 0L

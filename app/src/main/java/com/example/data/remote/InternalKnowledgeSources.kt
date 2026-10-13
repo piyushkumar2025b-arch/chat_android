@@ -574,6 +574,178 @@ Operational paradigms for constructing reliable, autonomous LLM agents equipped 
    - Tree of Thoughts (ToT): Explores deliberate reasoning trees using BFS/DFS with heuristic self-evaluations and backtracking.
    - Reflexion & Self-Correction: Agents critique their own past tool failures in retrospective memory to correct errors in subsequent attempts.
             """.trimIndent()
+        ),
+
+        InternalKnowledgeSourceItem(
+            id = "quantum_advanced_mechanics",
+            title = "Quantum Advanced Algorithms, QFT & Variational Optimization",
+            fileName = "Quantum Advanced Algorithms, QFT & Variational Optimization.md",
+            category = "Quantum Physics",
+            iconEmoji = "⚛️",
+            summary = "Superposition states, entanglement, Bloch sphere, Shor's & Grover's algorithms, and NISQ error mitigation.",
+            content = """
+# Quantum Computing Foundations & Algorithm Specifications
+Quantum computation leverages fundamental quantum mechanical phenomena to solve specialized computational problems exponentially faster than classical Turing machines.
+
+1. Qubit Mechanics & State Representation:
+   - Superposition: Pure state |ψ⟩ = α|0⟩ + β|1⟩ where α, β ∈ ℂ and |α|² + |β|² = 1.
+   - Bloch Sphere: Geometric representation parameterized by polar angle θ and azimuthal angle φ: |ψ⟩ = cos(θ/2)|0⟩ + e^(iφ)sin(θ/2)|1⟩.
+   - Entanglement: Composite states that cannot be factored into tensor products of single qubit states, exemplified by Bell states: |Φ+⟩ = (|00⟩ + |11⟩)/√2.
+
+2. Quantum Logic Gates:
+   - Single-Qubit: Pauli-X (NOT), Pauli-Z (phase flip), Hadamard H = (|0⟩+|1⟩)/√2 (creates equal superposition), and Phase Gate S.
+   - Multi-Qubit Entangling: CNOT (Controlled-NOT), CZ (Controlled-Z), and Toffoli (CCNOT).
+   - Unitary Invariance: All quantum logic gates correspond to unitary operators (U†U = I), ensuring quantum state evolution is strictly reversible.
+
+3. Benchmark Quantum Algorithms:
+   - Deutsch-Jozsa: Determines if a black-box boolean function is constant or balanced in a single evaluation (O(1) vs classical O(2^(n-1))).
+   - Grover's Search Algorithm: Quadratic speedup for searching unsorted databases of N items in O(√N) iterations using amplitude amplification.
+   - Shor's Algorithm: Polynomial time prime factorization of an integer N in O((log N)³) utilizing Quantum Fourier Transform (QFT) to compute modular order.
+   - Quantum Approximate Optimization Algorithm (QAOA): Hybrid quantum-classical variational heuristic for combinatorial graph optimization on noisy intermediate-scale quantum (NISQ) processors.
+            """.trimIndent()
+        ),
+
+        InternalKnowledgeSourceItem(
+            id = "cloud_kubernetes",
+            title = "Cloud Native Architecture, Kubernetes & Distributed Systems",
+            fileName = "Cloud Native Architecture, Kubernetes & Distributed Systems.md",
+            category = "Cloud Infrastructure",
+            iconEmoji = "☁️",
+            summary = "Kubernetes control plane, Pod scheduling, Service Mesh (mTLS), Raft consensus, and CAP theorem trade-offs.",
+            content = """
+# Cloud Native Architecture & Distributed Systems Engineering
+Architecture patterns for building resilient, elastic, and container-orchestrated microservices:
+
+1. Kubernetes (K8s) Control Plane & Architecture:
+   - kube-apiserver: Stateless REST gateway validating and configuring Pods, Deployments, and CRDs.
+   - etcd: Distributed consistent key-value store using the Raft consensus algorithm for cluster state synchronization.
+   - kube-scheduler: Evaluates resource requests/limits, node affinity/anti-affinity, taints, and tolerations to assign Pods to worker nodes.
+   - kube-controller-manager: Continuous reconciliation loop enforcing desired cluster state vs observed state.
+
+2. Networking & Service Mesh:
+   - Container Network Interface (CNI): Flat IP-per-Pod network topology (Calico, Cilium with eBPF datapaths).
+   - Kubernetes Services: ClusterIP, NodePort, and LoadBalancer abstractions backed by kube-proxy iptables or IPVS routing.
+   - Service Mesh (Istio / Linkerd): Envoy sidecar proxies injecting mutual TLS (mTLS), distributed tracing (OpenTelemetry), circuit breakers, and canary routing without modifying application binaries.
+
+3. Distributed Systems Consistency & Reliability:
+   - CAP Theorem: A distributed data store can guarantee at most two of Consistency, Availability, and Partition Tolerance.
+   - PACELC Theorem: In partitioned systems choose Availability or Consistency; else choose Latency or Consistency.
+   - Saga Pattern: Coordinates distributed transactions across microservices using compensating transactions to recover from intermediate failures.
+            """.trimIndent()
+        ),
+
+        InternalKnowledgeSourceItem(
+            id = "cyber_security_zero_trust",
+            title = "Cybersecurity, Cryptography & Zero-Trust Defense",
+            fileName = "Cybersecurity, Cryptography & Zero-Trust Defense.md",
+            category = "Security",
+            iconEmoji = "🛡️",
+            summary = "AES-GCM-256, RSA vs ECC curves, Zero-Trust Architecture (ZTA), OWASP Top 10 mitigation, and OAuth2/OIDC flows.",
+            content = """
+# Cybersecurity Principles, Cryptography & Defense-in-Depth
+Comprehensive security architecture for protecting cloud workloads and mobile client applications:
+
+1. Modern Cryptographic Primitives:
+   - Symmetric Ciphers: AES-256-GCM (Galois/Counter Mode) and ChaCha20-Poly1305 providing authenticated encryption with associated data (AEAD).
+   - Asymmetric Cryptography: Elliptic Curve Cryptography (Ed25519 for digital signatures, X25519 for Diffie-Hellman key exchange) providing superior 128-bit security with much smaller key lengths than RSA-2048/4096.
+   - Key Derivation Functions (KDF): Argon2id, PBKDF2, and HKDF for resilient password storage against GPU/ASIC brute-force cracking.
+
+2. Zero-Trust Architecture (NIST SP 800-207):
+   - Never Trust, Always Verify: Perimeter security is assumed breached; every network request requires explicit cryptographic authentication, least-privilege authorization, and risk inspection.
+   - Continuous Posture Evaluation: Device health, location, certificate validation, and behavioral telemetry inspected before granting access tokens.
+   - Micro-Segmentation: Restricts lateral network movement across workload zones through granular firewalling and software-defined perimeters.
+
+3. Application Security & OWASP Top 10 Defense:
+   - Injection Prevention: Mandatory parameterized queries and prepared statements for SQL/NoSQL databases.
+   - Cryptographic Storage: Android EncryptedSharedPreferences, Keystore hardware-backed KeyStore (StrongBox / TEE) for biometric-bound keys.
+   - Cross-Site Request Forgery (CSRF) & XSS: SameSite cookie flags, Content Security Policy (CSP), and strict input sanitization.
+            """.trimIndent()
+        ),
+
+        InternalKnowledgeSourceItem(
+            id = "space_astrophysics",
+            title = "Orbital Mechanics, Astrophysics & Deep Space Propulsion",
+            fileName = "Orbital Mechanics, Astrophysics & Deep Space Propulsion.md",
+            category = "Space Science",
+            iconEmoji = "🚀",
+            summary = "Tsiolkovsky rocket equation, Keplerian orbital elements, Hohmann transfers, Lagrange points, and stellar nucleosynthesis.",
+            content = """
+# Aerospace Engineering & Astrophysics Principles
+Physics foundations governing orbital trajectories, celestial mechanics, and deep space exploration:
+
+1. Rocket Propulsion & Orbital Dynamics:
+   - Tsiolkovsky Rocket Equation: Δv = v_e * ln(m_0 / m_f) = I_sp * g_0 * ln(m_0 / m_f), relating achievable velocity change to propellant mass fraction and specific impulse (I_sp).
+   - Kepler's Laws:
+     1. Planetary orbits are ellipses with the Sun at one focus.
+     2. A line segment joining a planet and the Sun sweeps out equal areas during equal intervals of time.
+     3. The square of the orbital period is proportional to the cube of the semi-major axis (T² ∝ a³).
+   - Orbital Transfers: Hohmann transfer orbit calculates minimum energy delta-v required to transit between two circular coplanar orbits.
+
+2. Gravitational Equilibrium & Lagrange Points:
+   - Three-body gravitational equilibria (L1, L2, L3, L4, L5) where gravitational forces and orbital centrifugal forces balance.
+   - Halo and Lissajous Orbits: Stable trajectories at Sun-Earth L2 home to deep-space observatories like the James Webb Space Telescope (JWST).
+
+3. Stellar Evolution & Astrophysics:
+   - Hydrostatic Equilibrium: Inward gravitational collapse balanced against outward radiation pressure generated by core nuclear fusion.
+   - Stellar Nucleosynthesis: Proton-proton chain and CNO cycle fusing hydrogen into helium, progressing through carbon, neon, oxygen, and silicon burning until reaching the iron peak (Fe-56).
+   - Final Evolutionary States: White dwarfs supported by electron degeneracy pressure (Chandrasekhar limit ~1.44 M☉), neutron stars supported by neutron degeneracy pressure (Tolman-Oppenheimer-Volkoff limit ~2.1 M☉), and black holes.
+            """.trimIndent()
+        ),
+
+        InternalKnowledgeSourceItem(
+            id = "clean_energy_batteries",
+            title = "Clean Energy, Battery Chemistry & Grid Storage Systems",
+            fileName = "Clean Energy, Battery Chemistry & Grid Storage Systems.md",
+            category = "Sustainable Tech",
+            iconEmoji = "🔋",
+            summary = "Lithium-ion vs LFP cathode chemistry, solid-state electrolytes, photovoltaic bandgap, and grid frequency regulation.",
+            content = """
+# Clean Energy Technologies & Electrochemical Energy Storage
+Engineering analysis of sustainable generation, electrochemical storage, and grid-scale energy transition:
+
+1. Electrochemical Cell Chemistry:
+   - Lithium-Ion (NMC / LFP): Intercalation of lithium ions into layered transition-metal oxide cathodes (LiNi_xMn_yCo_zO_2) or olivine lithium iron phosphate (LiFePO_4) during charge/discharge cycles.
+   - Energy Density vs Cycle Life: NMC achieves high volumetric density (~250-300 Wh/kg), while LFP offers superior thermal stability, cobalt-free chemistry, and extended cycle life (3000-5000+ cycles).
+   - Solid-State Batteries: Replacement of flammable liquid carbonate electrolytes with ceramic or polymer solid electrolytes, enabling lithium metal anodes for >400 Wh/kg specific energy and rapid charging.
+
+2. Photovoltaic Solar Generation:
+   - Semiconductor P-N Junction: Photons with energy exceeding the semiconductor bandgap (E_g ≈ 1.1 eV for Silicon) liberate electron-hole pairs, producing electric current through the built-in electric field.
+   - Shockley-Queisser Limit: Maximum theoretical thermodynamic efficiency of single-junction solar cells (~33.7%) constrained by unabsorbed sub-bandgap photons and thermalization losses.
+   - Perovskite Tandem Cells: Stacking wide-bandgap perovskites atop silicon absorbs complementary solar spectra, surpassing 30%+ practical module efficiency.
+
+3. Grid Integration & Energy Storage Systems (BESS):
+   - Frequency Response & Inertia: Grid-forming inverters (GFM) emulate synchronous machine rotational inertia to stabilize 50Hz/60Hz grid frequency during sudden generation or load disturbances.
+   - Utility-Scale Storage: Flow batteries (Vanadium redox) and pumped hydroelectric storage for long-duration energy storage (8-24+ hours).
+            """.trimIndent()
+        ),
+
+        InternalKnowledgeSourceItem(
+            id = "algorithms_graph_theory",
+            title = "Graph Theory, Dynamic Programming & Advanced Algorithms",
+            fileName = "Graph Theory, Dynamic Programming & Advanced Algorithms.md",
+            category = "Computer Science",
+            iconEmoji = "📊",
+            summary = "Dijkstra & A* pathfinding, Tarjan SCC, Maximum Flow (Ford-Fulkerson), Knapsack DP, and Segment Trees.",
+            content = """
+# Advanced Algorithms, Graph Theory & Computational Complexity
+Algorithmic paradigms for high-efficiency computational processing and combinatorial problem solving:
+
+1. Shortest Path & Network Algorithms:
+   - Dijkstra's Algorithm: Greedy single-source shortest path on non-negative weighted graphs in O((V + E) log V) utilizing binary/fibonacci heaps.
+   - A* Search: Heuristic-guided pathfinding where f(n) = g(n) + h(n); admissible and consistent heuristics guarantee optimal shortest paths while pruning search space.
+   - Tarjan's Strongly Connected Components (SCC): Computes maximal strongly connected subgraphs in linear O(V + E) using depth-first search (DFS) with low-link values.
+   - Network Flow: Ford-Fulkerson and Edmonds-Karp algorithms computing maximum flow matching minimum cut capacity in O(V * E²).
+
+2. Dynamic Programming Paradigms:
+   - Optimal Substructure & Overlapping Subproblems: State transitions memoized top-down or tabulated bottom-up.
+   - 0/1 Knapsack & Unbounded Knapsack: Maximizing utility within capacity constraints; state dp[i][w] = max(dp[i-1][w], dp[i-1][w - weight[i]] + value[i]).
+   - Longest Common Subsequence (LCS) and Edit Distance (Levenshtein): String alignment and diff algorithms foundational to version control and bioinformatic sequence matching.
+
+3. Advanced Spatial & Range Query Data Structures:
+   - Segment Trees & Fenwick Trees (Binary Indexed Tree): Range sum/minimum queries and point updates in O(log N) time with lazy propagation for range updates.
+   - Disjoint Set Union (DSU / Union-Find): Near-constant time amortized O(α(N)) set connectivity operations with path compression and union by rank.
+            """.trimIndent()
         )
     )
 }
+
