@@ -34,6 +34,9 @@ interface ProductivityDao {
     @Query("SELECT * FROM notes ORDER BY isPinned DESC, updatedAt DESC")
     fun getAllNotesFlow(): Flow<List<NoteItemEntity>>
 
+    @Query("SELECT * FROM notes ORDER BY updatedAt DESC")
+    suspend fun getAllNotesDirect(): List<NoteItemEntity>
+
     @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
     suspend fun getNoteById(id: String): NoteItemEntity?
 

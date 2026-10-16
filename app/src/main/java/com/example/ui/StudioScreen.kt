@@ -1,5 +1,6 @@
 package com.example.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -78,13 +79,27 @@ fun StudioScreen(
 
         Spacer(modifier = Modifier.height(2.dp))
 
+        BackHandler(enabled = selectedStudioTab != 0) {
+            selectedStudioTab = 0
+        }
+
         Box(modifier = Modifier.weight(1f)) {
             when (selectedStudioTab) {
                 0 -> ImageStudioScreen(onSendPromptToChat = onSendPromptToChat)
-                1 -> ImageEditorScreen(onSendImageToChat = onSendPromptToChat)
+                1 -> ImageEditorScreen(
+                    onBack = { selectedStudioTab = 0 },
+                    onSendImageToChat = onSendPromptToChat
+                )
                 2 -> MusicStudioScreen()
-                3 -> CodeStudioScreen(preferencesManager = preferencesManager, onSendToChat = onSendPromptToChat)
-                4 -> MarkdownStudioScreen(onSendToChat = onSendPromptToChat)
+                3 -> CodeStudioScreen(
+                    preferencesManager = preferencesManager,
+                    onBack = { selectedStudioTab = 0 },
+                    onSendToChat = onSendPromptToChat
+                )
+                4 -> MarkdownStudioScreen(
+                    onBack = { selectedStudioTab = 0 },
+                    onSendToChat = onSendPromptToChat
+                )
                 5 -> VideoStudioScreen(onSendPromptToChat = onSendPromptToChat)
                 6 -> UniversalMediaPlayerScreen(
                     onBack = { selectedStudioTab = 0 },

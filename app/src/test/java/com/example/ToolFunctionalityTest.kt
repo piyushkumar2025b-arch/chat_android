@@ -111,12 +111,32 @@ class ToolFunctionalityTest {
         val svgUri = Uri.parse("https://example.com/images/icon.svg")
         val svgItem = resolveMediaItemFromUri(context, svgUri)
         assertEquals(MediaKind.IMAGE, svgItem.kind)
+
+        val xmlUri = Uri.parse("https://example.com/layout/manifest.xml")
+        val xmlItem = resolveMediaItemFromUri(context, xmlUri)
+        assertEquals(MediaKind.TEXT_DOCUMENT, xmlItem.kind)
+
+        val cppUri = Uri.parse("https://example.com/dsp/kernel.cpp")
+        val cppItem = resolveMediaItemFromUri(context, cppUri)
+        assertEquals(MediaKind.TEXT_DOCUMENT, cppItem.kind)
+
+        val cssUri = Uri.parse("https://example.com/styles/theme.css")
+        val cssItem = resolveMediaItemFromUri(context, cssUri)
+        assertEquals(MediaKind.TEXT_DOCUMENT, cssItem.kind)
+
+        val logUri = Uri.parse("https://example.com/logs/server.log")
+        val logItem = resolveMediaItemFromUri(context, logUri)
+        assertEquals(MediaKind.TEXT_DOCUMENT, logItem.kind)
+
+        val m3uUri = Uri.parse("https://example.com/streams/live.m3u8")
+        val m3uItem = resolveMediaItemFromUri(context, m3uUri)
+        assertEquals(MediaKind.VIDEO, m3uItem.kind)
     }
 
     @Test
     fun testCuratedMediaSourcesCompleteness() {
         val sources = com.example.ui.CuratedMediaSources.sampleSources
-        assertTrue("Must contain at least 20 curated sample sources", sources.size >= 20)
+        assertTrue("Must contain at least 25 curated sample sources", sources.size >= 25)
         assertTrue(sources.any { it.kind == MediaKind.VIDEO })
         assertTrue(sources.any { it.kind == MediaKind.AUDIO })
         assertTrue(sources.any { it.kind == MediaKind.TEXT_DOCUMENT })
@@ -289,5 +309,30 @@ class ToolFunctionalityTest {
             assertTrue(name.isNotBlank())
             assertTrue(url.startsWith("http"))
         }
+    }
+
+    // --- Calculator Engine Tests ---
+
+    @Test
+    fun testEvaluateMathExpressionCorrectness() {
+        // Precedence: 2 + 3 * 4 should be 14, not 20
+        assertEquals("14", com.example.ui.evaluateMathExpression("2 + 3 * 4", isRad = true))
+
+        // Parentheses
+        assertEquals("20", com.example.ui.evaluateMathExpression("(2 + 3) * 4", isRad = true))
+
+        // Negative numbers & subtraction
+        assertEquals("3", com.example.ui.evaluateMathExpression("-5 + 8", isRad = true))
+        assertEquals("-10", com.example.ui.evaluateMathExpression("5 * -2", isRad = true))
+
+        // Exponents
+        assertEquals("8", com.example.ui.evaluateMathExpression("2 ^ 3", isRad = true))
+
+        // Sqrt & Functions
+        assertEquals("4", com.example.ui.evaluateMathExpression("sqrt(16)", isRad = true))
+        assertEquals("1", com.example.ui.evaluateMathExpression("sin(90)", isRad = false)) // DEG mode
+
+        // Division by zero safety
+        assertEquals("Cannot divide by 0", com.example.ui.evaluateMathExpression("10 / 0", isRad = true))
     }
 }

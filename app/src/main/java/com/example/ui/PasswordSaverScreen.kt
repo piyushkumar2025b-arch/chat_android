@@ -10,6 +10,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -765,7 +767,11 @@ private fun PasswordEditorDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (initialItem == null) "New Account Password" else "Edit Account") },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
                 OutlinedTextField(
                     value = serviceName,
                     onValueChange = { serviceName = it },
@@ -1032,7 +1038,11 @@ private fun MasterPinSettingsDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (isPinSet) "Master PIN Settings" else "Set Master PIN") },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
                 Text(
                     text = if (isPinSet) {
                         "Your vault is protected by a Master PIN. Enter your current PIN to change or remove it."

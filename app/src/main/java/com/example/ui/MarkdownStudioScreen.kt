@@ -343,7 +343,7 @@ fun MarkdownStudioScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     MarkdownToolbarButton(label = "H1", icon = Icons.Default.Title) {
-                        markdownText = "\n# New Heading\n$markdownText"
+                        markdownText = "$markdownText\n\n# New Heading\n"
                     }
                     MarkdownToolbarButton(label = "H2") {
                         markdownText = "$markdownText\n\n## Subheading\n"

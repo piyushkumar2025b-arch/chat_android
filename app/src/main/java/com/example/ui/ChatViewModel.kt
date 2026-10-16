@@ -4,7 +4,9 @@ import android.app.Application
 import android.net.Uri
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.ChatRepository
@@ -82,8 +84,42 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentSection = MutableStateFlow(AppSection.CHAT)
     val currentSection: StateFlow<AppSection> = _currentSection.asStateFlow()
 
+    var activeCodeSnippet by mutableStateOf<Pair<String, String>?>(null) // Pair(code, fileName)
+    var activeMarkdownSnippet by mutableStateOf<String?>(null)
+    var activeMediaItem by mutableStateOf<PlayableMediaItem?>(null)
+
     fun navigateToSection(section: AppSection) {
         _currentSection.value = section
+    }
+
+    fun openInCodeStudio(code: String, fileName: String) {
+        activeCodeSnippet = Pair(code, fileName)
+        navigateToSection(AppSection.CODE_STUDIO)
+    }
+
+    fun openInMarkdown(content: String) {
+        activeMarkdownSnippet = content
+        navigateToSection(AppSection.MARKDOWN)
+    }
+
+    fun openInMediaPlayer(uri: Uri, displayName: String, mimeType: String, textPreview: String? = null) {
+        val kind = when {
+            mimeType.startsWith("video/") || displayName.endsWith(".mp4", true) || displayName.endsWith(".mkv", true) || displayName.endsWith(".m3u8", true) -> MediaKind.VIDEO
+            mimeType.startsWith("audio/") || displayName.endsWith(".mp3", true) || displayName.endsWith(".wav", true) || displayName.endsWith(".m4a", true) || displayName.endsWith(".mp3", true) -> MediaKind.AUDIO
+            mimeType.startsWith("image/") || displayName.endsWith(".png", true) || displayName.endsWith(".jpg", true) -> MediaKind.IMAGE
+            mimeType == "application/pdf" || displayName.endsWith(".pdf", true) -> MediaKind.PDF_DOCUMENT
+            mimeType == "application/zip" || displayName.endsWith(".zip", true) -> MediaKind.ARCHIVE
+            else -> MediaKind.TEXT_DOCUMENT
+        }
+        activeMediaItem = PlayableMediaItem(
+            uri = uri,
+            displayName = displayName,
+            sizeBytes = 0L,
+            mimeType = mimeType,
+            kind = kind,
+            textPreview = textPreview
+        )
+        navigateToSection(AppSection.MEDIA_PLAYER)
     }
 
     private val _isWebSearchEnabled = MutableStateFlow(false)
@@ -153,6 +189,59 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 onComplete(true, "Document '${res.getOrNull()?.title}' indexed (${res.getOrNull()?.chunkCount ?: 0} chunks)")
             } else {
                 onComplete(false, res.exceptionOrNull()?.localizedMessage ?: "Failed to ingest file")
+            }
+        }
+    }
+
+    fun ingestAllNotesToRag(onComplete: (Boolean, String) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            _isRagProcessing.value = true
+            try {
+                val notes = productivityDao.getAllNotesDirect()
+                if (notes.isEmpty()) {
+                    _isRagProcessing.value = false
+                    onComplete(false, "No notes found in Notes Hub to import.")
+                    return@launch
+                }
+                var ingestedCount = 0
+                for (note in notes) {
+                    if (note.content.isNotBlank()) {
+                        val res = ragEngine.ingestDocument(
+                            title = "Note: ${note.title.ifBlank { "Untitled" }}",
+                            content = note.content,
+                            sourceType = "NOTES_HUB",
+                            geminiApiKey = preferencesManager.geminiApiKey
+                        )
+                        if (res.isSuccess) ingestedCount++
+                    }
+                }
+                _isRagProcessing.value = false
+                refreshRagStats()
+                onComplete(true, "Imported $ingestedCount note(s) into RAG Knowledge Base!")
+            } catch (e: Exception) {
+                _isRagProcessing.value = false
+                onComplete(false, e.localizedMessage ?: "Failed to import notes")
+            }
+        }
+    }
+
+    fun saveTextAsNote(title: String, content: String, category: String = "Imported", onComplete: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                productivityDao.insertNote(
+                    com.example.data.model.NoteItemEntity(
+                        id = java.util.UUID.randomUUID().toString(),
+                        title = title,
+                        content = content,
+                        category = category,
+                        colorHex = "#2196F3",
+                        isPinned = false,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+                onComplete(true)
+            } catch (_: Exception) {
+                onComplete(false)
             }
         }
     }

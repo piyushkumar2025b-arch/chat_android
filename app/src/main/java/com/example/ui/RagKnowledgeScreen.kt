@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.FactCheck
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -521,6 +522,19 @@ fun RagKnowledgeScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            FilledTonalButton(
+                                onClick = {
+                                    viewModel.ingestAllNotesToRag { success, msg ->
+                                        Toast.makeText(context, if (success) "✅ $msg" else "ℹ️ $msg", Toast.LENGTH_LONG).show()
+                                    }
+                                },
+                                modifier = Modifier.weight(1f).testTag("rag_import_notes_hub_btn")
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Note, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Import Notes Hub", maxLines = 1)
+                            }
+
                             Button(
                                 onClick = {
                                     viewModel.loadStarterKnowledgeBase { success, msg ->
@@ -531,7 +545,7 @@ fun RagKnowledgeScreen(
                             ) {
                                 Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Load All ${InternalKnowledgeSources.sources.size} Sources")
+                                Text("Load All Sources", maxLines = 1)
                             }
 
                             if (documents.isNotEmpty()) {
@@ -540,9 +554,7 @@ fun RagKnowledgeScreen(
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                                     modifier = Modifier.testTag("rag_clear_all_button")
                                 ) {
-                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Clear All")
+                                    Icon(Icons.Default.Delete, contentDescription = "Clear All", modifier = Modifier.size(16.dp))
                                 }
                             }
                         }

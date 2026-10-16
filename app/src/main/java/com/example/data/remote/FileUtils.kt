@@ -284,7 +284,10 @@ object FileUtils {
             "swift" -> "text/x-swift"
             "sql" -> "text/x-sql"
             "sh", "bash", "zsh" -> "text/x-shellscript"
-            "properties", "env", "ini", "conf", "gradle", "log" -> "text/plain"
+            "properties", "env", "ini", "conf", "gradle", "log", "dockerfile" -> "text/plain"
+            "css" -> "text/css"
+            "m3u", "m3u8" -> "application/x-mpegurl"
+            "srt", "vtt" -> "text/vtt"
             "jpg", "jpeg" -> "image/jpeg"
             "png" -> "image/png"
             "webp" -> "image/webp"
@@ -295,7 +298,13 @@ object FileUtils {
             "mp3" -> "audio/mpeg"
             "wav" -> "audio/wav"
             "m4a" -> "audio/mp4"
+            "ogg" -> "audio/ogg"
+            "flac" -> "audio/flac"
+            "aac" -> "audio/aac"
             "mp4" -> "video/mp4"
+            "mkv" -> "video/x-matroska"
+            "webm" -> "video/webm"
+            "mov" -> "video/quicktime"
             "zip" -> "application/zip"
             "tar" -> "application/x-tar"
             "gz" -> "application/gzip"
@@ -1306,6 +1315,147 @@ func worker(id int, jobs <-chan int, wg *sync.WaitGroup) {
 - **Client Cache**: Zero-latency local SQLite persistence and Vector embeddings.
 - **Multimodal Pipeline**: Vision OCR, media playback, and live code sandbox execution.""".trimIndent()
             )
+            "xml" -> Triple(
+                "Android_Manifest.xml",
+                "text/xml",
+                """<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.omnichat.ai">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="OmniChat Studio"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.OmniChat">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>""".trimIndent()
+            )
+            "java" -> Triple(
+                "DataService.java",
+                "text/x-java",
+                """package com.omnichat.service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class DataService {
+    private final Map<String, List<Double>> telemetryStore = new ConcurrentHashMap<>();
+
+    public synchronized void recordMetrics(String key, List<Double> values) {
+        telemetryStore.put(key, values);
+        System.out.println("Recorded " + values.size() + " data points for metric: " + key);
+    }
+
+    public List<Double> fetchMetrics(String key) {
+        return telemetryStore.getOrDefault(key, List.of());
+    }
+}""".trimIndent()
+            )
+            "cpp" -> Triple(
+                "Graphics_Engine.cpp",
+                "text/x-c",
+                """#include <iostream>
+#include <vector>
+#include <cmath>
+
+struct Vector3 {
+    float x, y, z;
+    float magnitude() const { return std::sqrt(x*x + y*y + z*z); }
+    Vector3 normalized() const {
+        float m = magnitude();
+        return (m > 0) ? Vector3{x/m, y/m, z/m} : Vector3{0, 0, 0};
+    }
+};
+
+int main() {
+    Vector3 lightDir{1.0f, 2.0f, 3.0f};
+    Vector3 norm = lightDir.normalized();
+    std::cout << "Normal: (" << norm.x << ", " << norm.y << ", " << norm.z << ")\n";
+    return 0;
+}""".trimIndent()
+            )
+            "css" -> Triple(
+                "Modern_Theme.css",
+                "text/css",
+                """:root {
+    --primary-color: #2563EB;
+    --background-color: #0F172A;
+    --surface-color: #1E293B;
+    --accent-glow: rgba(37, 99, 235, 0.35);
+    --font-family: 'Inter', -apple-system, sans-serif;
+}
+
+body {
+    background: var(--background-color);
+    color: #F8FAFC;
+    font-family: var(--font-family);
+    margin: 0;
+    padding: 1.5rem;
+}
+
+.studio-card {
+    background: var(--surface-color);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px var(--accent-glow);
+    padding: 1rem;
+}""".trimIndent()
+            )
+            "log" -> Triple(
+                "Production_Server.log",
+                "text/plain",
+                """[2026-10-13 04:12:01.402] [INFO] [Router] Incoming request POST /api/v1/chat/completions (model: gemini-3.8-flash)
+[2026-10-13 04:12:01.554] [INFO] [RAG] Vector similarity computed for query 'Neural Network Architecture' (topK: 4, latency: 42ms)
+[2026-10-13 04:12:01.810] [INFO] [Inference] Generated 680 tokens in 256ms (throughput: 2,656 tok/s)
+[2026-10-13 04:12:01.815] [INFO] [Metrics] Memory cache hit ratio: 94.2%, Active connections: 128
+[2026-10-13 04:12:02.100] [AUDIT] Session encrypted and committed to local Room SQLite storage.""".trimIndent()
+            )
+            "dockerfile" -> Triple(
+                "Dockerfile",
+                "text/plain",
+                """# OmniChat High-Performance Container Spec
+FROM openjdk:21-slim-bullseye AS base
+WORKDIR /app
+COPY build/libs/omnichat-service.jar app.jar
+ENV JAVA_OPTS="-XX:+UseZGC -XX:MaxRAMPercentage=80.0"
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:8080/health || exit 1
+ENTRYPOINT ["sh", "-c", "java ${'$'}JAVA_OPTS -jar app.jar"]""".trimIndent()
+            )
+            "m3u" -> Triple(
+                "Streaming_Playlist.m3u",
+                "application/x-mpegurl",
+                """#EXTM3U
+#EXTINF:455,Cyberpunk Synthwave Odyssey
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3
+#EXTINF:415,Acoustic Classical Nocturne
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3
+#EXTINF:734,Sci-Fi Action: Tears of Steel Open Movie
+https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4""".trimIndent()
+            )
+            "srt" -> Triple(
+                "Film_Subtitles.srt",
+                "text/vtt",
+                """1
+00:00:01,000 --> 00:00:04,500
+Welcome to OmniChat Universal Media & Audio Studio.
+
+2
+00:00:05,000 --> 00:00:09,200
+Playing video, music, code, documents, and streaming any URL format.
+
+3
+00:00:10,000 --> 00:00:14,000
+Real-time AI analysis with multimodal audio and subtitle processing.""".trimIndent()
+            )
             else -> Triple(
                 "Project_Architecture_Notes.txt",
                 "text/plain",
@@ -1350,8 +1500,10 @@ Core Architecture:
         val chars = extracted.length
         val summary = if (extracted.length > 320) extracted.take(320).trim() + "..." else extracted.trim()
 
+        val cleanName = if (file.name.contains('_')) file.name.substringAfter('_') else file.name
+
         FileDetailsInfo(
-            fileName = file.name,
+            fileName = cleanName,
             mimeType = mimeType,
             sizeBytes = file.length(),
             sizeFormatted = formatFileSize(file.length()),

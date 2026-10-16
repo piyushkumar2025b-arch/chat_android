@@ -492,20 +492,123 @@ ENTRYPOINT ["java", "-XX:+UseZGC", "-jar", "/app/runner.jar"]
             mimeType = "application/zip",
             kind = MediaKind.ARCHIVE,
             textPreview = "Compressed Archive (ZIP)\nFiles: 1,420 source files\nCompressed Ratio: 68.4%\nStructure: src/main/kotlin, assets, resources"
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"),
+            displayName = "Animation HD: Big Buck Bunny 60fps Open Movie",
+            sizeBytes = 158_000_000L,
+            mimeType = "video/mp4",
+            kind = MediaKind.VIDEO,
+            durationMs = 596_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"),
+            displayName = "Chill Acoustic Guitar Flow (MP3 Audio)",
+            sizeBytes = 6_400_000L,
+            mimeType = "audio/mpeg",
+            kind = MediaKind.AUDIO,
+            durationMs = 320_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"),
+            displayName = "Ambient Electronic Odyssey (MP3 Audio)",
+            sizeBytes = 7_800_000L,
+            mimeType = "audio/mpeg",
+            kind = MediaKind.AUDIO,
+            durationMs = 390_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"),
+            displayName = "Live Stream Test (Apple HLS .m3u8)",
+            sizeBytes = 1_200_000L,
+            mimeType = "application/x-mpegurl",
+            kind = MediaKind.VIDEO,
+            durationMs = 1_800_000L
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("content://omnichat/dsp/audio_dsp_filter.cpp"),
+            displayName = "C++ Real-Time Biquad Audio DSP Equalizer.cpp",
+            sizeBytes = 14_200L,
+            mimeType = "text/x-c",
+            kind = MediaKind.TEXT_DOCUMENT,
+            textPreview = """
+// C++ Biquad Filter Real-time Audio DSP Pipeline
+#include <cmath>
+#include <vector>
+
+class BiquadFilter {
+    float a0, a1, a2, b1, b2;
+    float z1 = 0.0f, z2 = 0.0f;
+public:
+    void setLowpass(float sampleRate, float cutoffHz, float q = 0.707f) {
+        float omega = 2.0f * M_PI * cutoffHz / sampleRate;
+        float alpha = std::sin(omega) / (2.0f * q);
+        float cosOmega = std::cos(omega);
+        float b0 = (1.0f - cosOmega) / 2.0f;
+        a0 = b0 / (1.0f + alpha);
+        a1 = (1.0f - cosOmega) / (1.0f + alpha);
+        a2 = a0;
+        b1 = (-2.0f * cosOmega) / (1.0f + alpha);
+        b2 = (1.0f - alpha) / (1.0f + alpha);
+    }
+    float processSample(float in) {
+        float out = in * a0 + z1;
+        z1 = in * a1 + z2 - b1 * out;
+        z2 = in * a2 - b2 * out;
+        return out;
+    }
+};
+            """.trimIndent()
+        ),
+        PlayableMediaItem(
+            uri = Uri.parse("content://omnichat/manifests/stream_manifest.json"),
+            displayName = "Multimodal Streaming & Subtitle Manifest.json",
+            sizeBytes = 5_600L,
+            mimeType = "application/json",
+            kind = MediaKind.TEXT_DOCUMENT,
+            textPreview = """
+{
+  "manifestVersion": "3.1.0",
+  "mediaType": "adaptive-streaming-hls",
+  "streams": [
+    {"resolution": "1080p", "bitrate_kbps": 4500, "codec": "h264"},
+    {"resolution": "720p", "bitrate_kbps": 2400, "codec": "h264"},
+    {"resolution": "480p", "bitrate_kbps": 1100, "codec": "h264"}
+  ],
+  "audioTracks": [
+    {"language": "en", "channels": 6, "format": "eac3", "default": true},
+    {"language": "es", "channels": 2, "format": "aac", "default": false}
+  ],
+  "subtitles": [
+    {"language": "en", "format": "webvtt", "label": "English CC"},
+    {"language": "es", "format": "webvtt", "label": "Español"}
+  ]
+}
+            """.trimIndent()
         )
     )
 }
 
 @Composable
 fun UniversalMediaPlayerScreen(
+    initialMediaItem: PlayableMediaItem? = null,
     onBack: () -> Unit = {},
     onSendToChat: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    var activeMedia by remember { mutableStateOf<PlayableMediaItem?>(null) }
+    var activeMedia by remember { mutableStateOf<PlayableMediaItem?>(initialMediaItem) }
     val playlist = remember { mutableStateListOf<PlayableMediaItem>() }
+
+    LaunchedEffect(initialMediaItem) {
+        if (initialMediaItem != null) {
+            if (!playlist.any { it.uri == initialMediaItem.uri }) {
+                playlist.add(0, initialMediaItem)
+            }
+            activeMedia = initialMediaItem
+        }
+    }
 
     // Audio playback state
     var audioPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
@@ -623,11 +726,6 @@ fun UniversalMediaPlayerScreen(
             }
             MediaKind.VIDEO -> {
                 releaseAudioPlayer()
-                videoViewInstance?.let { vv ->
-                    vv.setVideoURI(cur.uri)
-                    vv.start()
-                    isPlaying = true
-                }
             }
             else -> {
                 releaseAudioPlayer()
@@ -806,9 +904,6 @@ fun UniversalMediaPlayerScreen(
                             AndroidView(
                                 factory = { ctx ->
                                     VideoView(ctx).apply {
-                                        val mc = MediaController(ctx)
-                                        mc.setAnchorView(this)
-                                        setMediaController(mc)
                                         setVideoURI(item.uri)
                                         setOnPreparedListener { mp ->
                                             videoMediaPlayer = mp

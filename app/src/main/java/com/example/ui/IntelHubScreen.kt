@@ -1,5 +1,6 @@
 package com.example.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -93,6 +94,10 @@ fun IntelHubScreen(
 
         Spacer(modifier = Modifier.height(4.dp))
 
+        BackHandler(enabled = selectedHubTab != 0) {
+            selectedHubTab = 0
+        }
+
         Box(modifier = Modifier.weight(1f)) {
             when (selectedHubTab) {
                 0 -> AiPersonaScreen(
@@ -107,6 +112,7 @@ fun IntelHubScreen(
                     if (productivityDao != null) {
                         PasswordSaverScreen(
                             productivityDao = productivityDao,
+                            onBack = { selectedHubTab = 0 },
                             onSendToChat = onSendPromptToChat
                         )
                     }
@@ -115,23 +121,39 @@ fun IntelHubScreen(
                     if (productivityDao != null) {
                         NotesScreen(
                             productivityDao = productivityDao,
+                            onBack = { selectedHubTab = 0 },
                             onSendToChat = onSendPromptToChat
                         )
                     }
                 }
-                7 -> CalculatorScreen(onSendToChat = onSendPromptToChat)
+                7 -> CalculatorScreen(
+                    onBack = { selectedHubTab = 0 },
+                    onSendToChat = onSendPromptToChat
+                )
                 8 -> {
                     if (productivityDao != null) {
                         CalendarScreen(
                             productivityDao = productivityDao,
+                            onBack = { selectedHubTab = 0 },
                             onSendToChat = onSendPromptToChat
                         )
                     }
                 }
-                9 -> StepCounterScreen(onSendStatsToChat = onSendPromptToChat)
-                10 -> Game2048Screen(onSendScoreToChat = onSendPromptToChat)
-                11 -> NotificationCenterScreen()
-                12 -> ImageEditorScreen(onSendImageToChat = onSendPromptToChat)
+                9 -> StepCounterScreen(
+                    onBack = { selectedHubTab = 0 },
+                    onSendStatsToChat = onSendPromptToChat
+                )
+                10 -> Game2048Screen(
+                    onBack = { selectedHubTab = 0 },
+                    onSendScoreToChat = onSendPromptToChat
+                )
+                11 -> NotificationCenterScreen(
+                    onBack = { selectedHubTab = 0 }
+                )
+                12 -> ImageEditorScreen(
+                    onBack = { selectedHubTab = 0 },
+                    onSendImageToChat = onSendPromptToChat
+                )
                 13 -> UniversalMediaPlayerScreen(
                     onBack = { selectedHubTab = 0 },
                     onSendToChat = onSendPromptToChat

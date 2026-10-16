@@ -628,6 +628,16 @@ private fun UnitConverterTab() {
     var inputValue by remember { mutableStateOf("1") }
     val categories = listOf("Length", "Weight", "Temperature", "Speed")
 
+    val unitsForCategory = remember(category) {
+        when (category) {
+            "Length" -> listOf("Meters", "Kilometers", "Feet", "Miles", "Centimeters", "Inches")
+            "Weight" -> listOf("Kilograms", "Pounds", "Grams", "Ounces")
+            "Temperature" -> listOf("Celsius", "Fahrenheit", "Kelvin")
+            "Speed" -> listOf("km/h", "mph", "m/s", "Knots")
+            else -> listOf("Unit A", "Unit B")
+        }
+    }
+
     var fromUnit by remember { mutableStateOf("Meters") }
     var toUnit by remember { mutableStateOf("Feet") }
 
@@ -635,11 +645,15 @@ private fun UnitConverterTab() {
         convertUnits(inputValue, category, fromUnit, toUnit)
     }
 
+    val context = LocalContext.current
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
+            .verticalScroll(rememberScrollState())
     ) {
+        // Category Selector Chips
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(categories) { cat ->
                 FilterChip(
@@ -653,29 +667,80 @@ private fun UnitConverterTab() {
                             "Speed" -> { fromUnit = "km/h"; toUnit = "mph" }
                         }
                     },
-                    label = { Text(cat) }
+                    label = { Text(cat) },
+                    modifier = Modifier.testTag("converter_cat_$cat")
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        OutlinedTextField(
+            value = inputValue,
+            onValueChange = { inputValue = it },
+            label = { Text("Value to Convert") },
+            modifier = Modifier.fillMaxWidth().testTag("converter_input_value"),
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // From Unit Selection
+        Text("From Unit:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(4.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(unitsForCategory) { u ->
+                FilterChip(
+                    selected = fromUnit == u,
+                    onClick = { fromUnit = u },
+                    label = { Text(u, fontSize = 12.sp) },
+                    modifier = Modifier.testTag("from_unit_$u")
+                )
+            }
+        }
+
+        // Swap Button
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            FilledTonalButton(
+                onClick = {
+                    val temp = fromUnit
+                    fromUnit = toUnit
+                    toUnit = temp
+                },
+                modifier = Modifier.testTag("converter_swap_units_btn")
+            ) {
+                Icon(Icons.Default.SwapHoriz, contentDescription = "Swap Units", modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Swap Units")
+            }
+        }
+
+        // To Unit Selection
+        Text("To Unit:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(4.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(unitsForCategory) { u ->
+                FilterChip(
+                    selected = toUnit == u,
+                    onClick = { toUnit = u },
+                    label = { Text(u, fontSize = 12.sp) },
+                    modifier = Modifier.testTag("to_unit_$u")
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        OutlinedTextField(
-            value = inputValue,
-            onValueChange = { inputValue = it },
-            label = { Text("Value to Convert") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
+        // Result Card
         ElevatedCard(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(text = "From: $fromUnit", style = MaterialTheme.typography.titleSmall)
+                Text(text = "From: $fromUnit", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
                     text = "$inputValue $fromUnit",
                     style = MaterialTheme.typography.headlineSmall,
@@ -684,13 +749,31 @@ private fun UnitConverterTab() {
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
-                Text(text = "Equals: $toUnit", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    text = "$convertedValue $toUnit",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "Equals ($toUnit):", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            text = "$convertedValue $toUnit",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Converted Value", "$convertedValue $toUnit"))
+                            Toast.makeText(context, "Copied $convertedValue $toUnit", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy Result")
+                    }
+                }
             }
         }
     }
@@ -698,21 +781,25 @@ private fun UnitConverterTab() {
 
 private fun convertUnits(inputStr: String, category: String, from: String, to: String): String {
     val value = inputStr.toDoubleOrNull() ?: return "0"
-    val df = DecimalFormat("#.####")
+    val df = DecimalFormat("#.######")
     return when (category) {
         "Length" -> {
             val meters = when (from) {
                 "Meters" -> value
-                "Feet" -> value * 0.3048
                 "Kilometers" -> value * 1000.0
-                "Miles" -> value * 1609.34
+                "Feet" -> value * 0.3048
+                "Miles" -> value * 1609.344
+                "Centimeters" -> value * 0.01
+                "Inches" -> value * 0.0254
                 else -> value
             }
             val result = when (to) {
                 "Meters" -> meters
-                "Feet" -> meters / 0.3048
                 "Kilometers" -> meters / 1000.0
-                "Miles" -> meters / 1609.34
+                "Feet" -> meters / 0.3048
+                "Miles" -> meters / 1609.344
+                "Centimeters" -> meters / 0.01
+                "Inches" -> meters / 0.0254
                 else -> meters
             }
             df.format(result)
@@ -720,12 +807,16 @@ private fun convertUnits(inputStr: String, category: String, from: String, to: S
         "Weight" -> {
             val kg = when (from) {
                 "Kilograms" -> value
-                "Pounds" -> value * 0.453592
+                "Pounds" -> value * 0.45359237
+                "Grams" -> value * 0.001
+                "Ounces" -> value * 0.02834952
                 else -> value
             }
             val result = when (to) {
                 "Kilograms" -> kg
-                "Pounds" -> kg / 0.453592
+                "Pounds" -> kg / 0.45359237
+                "Grams" -> kg / 0.001
+                "Ounces" -> kg / 0.02834952
                 else -> kg
             }
             df.format(result)
@@ -734,103 +825,172 @@ private fun convertUnits(inputStr: String, category: String, from: String, to: S
             val celsius = when (from) {
                 "Celsius" -> value
                 "Fahrenheit" -> (value - 32.0) * (5.0 / 9.0)
+                "Kelvin" -> value - 273.15
                 else -> value
             }
             val result = when (to) {
                 "Celsius" -> celsius
                 "Fahrenheit" -> (celsius * (9.0 / 5.0)) + 32.0
+                "Kelvin" -> celsius + 273.15
                 else -> celsius
             }
             df.format(result)
         }
         "Speed" -> {
-            val kmh = if (from == "km/h") value else value * 1.60934
-            val result = if (to == "km/h") kmh else kmh / 1.60934
+            val kmh = when (from) {
+                "km/h" -> value
+                "mph" -> value * 1.609344
+                "m/s" -> value * 3.6
+                "Knots" -> value * 1.852
+                else -> value
+            }
+            val result = when (to) {
+                "km/h" -> kmh
+                "mph" -> kmh / 1.609344
+                "m/s" -> kmh / 3.6
+                "Knots" -> kmh / 1.852
+                else -> kmh
+            }
             df.format(result)
         }
         else -> df.format(value)
     }
 }
 
-private fun evaluateMathExpression(rawExpr: String, isRad: Boolean): String {
+internal fun evaluateMathExpression(rawExpr: String, isRad: Boolean): String {
     try {
-        var clean = rawExpr
+        val clean = rawExpr
             .replace("×", "*")
             .replace("÷", "/")
             .replace("−", "-")
             .replace("π", Math.PI.toString())
             .replace("e", Math.E.toString())
+            .replace(" ", "")
 
-        // Handle functions like sin, cos, tan, ln, log, sqrt
-        clean = evaluateFunctions(clean, isRad)
+        if (clean.isBlank()) return ""
 
-        val result = simpleEvaluate(clean)
+        val parser = MathParser(clean, isRad)
+        val result = parser.parse()
+        if (result.isNaN()) return "Invalid Input"
+        if (result.isInfinite()) return if (result > 0) "Infinity" else "-Infinity"
+
         val df = DecimalFormat("#.########")
-        return df.format(result)
+        val formatted = df.format(result)
+        return if (formatted == "-0") "0" else formatted
+    } catch (e: ArithmeticException) {
+        return e.message ?: "Cannot divide by 0"
     } catch (_: Exception) {
         return "Error"
     }
 }
 
-private fun evaluateFunctions(expr: String, isRad: Boolean): String {
-    var s = expr
-    val regex = Regex("(sin|cos|tan|ln|log|sqrt)\\(([^()]+)\\)")
-    var match = regex.find(s)
-    while (match != null) {
-        val func = match.groupValues[1]
-        val arg = simpleEvaluate(match.groupValues[2])
-        val evaluated = when (func) {
-            "sin" -> sin(if (isRad) arg else Math.toRadians(arg))
-            "cos" -> cos(if (isRad) arg else Math.toRadians(arg))
-            "tan" -> tan(if (isRad) arg else Math.toRadians(arg))
-            "ln" -> ln(arg)
-            "log" -> log10(arg)
-            "sqrt" -> sqrt(arg)
-            else -> arg
-        }
-        s = s.substring(0, match.range.first) + evaluated.toString() + s.substring(match.range.last + 1)
-        match = regex.find(s)
-    }
-    return s
-}
+private class MathParser(private val str: String, private val isRad: Boolean) {
+    private var pos = -1
+    private var ch = ' '
 
-private fun simpleEvaluate(expr: String): Double {
-    val tokens = expr.replace(" ", "")
-    var cur = 0.0
-    var pendingOp = '+'
-    var i = 0
-    val numBuffer = StringBuilder()
-
-    fun applyOp(op: Char, v: Double) {
-        when (op) {
-            '+' -> cur += v
-            '-' -> cur -= v
-            '*' -> cur *= v
-            '/' -> cur = if (v != 0.0) cur / v else 0.0
-            '^' -> cur = Math.pow(cur, v)
-            '%' -> cur = cur * (v / 100.0)
-        }
+    private fun nextChar() {
+        pos++
+        ch = if (pos < str.length) str[pos] else '\u0000'
     }
 
-    while (i < tokens.length) {
-        val c = tokens[i]
-        if (c.isDigit() || c == '.' || (c == '-' && numBuffer.isEmpty() && cur == 0.0)) {
-            numBuffer.append(c)
-        } else if (c in listOf('+', '-', '*', '/', '^', '%')) {
-            if (numBuffer.isNotEmpty()) {
-                val num = numBuffer.toString().toDoubleOrNull() ?: 0.0
-                numBuffer.clear()
-                applyOp(pendingOp, num)
+    private fun eat(charToEat: Char): Boolean {
+        while (ch == ' ') nextChar()
+        if (ch == charToEat) {
+            nextChar()
+            return true
+        }
+        return false
+    }
+
+    fun parse(): Double {
+        nextChar()
+        val x = parseExpression()
+        if (pos < str.length && ch != '\u0000') throw IllegalArgumentException("Unexpected: $ch")
+        return x
+    }
+
+    private fun parseExpression(): Double {
+        var x = parseTerm()
+        while (true) {
+            when {
+                eat('+') -> x += parseTerm()
+                eat('-') -> x -= parseTerm()
+                else -> return x
             }
-            pendingOp = c
         }
-        i++
     }
 
-    if (numBuffer.isNotEmpty()) {
-        val num = numBuffer.toString().toDoubleOrNull() ?: 0.0
-        applyOp(pendingOp, num)
+    private fun parseTerm(): Double {
+        var x = parseFactor()
+        while (true) {
+            when {
+                eat('*') -> x *= parseFactor()
+                eat('/') -> {
+                    val divisor = parseFactor()
+                    if (divisor == 0.0) throw ArithmeticException("Cannot divide by 0")
+                    x /= divisor
+                }
+                eat('%') -> {
+                    val divisor = parseFactor()
+                    if (divisor == 0.0) throw ArithmeticException("Cannot divide by 0")
+                    x %= divisor
+                }
+                else -> return x
+            }
+        }
     }
 
-    return cur
+    private fun parseFactor(): Double {
+        val x = parsePrimary()
+        if (eat('^')) {
+            val exponent = parseFactor()
+            return Math.pow(x, exponent)
+        }
+        return x
+    }
+
+    private fun parsePrimary(): Double {
+        if (eat('+')) return parsePrimary()
+        if (eat('-')) return -parsePrimary()
+
+        var x: Double
+        val startPos = pos
+
+        if (eat('(')) {
+            x = parseExpression()
+            if (!eat(')')) throw IllegalArgumentException("Missing closing parenthesis")
+        } else if ((ch in '0'..'9') || ch == '.') {
+            while ((ch in '0'..'9') || ch == '.') nextChar()
+            val numStr = str.substring(startPos, pos)
+            x = numStr.toDoubleOrNull() ?: throw IllegalArgumentException("Invalid number: $numStr")
+        } else if (ch in 'a'..'z' || ch in 'A'..'Z') {
+            while (ch in 'a'..'z' || ch in 'A'..'Z') nextChar()
+            val func = str.substring(startPos, pos).lowercase()
+            if (!eat('(')) throw IllegalArgumentException("Missing opening parenthesis after function $func")
+            val arg = parseExpression()
+            if (!eat(')')) throw IllegalArgumentException("Missing closing parenthesis for $func")
+            x = when (func) {
+                "sin" -> sin(if (isRad) arg else Math.toRadians(arg))
+                "cos" -> cos(if (isRad) arg else Math.toRadians(arg))
+                "tan" -> tan(if (isRad) arg else Math.toRadians(arg))
+                "ln" -> {
+                    if (arg <= 0.0) throw IllegalArgumentException("Invalid input for ln")
+                    ln(arg)
+                }
+                "log" -> {
+                    if (arg <= 0.0) throw IllegalArgumentException("Invalid input for log")
+                    log10(arg)
+                }
+                "sqrt" -> {
+                    if (arg < 0.0) throw IllegalArgumentException("Invalid input for sqrt")
+                    sqrt(arg)
+                }
+                else -> throw IllegalArgumentException("Unknown function: $func")
+            }
+        } else {
+            throw IllegalArgumentException("Unexpected character: $ch")
+        }
+
+        return x
+    }
 }

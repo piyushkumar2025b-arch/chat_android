@@ -437,13 +437,101 @@ fun DeviceStorageSheet(
                         }
                     )
                 }
+                item {
+                    SampleFileChip(
+                        name = "Manifest.xml",
+                        type = "XML Manifest",
+                        icon = Icons.Default.Code,
+                        onClick = {
+                            onDismiss()
+                            onAddSampleFile("xml")
+                        }
+                    )
+                }
+                item {
+                    SampleFileChip(
+                        name = "DataService.java",
+                        type = "Java Service",
+                        icon = Icons.Default.Code,
+                        onClick = {
+                            onDismiss()
+                            onAddSampleFile("java")
+                        }
+                    )
+                }
+                item {
+                    SampleFileChip(
+                        name = "Engine.cpp",
+                        type = "C++ Engine",
+                        icon = Icons.Default.Code,
+                        onClick = {
+                            onDismiss()
+                            onAddSampleFile("cpp")
+                        }
+                    )
+                }
+                item {
+                    SampleFileChip(
+                        name = "Modern.css",
+                        type = "CSS Theme",
+                        icon = Icons.Default.Description,
+                        onClick = {
+                            onDismiss()
+                            onAddSampleFile("css")
+                        }
+                    )
+                }
+                item {
+                    SampleFileChip(
+                        name = "Server.log",
+                        type = "Server Log",
+                        icon = Icons.Default.Description,
+                        onClick = {
+                            onDismiss()
+                            onAddSampleFile("log")
+                        }
+                    )
+                }
+                item {
+                    SampleFileChip(
+                        name = "Dockerfile",
+                        type = "Docker Spec",
+                        icon = Icons.Default.Code,
+                        onClick = {
+                            onDismiss()
+                            onAddSampleFile("dockerfile")
+                        }
+                    )
+                }
+                item {
+                    SampleFileChip(
+                        name = "Playlist.m3u",
+                        type = "M3U Stream",
+                        icon = Icons.Default.TableChart,
+                        onClick = {
+                            onDismiss()
+                            onAddSampleFile("m3u")
+                        }
+                    )
+                }
+                item {
+                    SampleFileChip(
+                        name = "Captions.srt",
+                        type = "SRT Subtitles",
+                        icon = Icons.Default.Description,
+                        onClick = {
+                            onDismiss()
+                            onAddSampleFile("srt")
+                        }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
             // Supported Formats Pills
             Text(
-                text = "Supported Formats (${15}+ types)",
+                text = "Supported Formats (${24}+ types)",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -462,15 +550,23 @@ fun DeviceStorageSheet(
                     "CSV & TSV Data",
                     "JSON & JSONL",
                     "XML & HTML",
-                    "RTF Documents",
-                    "Python & Kotlin",
-                    "Java & JS / TS",
+                    "YAML & TOML",
+                    "Rust & Go",
+                    "Java & Kotlin",
                     "C / C++ & C#",
-                    "SQL & Shell Scripts",
+                    "CSS & JS / TS",
+                    "Python & Bash",
+                    "SQL Databases",
                     "TXT & Markdown",
-                    "ZIP Archives",
-                    "JPG, PNG, WEBP",
-                    "Audio / Video Meta"
+                    "Server Logs (.log)",
+                    "Dockerfiles",
+                    "Playlists (.m3u/.m3u8)",
+                    "Captions (.srt/.vtt)",
+                    "ZIP & Tar Archives",
+                    "Images (JPG, PNG, WEBP, SVG)",
+                    "Audio (MP3, WAV, FLAC, OGG)",
+                    "Video (MP4, MKV, WebM)",
+                    "SQLite (.db)"
                 )
                 for (fmt in formats) {
                     Surface(

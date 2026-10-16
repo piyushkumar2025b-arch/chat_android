@@ -95,6 +95,7 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -1721,6 +1722,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
 
                     AppSection.MARKDOWN -> {
                         MarkdownStudioScreen(
+                            initialContent = viewModel.activeMarkdownSnippet,
                             onBack = { viewModel.navigateToSection(AppSection.CHAT) },
                             onSendToChat = { prompt ->
                                 viewModel.sendMessage(prompt)
@@ -1732,6 +1734,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
                     AppSection.CODE_STUDIO -> {
                         CodeStudioScreen(
                             preferencesManager = viewModel.preferencesManager,
+                            initialCode = viewModel.activeCodeSnippet?.first,
+                            initialFileName = viewModel.activeCodeSnippet?.second,
                             onBack = { viewModel.navigateToSection(AppSection.CHAT) },
                             onSendToChat = { prompt ->
                                 viewModel.sendMessage(prompt)
@@ -1817,6 +1821,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
 
                     AppSection.MEDIA_PLAYER -> {
                         UniversalMediaPlayerScreen(
+                            initialMediaItem = viewModel.activeMediaItem,
                             onBack = { viewModel.navigateToSection(AppSection.CHAT) },
                             onSendToChat = { prompt ->
                                 viewModel.sendMessage(prompt)
@@ -2157,6 +2162,114 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                 Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("Ask AI", fontSize = 12.sp)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Connected Actions Across Tools:",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // 1. Save to Notes Hub
+                            FilledTonalButton(
+                                onClick = {
+                                    val noteTitle = att.name.substringBeforeLast('.')
+                                    val noteContent = details.extractedText.ifBlank { att.previewSnippet ?: "" }
+                                    viewModel.saveTextAsNote(noteTitle, noteContent) { success ->
+                                        Toast.makeText(context, if (success) "Saved '$noteTitle' to Notes Hub!" else "Failed to save note", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f).testTag("save_as_note_file_details_btn")
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Note, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Save Note", fontSize = 11.sp, maxLines = 1)
+                            }
+
+                            // 2. Index into RAG Knowledge
+                            FilledTonalButton(
+                                onClick = {
+                                    val docTitle = att.name
+                                    val docContent = details.extractedText.ifBlank { att.previewSnippet ?: "" }
+                                    viewModel.ingestTextToRag(docTitle, docContent, sourceType = "ATTACHMENT") { success, msg ->
+                                        Toast.makeText(context, if (success) "✅ $msg" else "❌ $msg", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f).testTag("index_rag_file_details_btn")
+                            ) {
+                                Icon(Icons.Default.Hub, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Index RAG", fontSize = 11.sp, maxLines = 1)
+                            }
+                        }
+
+                        // Cross-Studio Switcher Buttons
+                        val isCodeOrConfig = remember(att.name) {
+                            val ext = att.name.substringAfterLast('.', "").lowercase()
+                            ext in listOf("py", "kt", "js", "ts", "html", "css", "java", "cpp", "c", "rs", "go", "sql", "json", "yaml", "xml", "sh")
+                        }
+                        val isMedia = remember(att.name) {
+                            com.example.data.remote.FileUtils.isMediaExtension(att.name)
+                        }
+
+                        if (isCodeOrConfig || isMedia || att.name.endsWith(".md", true) || att.name.endsWith(".txt", true)) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (isCodeOrConfig) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            inspectingAttachment = null
+                                            viewModel.navigateToSection(AppSection.CODE_STUDIO)
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f).testTag("open_in_code_studio_btn")
+                                    ) {
+                                        Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Code Studio", fontSize = 11.sp, maxLines = 1)
+                                    }
+                                }
+                                if (att.name.endsWith(".md", true) || att.name.endsWith(".txt", true)) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            inspectingAttachment = null
+                                            viewModel.navigateToSection(AppSection.MARKDOWN)
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f).testTag("open_in_markdown_btn")
+                                    ) {
+                                        Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Markdown", fontSize = 11.sp, maxLines = 1)
+                                    }
+                                }
+                                if (isMedia) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            inspectingAttachment = null
+                                            viewModel.navigateToSection(AppSection.MEDIA_PLAYER)
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f).testTag("play_in_media_player_btn")
+                                    ) {
+                                        Icon(Icons.Default.GraphicEq, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Media Player", fontSize = 11.sp, maxLines = 1)
+                                    }
+                                }
                             }
                         }
                     } else {

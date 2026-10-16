@@ -116,6 +116,8 @@ data class CodeTemplate(
 @Composable
 fun CodeStudioScreen(
     preferencesManager: PreferencesManager? = null,
+    initialCode: String? = null,
+    initialFileName: String? = null,
     onBack: (() -> Unit)? = null,
     onSendToChat: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -123,9 +125,30 @@ fun CodeStudioScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    var codeContent by remember { mutableStateOf(getHtmlAppTemplate()) }
-    var selectedLanguage by remember { mutableStateOf("HTML/JS") }
-    var fileName by remember { mutableStateOf("index.html") }
+    var codeContent by remember(initialCode) { mutableStateOf(initialCode ?: getHtmlAppTemplate()) }
+    var fileName by remember(initialFileName) { mutableStateOf(initialFileName ?: "index.html") }
+    var selectedLanguage by remember(initialFileName) {
+        mutableStateOf(
+            if (initialFileName != null) {
+                when {
+                    initialFileName.endsWith(".html", true) || initialFileName.endsWith(".htm", true) -> "HTML/JS"
+                    initialFileName.endsWith(".py", true) -> "Python"
+                    initialFileName.endsWith(".kt", true) || initialFileName.endsWith(".kts", true) -> "Kotlin"
+                    initialFileName.endsWith(".rs", true) -> "Rust"
+                    initialFileName.endsWith(".go", true) -> "Go"
+                    initialFileName.endsWith(".java", true) -> "Java"
+                    initialFileName.endsWith(".js", true) -> "JavaScript"
+                    initialFileName.endsWith(".ts", true) -> "TypeScript"
+                    initialFileName.endsWith(".json", true) -> "JSON"
+                    initialFileName.endsWith(".yaml", true) || initialFileName.endsWith(".yml", true) -> "YAML"
+                    initialFileName.endsWith(".cpp", true) || initialFileName.endsWith(".c", true) || initialFileName.endsWith(".h", true) -> "C++"
+                    initialFileName.endsWith(".sql", true) -> "SQL"
+                    initialFileName.endsWith(".sh", true) || initialFileName.endsWith(".bash", true) -> "Bash"
+                    else -> "Code"
+                }
+            } else "HTML/JS"
+        )
+    }
 
     // Tab: 0 = Code Editor, 1 = In-Site Web Preview, 2 = AI Terminal Output, 3 = AI Diagnostics
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -524,11 +547,16 @@ Status: SUCCESS (Code 0)
                                         "HTML/JS" -> "html"
                                         "Python" -> "py"
                                         "Kotlin" -> "kt"
+                                        "Rust" -> "rs"
+                                        "Go" -> "go"
+                                        "Java" -> "java"
                                         "JavaScript" -> "js"
                                         "TypeScript" -> "ts"
                                         "JSON" -> "json"
+                                        "YAML" -> "yaml"
                                         "C++" -> "cpp"
                                         "SQL" -> "sql"
+                                        "Bash" -> "sh"
                                         else -> "txt"
                                     }
                                     showLangDropdown = false
@@ -663,11 +691,15 @@ Status: SUCCESS (Code 0)
                                                 return super.onConsoleMessage(cm)
                                             }
                                         }
+                                        tag = codeContent
                                         loadDataWithBaseURL("https://local.omnichat", codeContent, "text/html", "UTF-8", null)
                                     }
                                 },
                                 update = { webView ->
-                                    webView.loadDataWithBaseURL("https://local.omnichat", codeContent, "text/html", "UTF-8", null)
+                                    if (webView.tag != codeContent) {
+                                        webView.tag = codeContent
+                                        webView.loadDataWithBaseURL("https://local.omnichat", codeContent, "text/html", "UTF-8", null)
+                                    }
                                 },
                                 modifier = Modifier.fillMaxSize()
                             )
