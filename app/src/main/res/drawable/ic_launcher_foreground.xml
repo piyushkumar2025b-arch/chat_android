@@ -1,8 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="66dp"
-        android:height="66dp"
-        android:drawable="@drawable/ic_omnichat_logo"
-        android:gravity="center" />
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Chat Bubble Backing Glow -->
+    <path
+        android:fillColor="#30FFFFFF"
+        android:pathData="M34,30 C30,30 26,34 26,38 L26,64 C26,68 30,72 34,72 L44,72 L50,82 L56,72 L74,72 C78,72 82,68 82,64 L82,38 C82,34 78,30 74,30 Z" />
+    <!-- Chat Bubble Body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,32 C32.7,32 30,34.7 30,38 L30,62 C30,65.3 32.7,68 36,68 L46,68 L52,77 L58,68 L72,68 C75.3,68 78,65.3 78,62 L78,38 C78,34.7 75.3,32 72,32 Z" />
+    <!-- AI Sparkle / Brain Star -->
+    <path
+        android:fillColor="#6366F1"
+        android:pathData="M54,39 L56.2,46.8 L64,49 L56.2,51.2 L54,59 L51.8,51.2 L44,49 L51.8,46.8 Z" />
+    <!-- Secondary AI Nodes -->
+    <path
+        android:fillColor="#818CF8"
+        android:pathData="M40,56 A2.5,2.5 0 1,1 40,51 A2.5,2.5 0 1,1 40,56 Z" />
+    <path
+        android:fillColor="#818CF8"
+        android:pathData="M68,56 A2.5,2.5 0 1,1 68,51 A2.5,2.5 0 1,1 68,56 Z" />
+</vector>

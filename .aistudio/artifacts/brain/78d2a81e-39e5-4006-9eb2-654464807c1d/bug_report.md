@@ -1,98 +1,95 @@
-# OmniChat Functionality Bug Report & Remediation Plan
+# OmniChat Comprehensive Bug & Defect Report
+
+**Date:** October 16, 2026  
+**Target:** OmniChat Android AI Platform  
+**Status:** Audit Completed — Fixes In Progress  
+
+---
 
 ## Executive Summary
-A comprehensive audit of the OmniChat workspace revealed several functional defects, navigation traps, UI overflow issues on mobile screens, and disconnected data paths between the Chat interface and secondary tool studios. This document details each bug, root cause analysis, severity, and the remediation implemented.
+A comprehensive static code analysis, architectural audit, and feature verification pass was conducted across the OmniChat platform. Nine (9) defects and functional bugs were cataloged spanning container lifecycle resilience, navigation back-stack handling, multi-screen attachment data pipelines, missing interactive controls, and resource cleanup.
 
 ---
 
-## Identified Bugs
+## Detailed Bug Inventory & Severity Matrix
 
-### 1. Dialog Content View Overflow (Mobile Keyboard Clipping)
-- **Severity**: High
-- **Affected Components**:
-  - `PasswordEditorDialog` in `PasswordSaverScreen.kt`
-  - `EventEditorDialog` in `CalendarScreen.kt`
-  - `NoteEditorDialog` in `NotesScreen.kt`
-- **Symptom**: On mobile screens, smaller viewports, or when the on-screen software keyboard appears, the dialog `Column` overflows vertically. The "Save", "Cancel", and secondary action buttons are pushed off-screen and cannot be clicked, trapping the user.
-- **Root Cause**: The inner dialog `Column(modifier = Modifier.fillMaxWidth())` was missing `Modifier.verticalScroll(rememberScrollState())`.
-- **Fix**: Add `.verticalScroll(rememberScrollState())` to all three dialog content columns.
+### BUG-01: Container Lifecycle & Build Manifest Disconnection
+- **Severity:** Critical
+- **Component:** Core Architecture / Manifest & Dependencies
+- **Description:** When the container execution environment encountered an unexpected restart, workspace dependencies, permissions (`INTERNET`, `ACCESS_NETWORK_STATE`), and the `applicationId` reverted to template defaults, causing build failure.
+- **Root Cause:** Incomplete build configuration synchronization and missing permissions in `AndroidManifest.xml`.
+- **Fix:** Update `AndroidManifest.xml` with all necessary network permissions, configure `applicationId` to `com.aistudio.omnichat.kxmpzq`, and configure production dependencies (Compose Material3, Coil, Coroutines, OkHttp, Moshi, Retrofit, Room).
 
 ---
 
-### 2. Sub-Screen Navigation Traps & Missing Back Handlers in Hubs
-- **Severity**: High
-- **Affected Components**:
-  - `IntelHubScreen.kt`
-  - `StudioScreen.kt`
-  - `PasswordSaverScreen.kt`
-  - `CalculatorScreen.kt`
-  - `NotesScreen.kt`
-  - `CalendarScreen.kt`
-  - `StepCounterScreen.kt`
-  - `Game2048Screen.kt`
-  - `NotificationCenterScreen.kt`
-  - `ImageEditorScreen.kt`
-- **Symptom**:
-  1. Sub-screens embedded in `IntelHubScreen` and `StudioScreen` were called without `onBack`, hiding their top-left back navigation buttons.
-  2. If the user had Master PIN enabled on `PasswordSaverScreen`, the lock screen rendered full-screen without an `onBack` button, completely trapping the user.
-  3. Pressing the hardware/system back button while on any sub-tab (e.g. Tab 5) immediately exited the entire Hub back to Chat, rather than returning to Tab 0 (Overview).
-- **Root Cause**: Missing `BackHandler(enabled = selectedTab != 0) { selectedTab = 0 }` inside `IntelHubScreen` and `StudioScreen`, and missing `onBack = { selectedTab = 0 }` passed into the sub-screen composables.
-- **Fix**: Wire `onBack = { selectedHubTab = 0 }` and `onBack = { selectedStudioTab = 0 }` to all child screens, and add `BackHandler` on both Hubs.
+### BUG-02: IntelHub & Studio Sub-Tab Hardware Back Navigation Trap
+- **Severity:** High
+- **Component:** `IntelHubScreen.kt`, `StudioScreen.kt`
+- **Description:** When users navigate to secondary tabs within Intel Hub (e.g., Notes, Calendar, Secrets Vault, Calculator, Web Search, News, Step Counter), pressing the Android system back button jumps entirely out of the Hub to the Chat screen instead of returning to the Hub overview (Tab 0).
+- **Root Cause:** Absence of `BackHandler(enabled = selectedHubTab != 0) { selectedHubTab = 0 }`.
+- **Fix:** Add contextual `BackHandler` on all sub-tab screens so that back gestures return to the Hub dashboard first, and only subsequent back gestures pop to Chat.
 
 ---
 
-### 3. Unit Converter Selection Lock & Calculator Backspace Missing
-- **Severity**: Medium-High
-- **Affected Components**:
-  - `CalculatorScreen.kt`
-- **Symptom**:
-  1. The Unit Converter displayed "Length", "Weight", "Temperature", "Speed", but gave the user **zero controls** to choose `fromUnit` and `toUnit` or swap them (e.g. converting Feet to Meters or Miles to Kilometers was impossible).
-  2. The calculator keypad only provided `AC` (All Clear) and lacked a single-character `Backspace` button. Any typographical error in a lengthy mathematical expression forced clearing the entire expression.
-- **Root Cause**: Keypad layout omitted `Backspace` despite importing `Icons.AutoMirrored.Filled.Backspace`. Unit converter UI omitted dropdowns/chips for unit selection and swap buttons.
-- **Fix**:
-  - Add individual unit selection chips / dropdowns for each category (Length, Weight, Temperature, Speed) with expanded units (Kilometers, Miles, Meters, Feet, Centimeters, Inches; Kilograms, Pounds, Grams, Ounces; Celsius, Fahrenheit, Kelvin; km/h, mph, m/s, Knots).
-  - Add an animated Swap button (`Icons.Default.SwapHoriz`).
-  - Add Backspace button to the calculator keypad with single-character deletion.
+### BUG-03: PasswordSaverScreen / Vault Lock Screen Dead-End
+- **Severity:** High
+- **Component:** `PasswordSaverScreen.kt`
+- **Description:** Inside Intel Hub, the Password & Secret Vault failed to supply or render an `onBack` navigation button when in the PIN-locked state, preventing users who forgot their PIN or decided not to unlock from returning to the Hub.
+- **Root Cause:** TopAppBar navigation icon had `if (onBack != null)` check but wasn't invoked or passed from `IntelHubScreen`.
+- **Fix:** Ensure `onBack` is consistently passed as `{ selectedHubTab = 0 }` and always render the back navigation arrow on the PIN lock screen.
 
 ---
 
-### 4. Cross-Tool Attachment Data Loss on Navigation
-- **Severity**: High
-- **Affected Components**:
-  - `ChatScreen.kt`
-  - `ChatViewModel.kt`
-  - `CodeStudioScreen.kt`
-  - `MarkdownStudioScreen.kt`
-  - `UniversalMediaPlayerScreen.kt`
-- **Symptom**: When inspecting an attachment in Chat (e.g., a `.kt` file, `.md` file, or `.mp3`/`.mp4` media) and clicking "Code Studio", "Markdown", or "Media Player", the app navigated to the studio but did not carry over the attachment data. Code Studio displayed generic boilerplate; Markdown Studio displayed default text; Media Player did not queue or play the selected item.
-- **Root Cause**: `navigateToSection` only toggled the `AppSection` enum without setting pending state or passing parameters.
-- **Fix**:
-  - Add `activeCodeSnippet`, `activeMarkdownSnippet`, and `activeMediaItem` to `ChatViewModel`.
-  - Provide `openInCodeStudio(code, fileName)`, `openInMarkdown(text)`, and `openInMediaPlayer(uri, name, mime)`.
-  - Connect `CodeStudioScreen` (`initialCode`, `initialFileName`), `MarkdownStudioScreen` (`initialContent`), and `UniversalMediaPlayerScreen` (`initialMediaItem`).
+### BUG-04: ImageEditor Missing "Send to AI Chat" Action Button
+- **Severity:** Medium
+- **Component:** `ImageEditorScreen.kt`
+- **Description:** The screen declared parameter `onSendImageToChat: (Bitmap) -> Unit` and imported `Icons.Default.Send`, but the top action bar only contained Save and Reset buttons. Users who edited or annotated images could not send them back into the active AI conversation.
+- **Root Cause:** Missing `IconButton` in the TopAppBar actions list.
+- **Fix:** Add a high-visibility "Send to AI Chat" action button in `ImageEditorScreen` TopAppBar that converts the edited bitmap to the chat attachment pipeline.
 
 ---
 
-### 5. Missing AI Chat Connectivity in ImageEditorScreen
-- **Severity**: Medium
-- **Affected Components**:
-  - `ImageEditorScreen.kt`
-- **Symptom**: `ImageEditorScreen` defined `onSendImageToChat: ((String) -> Unit)?`, but never displayed a button or invoked the callback.
-- **Root Cause**: Action bar omitted the `Icons.Default.Send` action button.
-- **Fix**: Add a "Send to AI Chat" action button in the top bar of `ImageEditorScreen` allowing users to prompt AI to analyze their edited image.
+### BUG-05: Attachment Handoff to Code & Markdown Studios Dropped Code
+- **Severity:** Medium
+- **Component:** `ChatScreen.kt` -> `CodeStudioScreen.kt`, `MarkdownStudioScreen.kt`
+- **Description:** When users inspected code snippets or markdown attachments in chat and clicked "Open in Code Studio" or "Open in Markdown Studio", the studios opened with blank/default templates instead of pre-populating the attachment's code and filename.
+- **Root Cause:** Navigation state in `ChatScreen` did not forward `attachment.content`, `attachment.name`, or language to `CodeStudioScreen(initialCode = ...)` and `MarkdownStudioScreen(initialContent = ...)`.
+- **Fix:** Wire active attachment content and metadata into `CodeStudioScreen` and `MarkdownStudioScreen` state upon transition.
 
 ---
 
-### 6. YouTube WebView Audio/Video Background Leaks
-- **Severity**: Medium
-- **Affected Components**:
-  - `YouTubeScreen.kt`
-- **Symptom**: When navigating away from `YouTubeScreen` while a video was playing inside the embedded WebView, audio continued playing in the background, and the WebView leaked resources.
-- **Root Cause**: Lack of `DisposableEffect` to pause, stop, and clean up the WebView instance.
-- **Fix**: Add `DisposableEffect` in `InlineYouTubePlayer` calling `onPause()`, `stopLoading()`, and `loadUrl("about:blank")` on dispose.
+### BUG-06: Calculator Keypad Missing Single-Character Backspace & Unit Swap
+- **Severity:** Medium
+- **Component:** `CalculatorScreen.kt`
+- **Description:** 
+  1. The calculator keypad lacked a single-character `⌫` backspace button, forcing users to press `AC` and re-enter entire expressions when correcting single-digit mistakes.
+  2. The Unit Converter was locked to static unit pairs with no unit selection dropdowns or swap functionality.
+- **Root Cause:** Backspace icon was imported but not bound to any keypad cell; unit converter lacked stateful `fromUnit`/`toUnit` dropdown menus and swap button.
+- **Fix:** Add a dedicated Backspace key `⌫` to the calculator grid and implement interactive Unit Category tabs (Speed, Length, Weight, Temperature) with bidirectional swap button and dropdown selectors.
 
 ---
 
-## Verification Strategy
-- Run `compile_applet` to confirm clean compilation across all modules.
-- Run unit tests to verify mathematical parsing, unit conversion, RAG ingestion, and file inspection helpers.
+### BUG-07: Calendar Event Status Labeling & AI Assistant Dispatch
+- **Severity:** Low
+- **Component:** `CalendarScreen.kt`
+- **Description:** Updating an existing scheduled event displayed "Event scheduled!" instead of "Event updated!", causing user confusion over whether changes were saved. Additionally, calendar events lacked a 1-tap "Consult AI on this Schedule" button.
+- **Root Cause:** Toast message was hardcoded to "Event scheduled!" regardless of whether the event ID was preexisting.
+- **Fix:** Dynamic Toast ("Event updated!" vs "Event scheduled!") and add an AI action button allowing users to send event summaries to the AI Chat for briefing preparation.
+
+---
+
+### BUG-08: Universal Media Player Missing Proper Release Cleanup
+- **Severity:** High
+- **Component:** `UniversalMediaPlayerScreen.kt`
+- **Description:** When navigating between media items or leaving the Universal Media Player screen, background audio/video playback resources could leak memory or continue playing audio in the background.
+- **Root Cause:** Missing Compose `DisposableEffect` to cleanly stop and release Android `MediaPlayer` / video controller.
+- **Fix:** Implement robust `DisposableEffect(Unit)` with `player.stop()` and `player.release()`.
+
+---
+
+### BUG-09: Missing Networking & Storage Permissions in AndroidManifest
+- **Severity:** Critical
+- **Component:** `AndroidManifest.xml`
+- **Description:** App attempted to make HTTP requests to Gemini, Groq, OpenRouter, and DuckDuckGo web search without `<uses-permission android:name="android.permission.INTERNET" />`.
+- **Root Cause:** Bare template manifest.
+- **Fix:** Add `INTERNET`, `ACCESS_NETWORK_STATE`, and `VIBRATE` permissions to `AndroidManifest.xml`.

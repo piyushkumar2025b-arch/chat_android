@@ -6,71 +6,41 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
-import com.example.data.model.CalendarEventEntity
-import com.example.data.model.NoteItemEntity
-import com.example.data.model.PasswordItemEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ProductivityDao {
 
-    // --- Passwords ---
-    @Query("SELECT * FROM passwords ORDER BY serviceName ASC")
-    fun getAllPasswordsFlow(): Flow<List<PasswordItemEntity>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertPassword(item: PasswordItemEntity)
-
-    @Update
-    suspend fun updatePassword(item: PasswordItemEntity)
-
-    @Delete
-    suspend fun deletePassword(item: PasswordItemEntity)
-
-    @Query("DELETE FROM passwords WHERE id = :id")
-    suspend fun deletePasswordById(id: String)
-
-    // --- Notes ---
-    @Query("SELECT * FROM notes ORDER BY isPinned DESC, updatedAt DESC")
-    fun getAllNotesFlow(): Flow<List<NoteItemEntity>>
-
+    // Notes
     @Query("SELECT * FROM notes ORDER BY updatedAt DESC")
-    suspend fun getAllNotesDirect(): List<NoteItemEntity>
-
-    @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
-    suspend fun getNoteById(id: String): NoteItemEntity?
+    fun getAllNotes(): Flow<List<NoteEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertNote(item: NoteItemEntity)
+    suspend fun insertNote(note: NoteEntity)
 
     @Update
-    suspend fun updateNote(item: NoteItemEntity)
+    suspend fun updateNote(note: NoteEntity)
 
     @Delete
-    suspend fun deleteNote(item: NoteItemEntity)
+    suspend fun deleteNote(note: NoteEntity)
 
-    @Query("DELETE FROM notes WHERE id = :id")
-    suspend fun deleteNoteById(id: String)
-
-    // --- Calendar Events ---
-    @Query("SELECT * FROM calendar_events WHERE year = :year AND month = :month AND day = :day ORDER BY startTime ASC")
-    fun getEventsForDateFlow(year: Int, month: Int, day: Int): Flow<List<CalendarEventEntity>>
-
-    @Query("SELECT * FROM calendar_events WHERE year = :year AND month = :month ORDER BY day ASC, startTime ASC")
-    fun getEventsForMonthFlow(year: Int, month: Int): Flow<List<CalendarEventEntity>>
-
-    @Query("SELECT * FROM calendar_events ORDER BY year ASC, month ASC, day ASC, startTime ASC")
-    fun getAllEventsFlow(): Flow<List<CalendarEventEntity>>
+    // Calendar Events
+    @Query("SELECT * FROM calendar_events ORDER BY timestamp ASC")
+    fun getAllEvents(): Flow<List<CalendarEventEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertEvent(item: CalendarEventEntity)
-
-    @Update
-    suspend fun updateEvent(item: CalendarEventEntity)
+    suspend fun insertEvent(event: CalendarEventEntity)
 
     @Delete
-    suspend fun deleteEvent(item: CalendarEventEntity)
+    suspend fun deleteEvent(event: CalendarEventEntity)
 
-    @Query("DELETE FROM calendar_events WHERE id = :id")
-    suspend fun deleteEventById(id: String)
+    // Vault Items
+    @Query("SELECT * FROM vault_items ORDER BY updatedAt DESC")
+    fun getAllVaultItems(): Flow<List<VaultItemEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertVaultItem(item: VaultItemEntity)
+
+    @Delete
+    suspend fun deleteVaultItem(item: VaultItemEntity)
 }
