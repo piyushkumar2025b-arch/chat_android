@@ -1,6 +1,8 @@
 package com.example.ui
 
+import android.content.Context
 import android.media.MediaPlayer
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -55,6 +57,157 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+enum class MediaKind {
+    VIDEO,
+    AUDIO,
+    IMAGE,
+    PDF_DOCUMENT,
+    TEXT_DOCUMENT,
+    ARCHIVE,
+    UNKNOWN
+}
+
+data class MediaItem(
+    val uri: Uri,
+    val displayName: String,
+    val mimeType: String,
+    val kind: MediaKind,
+    val sizeBytes: Long = 0L,
+    val durationMs: Long = 0L
+)
+
+fun formatMediaDuration(millis: Long): String {
+    if (millis <= 0L) return "00:00"
+    val totalSeconds = millis / 1000
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) {
+        "%d:%02d:%02d".format(hours, minutes, seconds)
+    } else {
+        "%02d:%02d".format(minutes, seconds)
+    }
+}
+
+fun formatFileSize(bytes: Long): String {
+    if (bytes <= 0L) return "0 B"
+    val kb = 1024L
+    val mb = kb * 1024L
+    val gb = mb * 1024L
+    return when {
+        bytes < kb -> "$bytes B"
+        bytes < mb -> "%.1f KB".format(bytes.toDouble() / kb)
+        bytes < gb -> "%.1f MB".format(bytes.toDouble() / mb)
+        else -> "%.1f GB".format(bytes.toDouble() / gb)
+    }
+}
+
+fun resolveMediaItemFromUri(context: Context, uri: Uri): MediaItem {
+    val displayName = uri.lastPathSegment?.substringAfterLast('/') ?: "unknown"
+    val ext = displayName.substringAfterLast('.', "").lowercase()
+
+    val (kind, mimeType) = when (ext) {
+        "mp4", "mkv", "webm", "avi", "mov" -> {
+            MediaKind.VIDEO to "video/$ext"
+        }
+        "m3u8" -> {
+            MediaKind.VIDEO to "application/x-mpegURL"
+        }
+        "mp3" -> {
+            MediaKind.AUDIO to "audio/mpeg"
+        }
+        "wav", "ogg", "flac", "m4a", "aac" -> {
+            MediaKind.AUDIO to "audio/$ext"
+        }
+        "png", "jpg", "jpeg", "webp", "gif" -> {
+            MediaKind.IMAGE to "image/$ext"
+        }
+        "svg" -> {
+            MediaKind.IMAGE to "image/svg+xml"
+        }
+        "pdf" -> {
+            MediaKind.PDF_DOCUMENT to "application/pdf"
+        }
+        "apk" -> {
+            MediaKind.ARCHIVE to "application/vnd.android.package-archive"
+        }
+        "zip", "tar", "gz", "7z", "rar" -> {
+            MediaKind.ARCHIVE to "application/zip"
+        }
+        "csv" -> {
+            MediaKind.TEXT_DOCUMENT to "text/csv"
+        }
+        "md", "markdown" -> {
+            MediaKind.TEXT_DOCUMENT to "text/markdown"
+        }
+        "txt", "log" -> {
+            MediaKind.TEXT_DOCUMENT to "text/plain"
+        }
+        "py" -> {
+            MediaKind.TEXT_DOCUMENT to "text/x-python"
+        }
+        "yaml", "yml" -> {
+            MediaKind.TEXT_DOCUMENT to "text/yaml"
+        }
+        "rs" -> {
+            MediaKind.TEXT_DOCUMENT to "text/x-rust"
+        }
+        "xml" -> {
+            MediaKind.TEXT_DOCUMENT to "text/xml"
+        }
+        "cpp", "c", "h", "hpp" -> {
+            MediaKind.TEXT_DOCUMENT to "text/x-c++src"
+        }
+        "css" -> {
+            MediaKind.TEXT_DOCUMENT to "text/css"
+        }
+        "js", "ts", "kt", "java", "json", "html" -> {
+            MediaKind.TEXT_DOCUMENT to "text/plain"
+        }
+        else -> {
+            MediaKind.UNKNOWN to "application/octet-stream"
+        }
+    }
+
+    return MediaItem(
+        uri = uri,
+        displayName = displayName,
+        mimeType = mimeType,
+        kind = kind
+    )
+}
+
+object CuratedMediaSources {
+    val sampleSources: List<MediaItem> = listOf(
+        MediaItem(Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"), "BigBuckBunny.mp4", "video/mp4", MediaKind.VIDEO, 158008374L, 596000L),
+        MediaItem(Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"), "ElephantsDream.mp4", "video/mp4", MediaKind.VIDEO, 140000000L, 653000L),
+        MediaItem(Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"), "ForBiggerBlazes.mp4", "video/mp4", MediaKind.VIDEO, 15000000L, 15000L),
+        MediaItem(Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"), "TearsOfSteel.mp4", "video/mp4", MediaKind.VIDEO, 220000000L, 734000L),
+        MediaItem(Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4"), "Bullrun.mp4", "video/mp4", MediaKind.VIDEO, 45000000L, 120000L),
+        MediaItem(Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"), "SoundHelix-Song-1.mp3", "audio/mpeg", MediaKind.AUDIO, 4200000L, 372000L),
+        MediaItem(Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"), "SoundHelix-Song-2.mp3", "audio/mpeg", MediaKind.AUDIO, 3800000L, 421000L),
+        MediaItem(Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"), "SoundHelix-Song-3.mp3", "audio/mpeg", MediaKind.AUDIO, 4500000L, 345000L),
+        MediaItem(Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"), "SoundHelix-Song-4.mp3", "audio/mpeg", MediaKind.AUDIO, 5100000L, 480000L),
+        MediaItem(Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"), "SoundHelix-Song-5.mp3", "audio/mpeg", MediaKind.AUDIO, 3900000L, 312000L),
+        MediaItem(Uri.parse("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3"), "SoundHelix-Song-6.mp3", "audio/mpeg", MediaKind.AUDIO, 4300000L, 395000L),
+        MediaItem(Uri.parse("https://example.com/docs/bitcoin_whitepaper.pdf"), "bitcoin_whitepaper.pdf", "application/pdf", MediaKind.PDF_DOCUMENT, 184292L, 0L),
+        MediaItem(Uri.parse("https://example.com/docs/quantum_primer.pdf"), "quantum_primer.pdf", "application/pdf", MediaKind.PDF_DOCUMENT, 250000L, 0L),
+        MediaItem(Uri.parse("https://example.com/docs/neural_networks.pdf"), "neural_networks.pdf", "application/pdf", MediaKind.PDF_DOCUMENT, 410000L, 0L),
+        MediaItem(Uri.parse("https://example.com/docs/ai_safety_manifesto.md"), "ai_safety_manifesto.md", "text/markdown", MediaKind.TEXT_DOCUMENT, 12000L, 0L),
+        MediaItem(Uri.parse("https://example.com/docs/data_pipeline.csv"), "data_pipeline.csv", "text/csv", MediaKind.TEXT_DOCUMENT, 45000L, 0L),
+        MediaItem(Uri.parse("https://example.com/docs/kernel_config.yaml"), "kernel_config.yaml", "text/yaml", MediaKind.TEXT_DOCUMENT, 8200L, 0L),
+        MediaItem(Uri.parse("https://example.com/docs/server.log"), "server.log", "text/plain", MediaKind.TEXT_DOCUMENT, 32000L, 0L),
+        MediaItem(Uri.parse("https://example.com/docs/algorithm.py"), "algorithm.py", "text/x-python", MediaKind.TEXT_DOCUMENT, 4500L, 0L),
+        MediaItem(Uri.parse("https://example.com/docs/core_math.rs"), "core_math.rs", "text/x-rust", MediaKind.TEXT_DOCUMENT, 6700L, 0L),
+        MediaItem(Uri.parse("https://example.com/archives/system_backup.zip"), "system_backup.zip", "application/zip", MediaKind.ARCHIVE, 89000000L, 0L),
+        MediaItem(Uri.parse("https://example.com/archives/release_bundle.apk"), "release_bundle.apk", "application/vnd.android.package-archive", MediaKind.ARCHIVE, 18000000L, 0L),
+        MediaItem(Uri.parse("https://example.com/archives/dataset_2026.tar.gz"), "dataset_2026.tar.gz", "application/zip", MediaKind.ARCHIVE, 45000000L, 0L),
+        MediaItem(Uri.parse("https://example.com/archives/firmware.7z"), "firmware.7z", "application/zip", MediaKind.ARCHIVE, 12000000L, 0L),
+        MediaItem(Uri.parse("https://example.com/images/wallpaper_nebula.jpg"), "wallpaper_nebula.jpg", "image/jpeg", MediaKind.IMAGE, 3200000L, 0L),
+        MediaItem(Uri.parse("https://example.com/images/vector_logo.svg"), "vector_logo.svg", "image/svg+xml", MediaKind.IMAGE, 15000L, 0L)
+    )
+}
 
 data class PlayableMediaItem(
     val id: String,

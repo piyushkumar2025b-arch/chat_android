@@ -59,6 +59,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
+enum class ColorPreset(val label: String) {
+    BW("Black & White"),
+    SEPIA("Sepia"),
+    VIBRANT("Vibrant"),
+    CYBERPUNK("Cyberpunk"),
+    INVERT("Invert"),
+    NORMAL("Normal")
+}
+
 data class DrawnLine(
     val start: Offset,
     val end: Offset,

@@ -4,14 +4,28 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.example.data.model.ChatMessageEntity
+import com.example.data.model.ChatSessionEntity
+import com.example.data.model.KnowledgeChunkEntity
+import com.example.data.model.KnowledgeDocumentEntity
 
 @Database(
-    entities = [NoteEntity::class, CalendarEventEntity::class, VaultItemEntity::class],
-    version = 1,
+    entities = [
+        NoteEntity::class,
+        CalendarEventEntity::class,
+        VaultItemEntity::class,
+        ChatMessageEntity::class,
+        ChatSessionEntity::class,
+        KnowledgeDocumentEntity::class,
+        KnowledgeChunkEntity::class
+    ],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun productivityDao(): ProductivityDao
+    abstract fun chatDao(): ChatDao
+    abstract fun ragDao(): RagDao
 
     companion object {
         @Volatile

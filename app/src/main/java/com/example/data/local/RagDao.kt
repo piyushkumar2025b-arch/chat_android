@@ -62,4 +62,9 @@ interface RagDao {
         clearAllChunks()
         clearAllDocuments()
     }
+
+    @Transaction
+    suspend fun clearAllKnowledge() {
+        clearEntireKnowledgeBase()
+    }
 }

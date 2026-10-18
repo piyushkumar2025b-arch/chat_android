@@ -201,6 +201,12 @@ class RagEngine(private val ragDao: RagDao) {
         }
     }
 
+    suspend fun retrieveRelevantChunks(
+        query: String,
+        topK: Int = 4,
+        geminiApiKey: String = ""
+    ): List<RetrievedChunk> = search(query, topK, geminiApiKey)
+
     /**
      * Hybrid Semantic Search: Computes vector cosine similarity and BM25 term overlap.
      */

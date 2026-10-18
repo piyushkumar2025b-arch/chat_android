@@ -19,6 +19,25 @@ import java.net.URLEncoder
 
 object AiService {
 
+    suspend fun sendMessage(
+        provider: com.example.data.model.ProviderType,
+        modelId: String,
+        prompt: String,
+        attachments: List<Any> = emptyList(),
+        history: List<Any> = emptyList(),
+        apiKey: String = "",
+        systemPrompt: String = "",
+        temperature: Float = 0.7f,
+        customBaseUrl: String = ""
+    ): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val text = callPollinations(if (systemPrompt.isNotBlank()) "$systemPrompt\n\n$prompt" else prompt)
+            Result.success(text)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun generateResponse(
         provider: AiProvider,
         apiKey: String,

@@ -1,5 +1,6 @@
 package com.example.ui
 
+import java.util.Locale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -482,36 +483,165 @@ private fun computeConversion(category: String, v: Double, from: String, to: Str
     }
 }
 
-private fun evalQuick(expr: String): String {
+fun evaluateMathExpression(expr: String, isRad: Boolean = true): String {
     try {
-        val sanitized = expr.replace("×", "*").replace("÷", "/")
+        val sanitized = expr
+            .replace("×", "*")
+            .replace("÷", "/")
+            .replace("π", Math.PI.toString())
+            .trim()
+
         if (sanitized.isBlank()) return "0"
-        // Simple 2-operand or single operand evaluator
-        val ops = listOf("+", "-", "*", "/")
-        for (op in ops) {
-            val idx = sanitized.lastIndexOf(op)
-            if (idx > 0 && idx < sanitized.length - 1) {
-                val left = sanitized.substring(0, idx).toDoubleOrNull()
-                val right = sanitized.substring(idx + 1).toDoubleOrNull()
-                if (left != null && right != null) {
-                    val ans = when (op) {
-                        "+" -> left + right
-                        "-" -> left - right
-                        "*" -> left * right
-                        "/" -> if (right != 0.0) left / right else Double.NaN
-                        else -> 0.0
+
+        class Parser(val s: String) {
+            var pos = 0
+            val len = s.length
+
+            fun peek(): Char {
+                skipWhitespace()
+                return if (pos < len) s[pos] else '\u0000'
+            }
+
+            fun nextChar(): Char {
+                skipWhitespace()
+                return if (pos < len) s[pos++] else '\u0000'
+            }
+
+            fun skipWhitespace() {
+                while (pos < len && s[pos].isWhitespace()) pos++
+            }
+
+            fun parse(): Double {
+                val res = parseExpression()
+                skipWhitespace()
+                if (pos < len) throw IllegalArgumentException("Unexpected: ${s[pos]}")
+                return res
+            }
+
+            fun parseExpression(): Double {
+                var v = parseTerm()
+                while (true) {
+                    val c = peek()
+                    if (c == '+' || c == '-') {
+                        nextChar()
+                        val right = parseTerm()
+                        v = if (c == '+') v + right else v - right
+                    } else {
+                        break
                     }
-                    return if (ans.isNaN()) "Error" else if (ans % 1.0 == 0.0) ans.toLong().toString() else "%.4f".format(ans)
                 }
+                return v
+            }
+
+            fun parseTerm(): Double {
+                var v = parsePower()
+                while (true) {
+                    val c = peek()
+                    if (c == '*' || c == '/') {
+                        nextChar()
+                        val right = parsePower()
+                        if (c == '/') {
+                            if (right == 0.0) throw ArithmeticException("Cannot divide by 0")
+                            v /= right
+                        } else {
+                            v *= right
+                        }
+                    } else {
+                        break
+                    }
+                }
+                return v
+            }
+
+            fun parsePower(): Double {
+                val left = parseFactor()
+                if (peek() == '^') {
+                    nextChar()
+                    val right = parsePower()
+                    return Math.pow(left, right)
+                }
+                return left
+            }
+
+            fun parseFactor(): Double {
+                val c = peek()
+                if (c == '+') {
+                    nextChar()
+                    return parseFactor()
+                }
+                if (c == '-') {
+                    nextChar()
+                    return -parseFactor()
+                }
+                if (c == '(') {
+                    nextChar()
+                    val v = parseExpression()
+                    if (peek() == ')') nextChar() else throw IllegalArgumentException("Missing )")
+                    return v
+                }
+                if (c.isLetter()) {
+                    val start = pos
+                    while (pos < len && s[pos].isLetter()) pos++
+                    val fn = s.substring(start, pos).lowercase()
+                    if (peek() != '(') throw IllegalArgumentException("Expected ( after $fn")
+                    nextChar()
+                    val arg = parseExpression()
+                    if (peek() == ')') nextChar() else throw IllegalArgumentException("Missing )")
+                    return when (fn) {
+                        "sqrt" -> {
+                            if (arg < 0) throw ArithmeticException("Domain error")
+                            Math.sqrt(arg)
+                        }
+                        "sin" -> {
+                            val rad = if (isRad) arg else Math.toRadians(arg)
+                            val v = Math.sin(rad)
+                            if (Math.abs(v - Math.round(v)) < 1e-10) Math.round(v).toDouble() else v
+                        }
+                        "cos" -> {
+                            val rad = if (isRad) arg else Math.toRadians(arg)
+                            val v = Math.cos(rad)
+                            if (Math.abs(v - Math.round(v)) < 1e-10) Math.round(v).toDouble() else v
+                        }
+                        "tan" -> {
+                            val rad = if (isRad) arg else Math.toRadians(arg)
+                            Math.tan(rad)
+                        }
+                        "log", "log10" -> Math.log10(arg)
+                        "ln" -> Math.log(arg)
+                        "abs" -> Math.abs(arg)
+                        else -> throw IllegalArgumentException("Unknown func: $fn")
+                    }
+                }
+
+                val start = pos
+                while (pos < len && (s[pos].isDigit() || s[pos] == '.')) pos++
+                if (start == pos) throw IllegalArgumentException("Expected number at $pos")
+                return s.substring(start, pos).toDouble()
             }
         }
-        val single = sanitized.toDoubleOrNull()
-        return if (single != null) {
-            if (single % 1.0 == 0.0) single.toLong().toString() else "%.4f".format(single)
+
+        val result = Parser(sanitized).parse()
+        if (result.isInfinite() || result.isNaN()) {
+            return "Cannot divide by 0"
+        }
+        val rounded = Math.round(result * 1000000.0) / 1000000.0
+        return if (rounded % 1.0 == 0.0) {
+            rounded.toLong().toString()
         } else {
-            expr
+            "%.6f".format(Locale.US, rounded).trimEnd('0').trimEnd('.')
+        }
+    } catch (e: ArithmeticException) {
+        return if (e.message?.contains("divide by 0", ignoreCase = true) == true) {
+            "Cannot divide by 0"
+        } else {
+            "Error"
         }
     } catch (_: Exception) {
         return "Error"
     }
+}
+
+private fun evalQuick(expr: String): String {
+    val res = evaluateMathExpression(expr, isRad = true)
+    return if (res == "Error") expr else res
 }

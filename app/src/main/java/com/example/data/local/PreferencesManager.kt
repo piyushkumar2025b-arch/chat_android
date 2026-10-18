@@ -77,7 +77,8 @@ class PreferencesManager(context: Context) {
             val saved = getSecureString(KEY_GOOGLE_MAPS_API_KEY)
             if (saved.isNotBlank()) return saved
             return try {
-                val buildConfigKey = BuildConfig.MAPS_API_KEY
+                val field = BuildConfig::class.java.getField("MAPS_API_KEY")
+                val buildConfigKey = field.get(null) as? String ?: ""
                 if (buildConfigKey != "MY_MAPS_API_KEY") buildConfigKey else ""
             } catch (e: Exception) {
                 ""
@@ -139,7 +140,8 @@ class PreferencesManager(context: Context) {
             val saved = getSecureString(KEY_GEMINI_API_KEY)
             if (saved.isNotBlank()) return saved
             return try {
-                val buildConfigKey = BuildConfig.GEMINI_API_KEY
+                val field = BuildConfig::class.java.getField("GEMINI_API_KEY")
+                val buildConfigKey = field.get(null) as? String ?: ""
                 if (buildConfigKey != "MY_GEMINI_API_KEY") buildConfigKey else ""
             } catch (e: Exception) {
                 ""
@@ -152,7 +154,8 @@ class PreferencesManager(context: Context) {
             val saved = getSecureString(KEY_GROQ_API_KEY)
             if (saved.isNotBlank()) return saved
             return try {
-                val buildConfigKey = BuildConfig.GROQ_API_KEY
+                val field = BuildConfig::class.java.getField("GROQ_API_KEY")
+                val buildConfigKey = field.get(null) as? String ?: ""
                 if (buildConfigKey != "MY_GROQ_API_KEY") buildConfigKey else ""
             } catch (e: Exception) {
                 ""
@@ -165,7 +168,8 @@ class PreferencesManager(context: Context) {
             val saved = getSecureString(KEY_OPENROUTER_API_KEY)
             if (saved.isNotBlank()) return saved
             return try {
-                val buildConfigKey = BuildConfig.OPENROUTER_API_KEY
+                val field = BuildConfig::class.java.getField("OPENROUTER_API_KEY")
+                val buildConfigKey = field.get(null) as? String ?: ""
                 if (buildConfigKey != "MY_OPENROUTER_API_KEY") buildConfigKey else ""
             } catch (e: Exception) {
                 ""
