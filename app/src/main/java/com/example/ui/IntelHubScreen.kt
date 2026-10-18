@@ -22,16 +22,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Newspaper
-import androidx.compose.material.icons.filled.Note
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -85,16 +87,18 @@ fun IntelHubScreen(
     }
 
     val tools = listOf(
-        HubToolItem(1, "Notes", "Rich markdown notes with tags & SQLite persistence", Icons.Default.Note),
+        HubToolItem(1, "Notes", "Rich markdown notes with tags & SQLite persistence", Icons.AutoMirrored.Filled.Note),
         HubToolItem(2, "Calendar", "Schedule meetings & dispatch AI briefings", Icons.Default.CalendarMonth),
         HubToolItem(3, "Secrets Vault", "PIN-protected encrypted storage for keys & passwords", Icons.Default.Key),
         HubToolItem(4, "Calculator", "Scientific calculator & interactive unit converter", Icons.Default.Calculate),
         HubToolItem(5, "Live Search", "Query DuckDuckGo & forward research to AI", Icons.Default.Search),
         HubToolItem(6, "AI News", "Latest AI, Android, and Silicon intelligence", Icons.Default.Newspaper),
-        HubToolItem(7, "Step Counter", "Activity tracking with AI Health Coach advice", Icons.Default.DirectionsRun),
+        HubToolItem(7, "Step Counter", "Activity tracking with AI Health Coach advice", Icons.AutoMirrored.Filled.DirectionsRun),
         HubToolItem(8, "Media Player", "Universal audio playback with release safety", Icons.Default.PlayCircle),
         HubToolItem(9, "Read Aloud", "Text-to-speech audio reader for documents", Icons.Default.RecordVoiceOver),
-        HubToolItem(10, "Image Studio", "Sketch, annotate, and send image to AI chat", Icons.Default.Image)
+        HubToolItem(10, "Image Studio", "Sketch, annotate, and send image to AI chat", Icons.Default.Image),
+        HubToolItem(11, "2048 Game", "Mind puzzle with AI game advisor integration", Icons.Default.SportsEsports),
+        HubToolItem(12, "Creative Studio", "Multi-track audio, image, and video generators", Icons.Default.Palette)
     )
 
     when (selectedHubTab) {
@@ -249,6 +253,13 @@ fun IntelHubScreen(
         10 -> ImageEditorScreen(
             onBack = { selectedHubTab = 0 },
             onSendImageToChat = onSendImageToChat
+        )
+        11 -> Game2048Screen(
+            onBack = { selectedHubTab = 0 },
+            onSendScoreToChat = onSendPromptToChat
+        )
+        12 -> StudioScreen(
+            onSendPromptToChat = onSendPromptToChat
         )
     }
 }

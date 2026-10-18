@@ -23,13 +23,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -269,7 +269,7 @@ fun UniversalMediaPlayerScreen(
                             onBack()
                         }
                     ) {
-                        Icon(Icons.Default.Send, contentDescription = "Send Track to Chat", tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send Track to Chat", tint = MaterialTheme.colorScheme.primary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -383,7 +383,7 @@ fun UniversalMediaPlayerScreen(
                         val next = samplePlaylist[(samplePlaylist.indexOf(currentTrack) + 1) % samplePlaylist.size]
                         currentTrack = next
                     }) {
-                        Icon(Icons.Default.VolumeUp, contentDescription = "Next")
+                        Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Next")
                     }
                 }
             }
