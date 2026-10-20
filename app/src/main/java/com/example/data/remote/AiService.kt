@@ -191,7 +191,17 @@ object AiService {
         }
 
         val contents = JSONArray()
+        for (msg in history.takeLast(6)) {
+            val role = if (msg.role == com.example.model.MessageRole.USER) "user" else "model"
+            contents.put(JSONObject().apply {
+                put("role", role)
+                val parts = JSONArray()
+                parts.put(JSONObject().apply { put("text", msg.content) })
+                put("parts", parts)
+            })
+        }
         contents.put(JSONObject().apply {
+            put("role", "user")
             val parts = JSONArray()
             parts.put(JSONObject().apply { put("text", prompt) })
             put("parts", parts)

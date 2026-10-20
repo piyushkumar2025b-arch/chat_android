@@ -14,7 +14,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [34])
 class NewFeaturesTest {
 
     @Test

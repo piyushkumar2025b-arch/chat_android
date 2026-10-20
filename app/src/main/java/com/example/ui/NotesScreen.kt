@@ -17,11 +17,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -157,7 +157,7 @@ fun NotesScreen(
                                             Toast.makeText(context, "Note sent to AI Chat!", Toast.LENGTH_SHORT).show()
                                             onBack()
                                         }) {
-                                            Icon(Icons.Default.Send, contentDescription = "Send to Chat", tint = MaterialTheme.colorScheme.primary)
+                                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send to Chat", tint = MaterialTheme.colorScheme.primary)
                                         }
                                         IconButton(onClick = {
                                             editingNote = note

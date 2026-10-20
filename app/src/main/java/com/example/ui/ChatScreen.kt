@@ -37,7 +37,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.AlertDialog
@@ -545,7 +545,7 @@ fun ChatScreen(
                                         .testTag("chat_send_button")
                                 ) {
                                     Icon(
-                                        Icons.Default.Send,
+                                        Icons.AutoMirrored.Filled.Send,
                                         contentDescription = "Send",
                                         tint = if (isGenerating) MaterialTheme.colorScheme.outline
                                         else MaterialTheme.colorScheme.onPrimary

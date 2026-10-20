@@ -117,9 +117,23 @@ fun InlineYouTubePlayer(
     videoId: String,
     modifier: Modifier = Modifier
 ) {
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose {
+            webViewRef?.let {
+                it.stopLoading()
+                it.loadUrl("about:blank")
+                it.destroy()
+            }
+            webViewRef = null
+        }
+    }
+
     AndroidView(
         factory = { ctx ->
             WebView(ctx).apply {
+                webViewRef = this
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
