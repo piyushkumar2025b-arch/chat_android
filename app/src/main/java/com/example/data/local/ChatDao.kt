@@ -50,7 +50,7 @@ interface ChatDao {
     @Query("SELECT * FROM chat_messages WHERE sessionId = :sessionId ORDER BY timestamp ASC")
     fun getMessagesForSession(sessionId: String): Flow<List<ChatMessageEntity>>
 
-    @Query("SELECT * FROM chat_messages WHERE sessionId = :sessionId")
+    @Query("SELECT * FROM chat_messages WHERE sessionId = :sessionId ORDER BY timestamp ASC, rowid ASC")
     suspend fun getMessagesListForSession(sessionId: String): List<ChatMessageEntity>
 
     @Query("SELECT * FROM chat_messages ORDER BY timestamp DESC")
@@ -62,6 +62,12 @@ interface ChatDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: ChatMessageEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMessages(messages: List<ChatMessageEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSessions(sessions: List<ChatSessionEntity>)
+
     @Query("SELECT * FROM chat_messages WHERE id = :messageId LIMIT 1")
     suspend fun getMessageById(messageId: String): ChatMessageEntity?
 
@@ -70,4 +76,13 @@ interface ChatDao {
 
     @Query("UPDATE chat_messages SET content = :content, isError = :isError WHERE id = :messageId")
     suspend fun updateMessageContent(messageId: String, content: String, isError: Boolean = false)
+
+    @Query("DELETE FROM chat_messages WHERE sessionId = :sessionId AND rowid > (SELECT rowid FROM chat_messages WHERE id = :messageId)")
+    suspend fun deleteMessagesAfter(sessionId: String, messageId: String)
+
+    @Query("SELECT * FROM chat_messages WHERE content LIKE '%' || :query || '%' ORDER BY timestamp DESC LIMIT 300")
+    suspend fun searchMessages(query: String): List<ChatMessageEntity>
+
+    @Query("SELECT * FROM chat_sessions WHERE title LIKE '%' || :query || '%' ORDER BY updatedAt DESC LIMIT 60")
+    suspend fun searchSessions(query: String): List<ChatSessionEntity>
 }

@@ -3,6 +3,7 @@ package com.example.data.local
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.BuildConfig
+import com.example.data.model.ProviderType
 
 class PreferencesManager(context: Context) {
     private val prefs: SharedPreferences =
@@ -43,6 +44,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_ACTIVE_PERSONA_ID = "active_persona_id"
         private const val KEY_CUSTOM_PERSONA_INSTRUCTIONS = "custom_persona_instructions"
         private const val KEY_MAX_OUTPUT_TOKENS = "max_output_tokens"
+        private const val KEY_MEMORY_ENABLED = "assistant_memory_enabled"
+        private const val KEY_CONTEXT_BUDGET = "context_budget_tokens"
 
         const val DEFAULT_SYSTEM_PROMPT =
             "You are a friendly, highly intelligent AI assistant. Provide helpful, accurate, well-formatted, and concise answers with markdown and code snippets when needed."
@@ -57,7 +60,10 @@ class PreferencesManager(context: Context) {
         set(value) = putSecureString(KEY_HUGGINGFACE_API_KEY, value)
 
     var selectedTheme: String
-        get() = prefs.getString(KEY_SELECTED_THEME, "indigo") ?: "indigo"
+        get() {
+            val saved = prefs.getString(KEY_SELECTED_THEME, "default") ?: "default"
+            return if (saved == "indigo") "default" else saved
+        }
         set(value) = prefs.edit().putString(KEY_SELECTED_THEME, value).apply()
 
     var themeMode: String
@@ -97,6 +103,14 @@ class PreferencesManager(context: Context) {
     var maxOutputTokens: Int
         get() = prefs.getInt(KEY_MAX_OUTPUT_TOKENS, 8192)
         set(value) = prefs.edit().putInt(KEY_MAX_OUTPUT_TOKENS, value).apply()
+
+    var memoryEnabled: Boolean
+        get() = prefs.getBoolean(KEY_MEMORY_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_MEMORY_ENABLED, value).apply()
+
+    var contextBudgetTokens: Int
+        get() = prefs.getInt(KEY_CONTEXT_BUDGET, 6000)
+        set(value) = prefs.edit().putInt(KEY_CONTEXT_BUDGET, value.coerceIn(1_000, 32_000)).apply()
 
     fun exportKeysJson(): String {
         val obj = org.json.JSONObject().apply {
@@ -204,4 +218,31 @@ class PreferencesManager(context: Context) {
     var lastModelId: String
         get() = prefs.getString(KEY_LAST_MODEL, "openai-fast") ?: "openai-fast"
         set(value) = prefs.edit().putString(KEY_LAST_MODEL, value).apply()
+
+    fun getApiKey(provider: ProviderType): String = when (provider) {
+        ProviderType.GEMINI -> geminiApiKey
+        ProviderType.GROQ -> groqApiKey
+        ProviderType.OPENROUTER -> openRouterApiKey
+        ProviderType.CEREBRAS -> cerebrasApiKey
+        ProviderType.HUGGINGFACE -> huggingFaceApiKey
+        ProviderType.CUSTOM -> customApiKey
+        ProviderType.POLLINATIONS -> ""
+    }
+
+    fun setApiKey(provider: ProviderType, key: String) {
+        when (provider) {
+            ProviderType.GEMINI -> geminiApiKey = key
+            ProviderType.GROQ -> groqApiKey = key
+            ProviderType.OPENROUTER -> openRouterApiKey = key
+            ProviderType.CEREBRAS -> cerebrasApiKey = key
+            ProviderType.HUGGINGFACE -> huggingFaceApiKey = key
+            ProviderType.CUSTOM -> customApiKey = key
+            ProviderType.POLLINATIONS -> Unit
+        }
+    }
+
+    fun isKeyConfigured(provider: ProviderType): Boolean {
+        if (!provider.requiresApiKey) return true
+        return getApiKey(provider).isNotBlank()
+    }
 }

@@ -3,38 +3,6 @@ package com.example.model
 import android.graphics.Bitmap
 import java.util.UUID
 
-enum class AiProvider(
-    val displayName: String,
-    val defaultModel: String,
-    val description: String,
-    val requiresApiKey: Boolean
-) {
-    GEMINI(
-        displayName = "Google Gemini",
-        defaultModel = "gemini-2.5-flash",
-        description = "High-speed multimodal reasoning & coding",
-        requiresApiKey = false // Managed via Server-Side or free tier / BuildConfig
-    ),
-    GROQ(
-        displayName = "Groq LLaMA 3",
-        defaultModel = "llama-3.3-70b-versatile",
-        description = "Ultra-fast low-latency LPU inference",
-        requiresApiKey = true
-    ),
-    OPENROUTER(
-        displayName = "OpenRouter",
-        defaultModel = "meta-llama/llama-3.3-70b-instruct:free",
-        description = "Unified gateway to Claude, DeepSeek, LLaMA",
-        requiresApiKey = false // Has free models
-    ),
-    FREE_WEB(
-        displayName = "Pollinations / Web AI",
-        defaultModel = "openai-large",
-        description = "Zero-setup free multi-agent intelligence",
-        requiresApiKey = false
-    )
-}
-
 enum class MessageRole {
     USER, ASSISTANT, SYSTEM
 }
@@ -49,7 +17,8 @@ data class ChatAttachment(
     val mimeType: String,
     val sizeBytes: Long = 0L,
     val content: String = "",
-    val bitmap: Bitmap? = null
+    val bitmap: Bitmap? = null,
+    val localUri: String = ""
 )
 
 data class ChatMessage(
@@ -66,7 +35,14 @@ data class ChatMessage(
 enum class AppSection(val label: String) {
     CHAT("Chat"),
     INTEL_HUB("Intel Hub"),
+    CREATIVE_STUDIO("Creative Studio"),
     CODE_STUDIO("Code Studio"),
     MARKDOWN_STUDIO("Markdown Studio"),
-    MEDIA_PLAYER("Media Player")
+    MEDIA_PLAYER("Media Player"),
+    RAG_KNOWLEDGE("Knowledge Base"),
+    CHAT_SEARCH("Search Chats"),
+    AI_MEMORY("AI Memory"),
+    PROMPT_LIBRARY("Prompt Library"),
+    FOCUS_HABITS("Focus & Habits"),
+    BACKUP_RESTORE("Backup & Restore")
 }

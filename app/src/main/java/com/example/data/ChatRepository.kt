@@ -130,4 +130,12 @@ class ChatRepository(private val chatDao: ChatDao) {
             emptyList()
         }
     }
+
+    fun serializeAttachments(attachments: List<AttachmentInfo>): String {
+        return try {
+            attachmentAdapter.toJson(attachments)
+        } catch (e: Exception) {
+            "[]"
+        }
+    }
 }

@@ -10,5 +10,6 @@ data class AttachmentInfo(
     val sizeBytes: Long,
     val localUri: String,
     val isImage: Boolean,
-    val previewSnippet: String? = null
+    val previewSnippet: String? = null,
+    val content: String = ""
 )

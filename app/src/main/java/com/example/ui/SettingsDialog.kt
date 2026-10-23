@@ -46,6 +46,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -54,7 +55,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import com.example.data.local.AppLockManager
 import com.example.data.local.PreferencesManager
+import kotlin.math.roundToInt
 
 @Composable
 fun SettingsDialog(
@@ -63,7 +66,11 @@ fun SettingsDialog(
     onOpenUsageLimits: () -> Unit,
     onDismiss: () -> Unit,
     onClearAllChats: () -> Unit,
-    onKeyUpdated: (() -> Unit)? = null
+    onKeyUpdated: (() -> Unit)? = null,
+    appLockManager: AppLockManager? = null,
+    onAppLockChanged: (Boolean) -> Unit = {},
+    onLockNow: () -> Unit = {},
+    onOpenBackupRestore: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -80,6 +87,7 @@ fun SettingsDialog(
     var systemPrompt by remember { mutableStateOf(preferencesManager.systemPrompt) }
     var temperature by remember { mutableFloatStateOf(preferencesManager.temperature) }
     var maxTokens by remember { mutableStateOf(preferencesManager.maxOutputTokens) }
+    var contextBudget by remember { mutableStateOf(preferencesManager.contextBudgetTokens) }
 
     var showConfirmClearDialog by remember { mutableStateOf(false) }
 
@@ -188,6 +196,16 @@ fun SettingsDialog(
                             Text("Set Limit", fontSize = 12.sp)
                         }
                     }
+                }
+
+                // App Lock & Backup shortcuts
+                appLockManager?.let { manager ->
+                    AppLockSettingsSection(
+                        appLockManager = manager,
+                        onAppLockChanged = onAppLockChanged,
+                        onLockNow = onLockNow,
+                        onOpenBackupRestore = onOpenBackupRestore
+                    )
                 }
 
                 // Backup & Restore Keys Banner
@@ -411,7 +429,7 @@ fun SettingsDialog(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("Creativity / Temperature", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                        Text(String.format("%.2f", temperature), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text(String.format(java.util.Locale.US, "%.2f", temperature), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                     }
                     Slider(
                         value = temperature,
@@ -457,6 +475,38 @@ fun SettingsDialog(
                     )
                 }
 
+                // Context window budget
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Context Budget", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "~${contextBudget / 1000}k tokens",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Slider(
+                        value = contextBudget.toFloat(),
+                        onValueChange = {
+                            contextBudget = ((it / 1000f).roundToInt() * 1000).coerceIn(1_000, 32_000)
+                        },
+                        valueRange = 1_000f..32_000f,
+                        steps = 30,
+                        modifier = Modifier.fillMaxWidth().testTag("context_budget_slider")
+                    )
+                    Text(
+                        "Older chat turns are trimmed automatically to keep requests fast and within provider limits.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Start
+                    )
+                }
+
                 // Danger zone: Clear all chat history
                 OutlinedButton(
                     onClick = { showConfirmClearDialog = true },
@@ -485,6 +535,7 @@ fun SettingsDialog(
                     preferencesManager.systemPrompt = systemPrompt
                     preferencesManager.temperature = temperature
                     preferencesManager.maxOutputTokens = maxTokens
+                    preferencesManager.contextBudgetTokens = contextBudget
                     onKeyUpdated?.invoke()
                     Toast.makeText(context, "Settings saved!", Toast.LENGTH_SHORT).show()
                     onDismiss()

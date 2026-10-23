@@ -153,8 +153,6 @@ fun AiPersonaScreen(
                 provider = ProviderType.POLLINATIONS,
                 modelId = "openai",
                 prompt = q,
-                attachments = emptyList(),
-                history = emptyList(),
                 apiKey = "",
                 systemPrompt = systemPrompt,
                 temperature = 0.7f,

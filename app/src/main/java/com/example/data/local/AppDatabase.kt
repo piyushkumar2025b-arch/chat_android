@@ -17,15 +17,23 @@ import com.example.data.model.KnowledgeDocumentEntity
         ChatMessageEntity::class,
         ChatSessionEntity::class,
         KnowledgeDocumentEntity::class,
-        KnowledgeChunkEntity::class
+        KnowledgeChunkEntity::class,
+        MemoryEntity::class,
+        PromptTemplateEntity::class,
+        HabitEntity::class,
+        HabitCheckInEntity::class,
+        FocusSessionEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun productivityDao(): ProductivityDao
     abstract fun chatDao(): ChatDao
     abstract fun ragDao(): RagDao
+    abstract fun memoryDao(): MemoryDao
+    abstract fun promptDao(): PromptDao
+    abstract fun focusDao(): FocusDao
 
     companion object {
         @Volatile

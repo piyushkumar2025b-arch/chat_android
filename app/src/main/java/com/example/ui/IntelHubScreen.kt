@@ -23,17 +23,26 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Newspaper
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.OndemandVideo
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -57,7 +66,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.data.local.ProductivityDao
 
 data class HubToolItem(
     val id: Int,
@@ -69,14 +77,18 @@ data class HubToolItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IntelHubScreen(
-    productivityDao: ProductivityDao,
+    viewModel: ChatViewModel,
     onBackToChat: () -> Unit,
     onSendPromptToChat: (String) -> Unit = {},
     onSendImageToChat: (Bitmap) -> Unit = {},
-    onApplyApiKey: (String) -> Unit = {}
+    onApplyApiKey: (String) -> Unit = {},
+    onOpenSettings: () -> Unit = {}
 ) {
     // 0 = Hub Overview, 1 = Notes, 2 = Calendar, 3 = Secrets Vault, 4 = Calculator,
-    // 5 = Web Search, 6 = News, 7 = Step Counter, 8 = Media Player, 9 = Read Aloud, 10 = Image Studio
+    // 5 = Web Search, 6 = News, 7 = Step Counter, 8 = Media Player, 9 = Read Aloud,
+    // 10 = Image Studio, 11 = 2048, 12 = Creative Studio, 13 = Knowledge Base,
+    // 14 = AI Persona, 15 = AI Academy, 16 = YouTube Intel, 17 = Map Explorer,
+    // 18 = Notification Center, 19 = Focus & Habits, 20 = AI Memory, 21 = Prompt Library
     var selectedHubTab by remember { mutableIntStateOf(0) }
 
     // CRITICAL FIX FOR BUG-02:
@@ -98,7 +110,16 @@ fun IntelHubScreen(
         HubToolItem(9, "Read Aloud", "Text-to-speech audio reader for documents", Icons.Default.RecordVoiceOver),
         HubToolItem(10, "Image Studio", "Sketch, annotate, and send image to AI chat", Icons.Default.Image),
         HubToolItem(11, "2048 Game", "Mind puzzle with AI game advisor integration", Icons.Default.SportsEsports),
-        HubToolItem(12, "Creative Studio", "Multi-track audio, image, and video generators", Icons.Default.Palette)
+        HubToolItem(12, "Creative Studio", "Multi-track audio, image, and video generators", Icons.Default.Palette),
+        HubToolItem(13, "Knowledge Base", "RAG engine: ingest documents, chunk & semantic search", Icons.AutoMirrored.Filled.MenuBook),
+        HubToolItem(14, "AI Persona", "Behavior presets, custom instructions & test drive", Icons.Default.Face),
+        HubToolItem(15, "AI Academy", "Curated learning paths with AI topic explainers", Icons.Default.School),
+        HubToolItem(16, "YouTube Intel", "Search videos, transcripts & summarize into chat", Icons.Default.OndemandVideo),
+        HubToolItem(17, "Map Explorer", "Search places, coordinates & route planning", Icons.Default.Map),
+        HubToolItem(18, "Notifications", "Permissions, test alerts & notification history", Icons.Default.Notifications),
+        HubToolItem(19, "Focus & Habits", "Pomodoro timer, daily streaks & focus analytics", Icons.Default.Timer),
+        HubToolItem(20, "AI Memory", "Long-term facts the assistant remembers across chats", Icons.Default.Psychology),
+        HubToolItem(21, "Prompt Library", "Reusable prompt templates with variable placeholders", Icons.Default.Bookmarks)
     )
 
     when (selectedHubTab) {
@@ -213,17 +234,17 @@ fun IntelHubScreen(
             }
         }
         1 -> NotesScreen(
-            productivityDao = productivityDao,
+            productivityDao = viewModel.productivityDao,
             onBack = { selectedHubTab = 0 },
             onSendNoteToChat = onSendPromptToChat
         )
         2 -> CalendarScreen(
-            productivityDao = productivityDao,
+            productivityDao = viewModel.productivityDao,
             onBack = { selectedHubTab = 0 },
             onSendScheduleToChat = onSendPromptToChat
         )
         3 -> PasswordSaverScreen(
-            productivityDao = productivityDao,
+            productivityDao = viewModel.productivityDao,
             onBack = { selectedHubTab = 0 },
             onApplyApiKey = onApplyApiKey
         )
@@ -259,7 +280,44 @@ fun IntelHubScreen(
             onSendScoreToChat = onSendPromptToChat
         )
         12 -> StudioScreen(
+            preferencesManager = viewModel.preferencesManager,
             onSendPromptToChat = onSendPromptToChat
+        )
+        13 -> RagKnowledgeScreen(
+            viewModel = viewModel,
+            onBack = { selectedHubTab = 0 }
+        )
+        14 -> AiPersonaScreen(
+            preferencesManager = viewModel.preferencesManager,
+            onApplyPersonaToChat = onSendPromptToChat
+        )
+        15 -> AiLearningScreen(
+            onSendTopicToChat = onSendPromptToChat
+        )
+        16 -> YouTubeScreen(
+            preferencesManager = viewModel.preferencesManager,
+            onOpenSettings = onOpenSettings,
+            onSummarizeVideoInChat = onSendPromptToChat
+        )
+        17 -> MapExplorerScreen(
+            preferencesManager = viewModel.preferencesManager,
+            onOpenSettings = onOpenSettings,
+            onSendLocationToChat = onSendPromptToChat
+        )
+        18 -> NotificationCenterScreen(
+            onBack = { selectedHubTab = 0 }
+        )
+        19 -> FocusHabitsScreen(
+            viewModel = viewModel,
+            onBack = { selectedHubTab = 0 }
+        )
+        20 -> MemoryScreen(
+            viewModel = viewModel,
+            onBack = { selectedHubTab = 0 }
+        )
+        21 -> PromptLibraryScreen(
+            viewModel = viewModel,
+            onBack = { selectedHubTab = 0 }
         )
     }
 }

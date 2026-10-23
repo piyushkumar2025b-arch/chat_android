@@ -15,8 +15,14 @@ interface ProductivityDao {
     @Query("SELECT * FROM notes ORDER BY updatedAt DESC")
     fun getAllNotes(): Flow<List<NoteEntity>>
 
+    @Query("SELECT * FROM notes ORDER BY updatedAt DESC")
+    suspend fun getAllNotesOnce(): List<NoteEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertNote(note: NoteEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNotes(notes: List<NoteEntity>)
 
     @Update
     suspend fun updateNote(note: NoteEntity)
@@ -28,8 +34,14 @@ interface ProductivityDao {
     @Query("SELECT * FROM calendar_events ORDER BY timestamp ASC")
     fun getAllEvents(): Flow<List<CalendarEventEntity>>
 
+    @Query("SELECT * FROM calendar_events ORDER BY timestamp ASC")
+    suspend fun getAllEventsOnce(): List<CalendarEventEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEvent(event: CalendarEventEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEvents(events: List<CalendarEventEntity>)
 
     @Delete
     suspend fun deleteEvent(event: CalendarEventEntity)

@@ -134,6 +134,7 @@ fun InlineYouTubePlayer(
         factory = { ctx ->
             WebView(ctx).apply {
                 webViewRef = this
+                tag = videoId
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
@@ -173,8 +174,8 @@ fun InlineYouTubePlayer(
             }
         },
         update = { webView ->
-            val cur = webView.url
-            if (cur == null || !cur.contains(videoId)) {
+            if (webView.tag != videoId) {
+                webView.tag = videoId
                 val html = """
                     <!DOCTYPE html>
                     <html>
