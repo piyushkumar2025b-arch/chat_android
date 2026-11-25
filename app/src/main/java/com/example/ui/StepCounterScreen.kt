@@ -1,6 +1,8 @@
 package com.example.ui
 
+import android.content.Context
 import android.widget.Toast
+import com.example.util.AppNotificationManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +39,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,8 +58,20 @@ fun StepCounterScreen(
     onSendStatsToChat: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
-    var currentSteps by remember { mutableIntStateOf(6842) }
+    val prefs = remember { context.getSharedPreferences("omnichat_steps", Context.MODE_PRIVATE) }
+    var currentSteps by remember { mutableIntStateOf(prefs.getInt("steps_count", 6842)) }
+    var goalNotified by remember { mutableStateOf(prefs.getBoolean("goal_notified", false)) }
     val stepGoal = 10000
+
+    fun recordSteps(newSteps: Int) {
+        currentSteps = newSteps
+        prefs.edit().putInt("steps_count", newSteps).apply()
+        if (newSteps >= stepGoal && !goalNotified) {
+            goalNotified = true
+            prefs.edit().putBoolean("goal_notified", true).apply()
+            AppNotificationManager.sendStepGoalAchieved(context, newSteps, stepGoal)
+        }
+    }
 
     val progress = (currentSteps.toFloat() / stepGoal).coerceIn(0f, 1f)
     val distanceKm = "%.2f".format(currentSteps * 0.00078)
@@ -169,7 +184,7 @@ fun StepCounterScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         Button(
                             onClick = {
-                                currentSteps += 250
+                                recordSteps(currentSteps + 250)
                                 Toast.makeText(context, "+250 steps recorded!", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f)
@@ -178,7 +193,7 @@ fun StepCounterScreen(
                         }
                         Button(
                             onClick = {
-                                currentSteps += 1000
+                                recordSteps(currentSteps + 1000)
                                 Toast.makeText(context, "+1,000 steps recorded!", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f)
@@ -188,7 +203,11 @@ fun StepCounterScreen(
                     }
 
                     OutlinedButton(
-                        onClick = { currentSteps = 0 },
+                        onClick = {
+                            goalNotified = false
+                            prefs.edit().putBoolean("goal_notified", false).apply()
+                            recordSteps(0)
+                        },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Reset Daily Counter")

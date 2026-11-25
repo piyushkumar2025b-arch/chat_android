@@ -279,30 +279,55 @@ fun IntelHubScreen(
             onBack = { selectedHubTab = 0 },
             onSendScoreToChat = onSendPromptToChat
         )
-        12 -> StudioScreen(
-            preferencesManager = viewModel.preferencesManager,
-            onSendPromptToChat = onSendPromptToChat
-        )
+        12 -> Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Creative Studio", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = { selectedHubTab = 0 },
+                            modifier = Modifier.testTag("hub_studio_back")
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    )
+                )
+            }
+        ) { innerPadding ->
+            StudioScreen(
+                preferencesManager = viewModel.preferencesManager,
+                onSendPromptToChat = onSendPromptToChat,
+                onSendImageToChat = onSendImageToChat,
+                modifier = Modifier.padding(innerPadding)
+            )
+        }
         13 -> RagKnowledgeScreen(
             viewModel = viewModel,
             onBack = { selectedHubTab = 0 }
         )
         14 -> AiPersonaScreen(
             preferencesManager = viewModel.preferencesManager,
-            onApplyPersonaToChat = onSendPromptToChat
+            onApplyPersonaToChat = onSendPromptToChat,
+            onBack = { selectedHubTab = 0 }
         )
         15 -> AiLearningScreen(
-            onSendTopicToChat = onSendPromptToChat
+            onSendTopicToChat = onSendPromptToChat,
+            onBack = { selectedHubTab = 0 }
         )
         16 -> YouTubeScreen(
             preferencesManager = viewModel.preferencesManager,
             onOpenSettings = onOpenSettings,
-            onSummarizeVideoInChat = onSendPromptToChat
+            onSummarizeVideoInChat = onSendPromptToChat,
+            onBack = { selectedHubTab = 0 }
         )
         17 -> MapExplorerScreen(
             preferencesManager = viewModel.preferencesManager,
             onOpenSettings = onOpenSettings,
-            onSendLocationToChat = onSendPromptToChat
+            onSendLocationToChat = onSendPromptToChat,
+            onBack = { selectedHubTab = 0 }
         )
         18 -> NotificationCenterScreen(
             onBack = { selectedHubTab = 0 }

@@ -178,7 +178,11 @@ fun NotesScreen(
                                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         note.tags.split(",").forEach { tag ->
                                             if (tag.isNotBlank()) {
-                                                SuggestionChip(onClick = {}, label = { Text("#${tag.trim()}") })
+                                                val cleanTag = tag.trim()
+                                                SuggestionChip(
+                                                    onClick = { searchQuery = cleanTag },
+                                                    label = { Text("#$cleanTag") }
+                                                )
                                             }
                                         }
                                     }

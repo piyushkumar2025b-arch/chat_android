@@ -64,6 +64,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.graphics.graphicsLayer
 import coil.compose.AsyncImage
 import java.net.URLEncoder
 import kotlin.random.Random
@@ -93,6 +102,7 @@ fun VideoStudioScreen(
     var currentVideoItem by remember { mutableStateOf<VideoGenerationItem?>(null) }
     var autoSaveVideo by remember { mutableStateOf(true) }
     var isSavingVideo by remember { mutableStateOf(false) }
+    var showPreviewDialog by remember { mutableStateOf(false) }
 
     val motionTypes = listOf(
         "Cinematic Drone",
@@ -390,7 +400,9 @@ fun VideoStudioScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(16f / 9f)
-                                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
+                                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                                .clickable { showPreviewDialog = true }
+                                .testTag("video_preview_box"),
                             contentAlignment = Alignment.Center
                         ) {
                             AsyncImage(
@@ -400,16 +412,17 @@ fun VideoStudioScreen(
                                 contentScale = ContentScale.Crop
                             )
 
-                            // Play overlay badge
+                            // Interactive play overlay badge
                             Box(
                                 modifier = Modifier
                                     .size(54.dp)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f), CircleShape),
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     Icons.Default.PlayArrow,
-                                    contentDescription = "Video Motion Preview",
+                                    contentDescription = "Play Video Motion Preview",
                                     tint = MaterialTheme.colorScheme.onPrimary,
                                     modifier = Modifier.size(34.dp)
                                 )
@@ -479,5 +492,91 @@ fun VideoStudioScreen(
         }
 
         item { Spacer(modifier = Modifier.height(24.dp)) }
+    }
+
+    if (showPreviewDialog && currentVideoItem != null) {
+        val active = currentVideoItem!!
+        val isLocalUri = active.videoPreviewUrl.startsWith("content://") || active.videoPreviewUrl.startsWith("file://")
+        val infiniteTransition = rememberInfiniteTransition(label = "video_motion_preview")
+        val animProgress by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 4500, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "motion_progress"
+        )
+        val scale = 1.0f + (animProgress * 0.16f)
+        val shiftX = (animProgress - 0.5f) * 32f
+
+        AlertDialog(
+            onDismissRequest = { showPreviewDialog = false },
+            title = { Text("Motion Preview (${active.motionType})") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AsyncImage(
+                            model = active.videoPreviewUrl,
+                            contentDescription = active.prompt,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                    translationX = shiftX
+                                },
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                    Text(
+                        text = active.prompt,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                if (isLocalUri) {
+                    Button(
+                        onClick = {
+                            runCatching {
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(Uri.parse(active.videoPreviewUrl), "video/*")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(intent)
+                            }.onFailure {
+                                Toast.makeText(context, "No video player app found", Toast.LENGTH_SHORT).show()
+                            }
+                            showPreviewDialog = false
+                        }
+                    ) {
+                        Text("Open Player")
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            onSendPromptToChat("Video Scene Prompt (${active.motionType}, ${active.style}): ${active.prompt}")
+                            showPreviewDialog = false
+                        }
+                    ) {
+                        Text("Send to Chat")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPreviewDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
     }
 }

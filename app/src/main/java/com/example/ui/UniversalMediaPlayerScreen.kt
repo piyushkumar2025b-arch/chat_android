@@ -4,6 +4,8 @@ import android.content.Context
 import android.media.MediaPlayer
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,19 +26,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -44,10 +47,14 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,8 +62,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.data.remote.AudioSynthesizer
+import com.example.data.remote.SoundPreset
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 enum class MediaKind {
     VIDEO,
@@ -213,37 +225,144 @@ data class PlayableMediaItem(
     val id: String,
     val title: String,
     val artist: String,
-    val durationText: String
+    val durationText: String,
+    val durationMs: Long = 5000L,
+    val preset: SoundPreset = SoundPreset.SOOTHING_RAIN
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UniversalMediaPlayerScreen(
     onBack: () -> Unit,
-    onSendMediaToChat: (String) -> Unit = {}
+    onSendMediaToChat: (String) -> Unit = {},
+    showTopBar: Boolean = true
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     val samplePlaylist = remember {
         listOf(
-            PlayableMediaItem("1", "Lo-Fi Coding Focus Beat", "AI Synth Labs", "2:45"),
-            PlayableMediaItem("2", "Ambient Neural Atmosphere", "DeepMind Frequencies", "3:12"),
-            PlayableMediaItem("3", "Cyberpunk Algorithm Pulse", "Matrix Soundworks", "2:30"),
-            PlayableMediaItem("4", "Omni Meditation Wave", "Silicon Flow", "4:15")
+            PlayableMediaItem("1", "Gentle Focus Rain", "AI Synth Labs", "00:05", 5000L, SoundPreset.SOOTHING_RAIN),
+            PlayableMediaItem("2", "Ambient 432Hz Resonance", "DeepMind Frequencies", "00:04", 4000L, SoundPreset.AMBIENT_DRONE),
+            PlayableMediaItem("3", "Cosmic Starlight Pad", "Matrix Soundworks", "00:04", 4000L, SoundPreset.COSMIC_PAD),
+            PlayableMediaItem("4", "Ocean Surf Waves", "Silicon Flow", "00:05", 5000L, SoundPreset.OCEAN_SURF),
+            PlayableMediaItem("5", "Warm Analog Vinyl Organ", "Retro Studio", "00:04", 4500L, SoundPreset.ANALOG_WARMTH)
         )
     }
 
     var currentTrack by remember { mutableStateOf(samplePlaylist.first()) }
+    var isCustomAudio by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(false) }
-    var playbackProgress by remember { mutableFloatStateOf(0.35f) }
+    var currentPositionMs by remember { mutableLongStateOf(0L) }
+    var totalDurationMs by remember { mutableLongStateOf(samplePlaylist.first().durationMs) }
+    var playbackProgress by remember { mutableFloatStateOf(0f) }
     var isLooping by remember { mutableStateOf(false) }
+    val latestLooping by rememberUpdatedState(isLooping)
 
-    // Mock/Simulated Android MediaPlayer handle
     var mediaPlayerInstance by remember { mutableStateOf<MediaPlayer?>(null) }
 
-    // FIX BUG-08: Clean DisposableEffect ensures MediaPlayer stops and releases on unmount/screen exit!
+    fun stopAllPlayback() {
+        isPlaying = false
+        AudioSynthesizer.stopSound()
+        try {
+            if (mediaPlayerInstance?.isPlaying == true) {
+                mediaPlayerInstance?.pause()
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun startSynthTrack(track: PlayableMediaItem) {
+        AudioSynthesizer.stopSound()
+        try {
+            mediaPlayerInstance?.stop()
+            mediaPlayerInstance?.release()
+        } catch (_: Exception) {}
+        mediaPlayerInstance = null
+        isCustomAudio = false
+        currentTrack = track
+        totalDurationMs = track.durationMs
+        currentPositionMs = 0L
+        playbackProgress = 0f
+        isPlaying = true
+
+        coroutineScope.launch {
+            AudioSynthesizer.playSound(track.preset, volume = 0.85f) {
+                if (latestLooping && currentTrack.id == track.id && !isCustomAudio && isPlaying) {
+                    startSynthTrack(track)
+                } else {
+                    isPlaying = false
+                    currentPositionMs = 0L
+                    playbackProgress = 0f
+                }
+            }
+        }
+    }
+
+    val audioPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                AudioSynthesizer.stopSound()
+                mediaPlayerInstance?.release()
+                mediaPlayerInstance = null
+
+                val mp = MediaPlayer().apply {
+                    setDataSource(context, uri)
+                    prepare()
+                    this.isLooping = latestLooping
+                    setOnCompletionListener {
+                        if (!latestLooping) {
+                            isPlaying = false
+                            currentPositionMs = 0L
+                            playbackProgress = 0f
+                        }
+                    }
+                }
+                val name = uri.lastPathSegment?.substringAfterLast('/') ?: "Local Audio"
+                val durMs = mp.duration.toLong().coerceAtLeast(1000L)
+                mediaPlayerInstance = mp
+                isCustomAudio = true
+                currentTrack = PlayableMediaItem(
+                    id = "local_${uri.hashCode()}",
+                    title = name,
+                    artist = "Device Audio File",
+                    durationText = formatMediaDuration(durMs),
+                    durationMs = durMs
+                )
+                totalDurationMs = durMs
+                currentPositionMs = 0L
+                playbackProgress = 0f
+                mp.start()
+                isPlaying = true
+                Toast.makeText(context, "Playing $name", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Could not open audio: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    LaunchedEffect(isPlaying, isCustomAudio, totalDurationMs) {
+        while (isActive && isPlaying) {
+            delay(100)
+            if (isCustomAudio) {
+                val mp = mediaPlayerInstance
+                if (mp != null) {
+                    runCatching {
+                        currentPositionMs = mp.currentPosition.toLong()
+                        playbackProgress = (currentPositionMs.toFloat() / totalDurationMs.coerceAtLeast(1L)).coerceIn(0f, 1f)
+                    }
+                }
+            } else {
+                currentPositionMs = (currentPositionMs + 100L).coerceAtMost(totalDurationMs)
+                playbackProgress = (currentPositionMs.toFloat() / totalDurationMs.coerceAtLeast(1L)).coerceIn(0f, 1f)
+            }
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
+            AudioSynthesizer.stopSound()
             try {
                 mediaPlayerInstance?.stop()
                 mediaPlayerInstance?.release()
@@ -252,36 +371,10 @@ fun UniversalMediaPlayerScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Universal Media Studio", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack, modifier = Modifier.testTag("media_back_button")) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = {
-                            onSendMediaToChat("Now playing: \"${currentTrack.title}\" by ${currentTrack.artist}. Suggest similar tracks or background study playlists.")
-                            Toast.makeText(context, "Track sent to OmniChat!", Toast.LENGTH_SHORT).show()
-                            onBack()
-                        }
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send Track to Chat", tint = MaterialTheme.colorScheme.primary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
-                )
-            )
-        }
-    ) { innerPadding ->
+    val content: @Composable (Modifier) -> Unit = { contentModifier ->
         Column(
-            modifier = Modifier
+            modifier = contentModifier
                 .fillMaxSize()
-                .padding(innerPadding)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -289,7 +382,7 @@ fun UniversalMediaPlayerScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(220.dp),
+                    .height(210.dp),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
@@ -318,12 +411,16 @@ fun UniversalMediaPlayerScreen(
                     Text(
                         text = currentTrack.title,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = currentTrack.artist,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -332,15 +429,22 @@ fun UniversalMediaPlayerScreen(
             Column(modifier = Modifier.fillMaxWidth()) {
                 Slider(
                     value = playbackProgress,
-                    onValueChange = { playbackProgress = it },
+                    onValueChange = { value ->
+                        playbackProgress = value.coerceIn(0f, 1f)
+                        val targetMs = (playbackProgress * totalDurationMs).toLong()
+                        currentPositionMs = targetMs
+                        if (isCustomAudio) {
+                            runCatching { mediaPlayerInstance?.seekTo(targetMs.toInt()) }
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("0:58", style = MaterialTheme.typography.labelSmall)
-                    Text(currentTrack.durationText, style = MaterialTheme.typography.labelSmall)
+                    Text(formatMediaDuration(currentPositionMs), style = MaterialTheme.typography.labelSmall)
+                    Text(formatMediaDuration(totalDurationMs), style = MaterialTheme.typography.labelSmall)
                 }
 
                 // Controls row
@@ -351,7 +455,10 @@ fun UniversalMediaPlayerScreen(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { isLooping = !isLooping }) {
+                    IconButton(onClick = {
+                        isLooping = !isLooping
+                        runCatching { mediaPlayerInstance?.isLooping = isLooping }
+                    }) {
                         Icon(
                             Icons.Default.Repeat,
                             contentDescription = "Loop Track",
@@ -365,30 +472,56 @@ fun UniversalMediaPlayerScreen(
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primary)
                             .clickable {
-                                isPlaying = !isPlaying
-                                val msg = if (isPlaying) "Playing ${currentTrack.title}" else "Paused"
-                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                            },
+                                if (isPlaying) {
+                                    stopAllPlayback()
+                                } else if (isCustomAudio && mediaPlayerInstance != null) {
+                                    runCatching {
+                                        mediaPlayerInstance?.start()
+                                        isPlaying = true
+                                    }
+                                } else {
+                                    startSynthTrack(currentTrack)
+                                }
+                            }
+                            .testTag("media_play_pause_button"),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = "Play/Pause",
+                            contentDescription = if (isPlaying) "Pause" else "Play",
                             tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(36.dp)
                         )
                     }
 
-                    IconButton(onClick = {
-                        val next = samplePlaylist[(samplePlaylist.indexOf(currentTrack) + 1) % samplePlaylist.size]
-                        currentTrack = next
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Next")
+                    IconButton(
+                        onClick = {
+                            val currentIdx = samplePlaylist.indexOfFirst { it.id == currentTrack.id }
+                            val next = samplePlaylist[(currentIdx + 1) % samplePlaylist.size]
+                            startSynthTrack(next)
+                        },
+                        modifier = Modifier.testTag("media_next_button")
+                    ) {
+                        Icon(Icons.Default.SkipNext, contentDescription = "Next Track")
                     }
                 }
             }
 
-            Text("Audio Library", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Audio Library", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                FilledTonalButton(
+                    onClick = { audioPickerLauncher.launch(arrayOf("audio/*")) },
+                    modifier = Modifier.testTag("media_open_file_button")
+                ) {
+                    Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Load Audio File")
+                }
+            }
 
             // Playlist
             LazyColumn(
@@ -396,14 +529,11 @@ fun UniversalMediaPlayerScreen(
                 modifier = Modifier.weight(1f)
             ) {
                 items(samplePlaylist) { track ->
-                    val isCurrent = track.id == currentTrack.id
+                    val isCurrent = track.id == currentTrack.id && !isCustomAudio
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                currentTrack = track
-                                isPlaying = true
-                            },
+                            .clickable { startSynthTrack(track) },
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = if (isCurrent) MaterialTheme.colorScheme.primaryContainer
@@ -446,5 +576,38 @@ fun UniversalMediaPlayerScreen(
                 }
             }
         }
+    }
+
+    if (showTopBar) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Universal Media Studio", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack, modifier = Modifier.testTag("media_back_button")) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = {
+                                onSendMediaToChat("Now playing: \"${currentTrack.title}\" by ${currentTrack.artist}. Suggest similar tracks or background study playlists.")
+                                Toast.makeText(context, "Track sent to OmniChat!", Toast.LENGTH_SHORT).show()
+                                onBack()
+                            }
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send Track to Chat", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    )
+                )
+            }
+        ) { innerPadding ->
+            content(Modifier.padding(innerPadding))
+        }
+    } else {
+        content(Modifier)
     }
 }

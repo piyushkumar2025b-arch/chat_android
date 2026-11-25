@@ -22,7 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.ManageSearch
+import androidx.compose.material.icons.automirrored.filled.ManageSearch
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Person
@@ -203,7 +203,7 @@ fun ChatSearchScreen(
             when {
                 query.isBlank() -> {
                     SearchEmptyState(
-                        icon = Icons.Default.ManageSearch,
+                        icon = Icons.AutoMirrored.Filled.ManageSearch,
                         title = "Search across every conversation",
                         subtitle = "Try a keyword, a decision you made, a code snippet, or part of a chat title."
                     )

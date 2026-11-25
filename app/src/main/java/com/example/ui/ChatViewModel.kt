@@ -138,6 +138,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
 
+    val allMessages: StateFlow<List<ChatMessageEntity>> = chatDao.getAllMessages()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     private val _sessions = MutableStateFlow<List<ChatSessionEntity>>(emptyList())
     val sessions: StateFlow<List<ChatSessionEntity>> = _sessions.asStateFlow()
 

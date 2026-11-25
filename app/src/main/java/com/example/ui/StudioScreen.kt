@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
@@ -40,6 +41,7 @@ fun StudioScreen(
     initialTab: Int = 0,
     preferencesManager: PreferencesManager? = null,
     onSendPromptToChat: (String) -> Unit = {},
+    onSendImageToChat: (android.graphics.Bitmap) -> Unit = { _ -> onSendPromptToChat("[Image Edited from Studio]") },
     modifier: Modifier = Modifier
 ) {
     var selectedStudioTab by remember { mutableIntStateOf(initialTab) }
@@ -50,7 +52,8 @@ fun StudioScreen(
         Triple("Code & HTML", Icons.Default.Code, 3),
         Triple("Markdown Hub", Icons.Default.Description, 4),
         Triple("Video Motion", Icons.Default.Videocam, 5),
-        Triple("Media Player", Icons.Default.GraphicEq, 6)
+        Triple("Media Player", Icons.Default.GraphicEq, 6),
+        Triple("Sound Synth", Icons.AutoMirrored.Filled.VolumeUp, 7)
     )
 
     Column(
@@ -88,7 +91,7 @@ fun StudioScreen(
                 0 -> ImageStudioScreen(onSendPromptToChat = onSendPromptToChat)
                 1 -> ImageEditorScreen(
                     onBack = { selectedStudioTab = 0 },
-                    onSendImageToChat = { _ -> onSendPromptToChat("[Image Edited from Studio]") }
+                    onSendImageToChat = onSendImageToChat
                 )
                 2 -> MusicStudioScreen()
                 3 -> CodeStudioScreen(
@@ -102,8 +105,10 @@ fun StudioScreen(
                 5 -> VideoStudioScreen(onSendPromptToChat = onSendPromptToChat)
                 6 -> UniversalMediaPlayerScreen(
                     onBack = { selectedStudioTab = 0 },
-                    onSendMediaToChat = onSendPromptToChat
+                    onSendMediaToChat = onSendPromptToChat,
+                    showTopBar = false
                 )
+                7 -> SoundStudioScreen()
             }
         }
     }

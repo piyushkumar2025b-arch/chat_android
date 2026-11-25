@@ -2,7 +2,10 @@ package com.example.ui
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.text.format.DateUtils
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -128,7 +131,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.local.UsageStats
+import com.example.data.model.ArtifactExtractor
+import com.example.data.model.ArtifactItem
 import com.example.data.model.AttachmentInfo
+import com.example.data.model.ChatMessageEntity
 import com.example.data.model.ChatSessionEntity
 import com.example.data.model.ProviderType
 import com.example.data.remote.ConversationExporter
@@ -197,6 +203,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
     val isAppLockEnabled by viewModel.isAppLockEnabled.collectAsState()
     val composerDraft by viewModel.composerDraft.collectAsState()
     val focusMessageId by viewModel.focusMessageId.collectAsState()
+    val allMessageEntities by viewModel.allMessages.collectAsState()
 
     val codeHandoff by viewModel.studioCodeHandoff.collectAsState()
     val markdownHandoff by viewModel.studioMarkdownHandoff.collectAsState()
@@ -207,6 +214,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
     var showProviderSheet by remember { mutableStateOf(false) }
     var showUsageSheet by remember { mutableStateOf(false) }
     var showStorageSheet by remember { mutableStateOf(false) }
+    var showArtifactsSheet by remember { mutableStateOf(false) }
+    var selectedArtifact by remember { mutableStateOf<ArtifactItem?>(null) }
     var showOverflowMenu by remember { mutableStateOf(false) }
     var inspectingAttachment by remember { mutableStateOf<ChatAttachment?>(null) }
     var renameTarget by remember { mutableStateOf<ChatSessionEntity?>(null) }
@@ -224,16 +233,62 @@ fun ChatScreen(viewModel: ChatViewModel) {
     val providerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val usageSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val storageSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val artifactsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val currentSessionArtifacts = remember(messages, activeSessionId) {
+        val sid = activeSessionId ?: ""
+        messages.flatMap { msg ->
+            ArtifactExtractor.extractFromMessage(
+                ChatMessageEntity(
+                    id = msg.id,
+                    sessionId = sid,
+                    role = when (msg.role) {
+                        MessageRole.USER -> "user"
+                        MessageRole.SYSTEM -> "system"
+                        else -> "assistant"
+                    },
+                    content = msg.content,
+                    timestamp = msg.timestamp,
+                    isError = msg.status == MessageStatus.ERROR
+                )
+            )
+        }
+    }
+    val allArtifacts = remember(allMessageEntities) {
+        allMessageEntities.flatMap { ArtifactExtractor.extractFromMessage(it) }
+    }
 
     var ttsEngine by remember { mutableStateOf<TextToSpeech?>(null) }
     var ttsReady by remember { mutableStateOf(false) }
     var speakingMessageId by remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(Unit) {
+        val mainHandler = Handler(Looper.getMainLooper())
+        var engineRef: TextToSpeech? = null
         val engine = TextToSpeech(context) { status ->
-            ttsReady = status == TextToSpeech.SUCCESS
+            val ok = status == TextToSpeech.SUCCESS
+            if (ok) {
+                engineRef?.language = Locale.getDefault()
+            }
+            mainHandler.post { ttsReady = ok }
         }
-        engine.language = Locale.getDefault()
+        engineRef = engine
+        engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {}
+            override fun onDone(utteranceId: String?) {
+                mainHandler.post { speakingMessageId = null }
+            }
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String?) {
+                mainHandler.post { speakingMessageId = null }
+            }
+            override fun onError(utteranceId: String?, errorCode: Int) {
+                mainHandler.post { speakingMessageId = null }
+            }
+            override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                mainHandler.post { speakingMessageId = null }
+            }
+        })
         ttsEngine = engine
         onDispose {
             engine.stop()
@@ -368,6 +423,17 @@ fun ChatScreen(viewModel: ChatViewModel) {
                     onSendPromptToChat = { prompt ->
                         viewModel.navigateToSection(AppSection.CHAT)
                         viewModel.sendMessage(prompt)
+                    },
+                    onSendImageToChat = { bitmap ->
+                        viewModel.navigateToSection(AppSection.CHAT)
+                        viewModel.addAttachment(
+                            ChatAttachment(
+                                name = "Edited_${System.currentTimeMillis()}.png",
+                                mimeType = "image/png",
+                                bitmap = bitmap,
+                                content = "[Canvas Image from Studio]"
+                            )
+                        )
                     },
                     modifier = Modifier.padding(innerPadding)
                 )
@@ -591,6 +657,15 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                                 showOverflowMenu = false
                                                 viewModel.navigateToSection(AppSection.CHAT_SEARCH)
                                             }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Artifacts (${currentSessionArtifacts.size})") },
+                                            leadingIcon = { Icon(Icons.Default.Widgets, contentDescription = null) },
+                                            onClick = {
+                                                showOverflowMenu = false
+                                                showArtifactsSheet = true
+                                            },
+                                            modifier = Modifier.testTag("menu_artifacts")
                                         )
                                         DropdownMenuItem(
                                             text = { Text("AI Memory") },
@@ -958,6 +1033,29 @@ fun ChatScreen(viewModel: ChatViewModel) {
             onAttachCachedFile = { file ->
                 viewModel.attachCachedFile(file) { _, message -> toast(message) }
             }
+        )
+    }
+
+    if (showArtifactsSheet) {
+        ArtifactsSheet(
+            sheetState = artifactsSheetState,
+            currentSessionArtifacts = currentSessionArtifacts,
+            allArtifacts = allArtifacts,
+            onSelectArtifact = { artifact ->
+                showArtifactsSheet = false
+                selectedArtifact = artifact
+            },
+            onPromptSuggestion = { suggestion ->
+                inputPrompt = suggestion
+            },
+            onDismiss = { showArtifactsSheet = false }
+        )
+    }
+
+    selectedArtifact?.let { artifact ->
+        ArtifactViewerDialog(
+            artifact = artifact,
+            onDismiss = { selectedArtifact = null }
         )
     }
 

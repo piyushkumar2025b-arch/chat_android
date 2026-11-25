@@ -1,6 +1,9 @@
 package com.example.ui
 
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -63,21 +66,43 @@ fun ReadAloudScreen(
     var speechRate by remember { mutableFloatStateOf(1.0f) }
     var pitch by remember { mutableFloatStateOf(1.0f) }
     var isSpeaking by remember { mutableStateOf(false) }
+    var ttsReady by remember { mutableStateOf(false) }
 
     var ttsInstance by remember { mutableStateOf<TextToSpeech?>(null) }
 
     DisposableEffect(Unit) {
+        val mainHandler = Handler(Looper.getMainLooper())
+        var engineRef: TextToSpeech? = null
         val tts = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                // Configured
+            val ok = status == TextToSpeech.SUCCESS
+            if (ok) {
+                engineRef?.language = Locale.getDefault()
             }
+            mainHandler.post { ttsReady = ok }
         }
-        tts.language = Locale.getDefault()
+        engineRef = tts
+        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {}
+            override fun onDone(utteranceId: String?) {
+                mainHandler.post { isSpeaking = false }
+            }
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String?) {
+                mainHandler.post { isSpeaking = false }
+            }
+            override fun onError(utteranceId: String?, errorCode: Int) {
+                mainHandler.post { isSpeaking = false }
+            }
+            override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                mainHandler.post { isSpeaking = false }
+            }
+        })
         ttsInstance = tts
 
         onDispose {
             tts.stop()
             tts.shutdown()
+            ttsInstance = null
         }
     }
 
@@ -159,11 +184,17 @@ fun ReadAloudScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 Button(
                     onClick = {
-                        ttsInstance?.setSpeechRate(speechRate)
-                        ttsInstance?.setPitch(pitch)
-                        ttsInstance?.speak(speechText, TextToSpeech.QUEUE_FLUSH, null, "omni_tts")
-                        isSpeaking = true
-                        Toast.makeText(context, "Speaking...", Toast.LENGTH_SHORT).show()
+                        if (!ttsReady) {
+                            Toast.makeText(context, "Voice engine is still initializing…", Toast.LENGTH_SHORT).show()
+                        } else if (speechText.isBlank()) {
+                            Toast.makeText(context, "Enter text to read aloud.", Toast.LENGTH_SHORT).show()
+                        } else {
+                            ttsInstance?.setSpeechRate(speechRate)
+                            ttsInstance?.setPitch(pitch)
+                            ttsInstance?.speak(speechText, TextToSpeech.QUEUE_FLUSH, null, "omni_tts")
+                            isSpeaking = true
+                            Toast.makeText(context, "Speaking...", Toast.LENGTH_SHORT).show()
+                        }
                     },
                     modifier = Modifier.weight(1f)
                 ) {

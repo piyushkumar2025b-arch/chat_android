@@ -1,6 +1,10 @@
 package com.example.ui
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,18 +14,24 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,9 +52,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.data.remote.AiService
-import com.example.data.remote.SearchResult
+import com.example.data.remote.SearchCategory
+import com.example.data.remote.WebSearchResult
+import com.example.data.remote.WebSearchService
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,17 +69,28 @@ fun WebSearchScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    var searchQuery by remember { mutableStateOf("Latest Android Jetpack Compose 2026") }
+    var searchQuery by remember { mutableStateOf("Latest Android Jetpack Compose") }
+    var selectedCategory by remember { mutableStateOf(SearchCategory.ALL) }
     var isSearching by remember { mutableStateOf(false) }
-    val searchResults = remember { mutableStateListOf<SearchResult>() }
+    var searchError by remember { mutableStateOf<String?>(null) }
+    var hasSearched by remember { mutableStateOf(false) }
+    val searchResults = remember { mutableStateListOf<WebSearchResult>() }
 
-    fun executeSearch() {
+    fun executeSearch(categoryOverride: SearchCategory = selectedCategory) {
         if (searchQuery.isBlank()) return
         isSearching = true
+        searchError = null
         coroutineScope.launch {
-            val results = AiService.searchWeb(searchQuery)
-            searchResults.clear()
-            searchResults.addAll(results)
+            WebSearchService.search(searchQuery, categoryOverride)
+                .onSuccess { results ->
+                    searchResults.clear()
+                    searchResults.addAll(results)
+                    hasSearched = true
+                }
+                .onFailure { err ->
+                    searchError = err.localizedMessage ?: "Search request failed."
+                    hasSearched = true
+                }
             isSearching = false
         }
     }
@@ -84,8 +108,8 @@ fun WebSearchScreen(
                     if (searchResults.isNotEmpty()) {
                         IconButton(
                             onClick = {
-                                val summary = searchResults.joinToString("\n\n") {
-                                    "Title: ${it.title}\nSource: ${it.source}\nSnippet: ${it.snippet}"
+                                val summary = searchResults.take(8).joinToString("\n\n") {
+                                    "Title: ${it.title}\nSource: ${it.source}\nURL: ${it.url}\nSnippet: ${it.snippet}"
                                 }
                                 onSendResultsToChat("Web Research Findings for \"$searchQuery\":\n\n$summary\n\nPlease synthesize and verify these sources.")
                                 Toast.makeText(context, "Research sent to AI Chat!", Toast.LENGTH_SHORT).show()
@@ -107,7 +131,7 @@ fun WebSearchScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -119,55 +143,125 @@ fun WebSearchScreen(
                     onValueChange = { searchQuery = it },
                     label = { Text("Search web topic...") },
                     modifier = Modifier.weight(1f),
-                    singleLine = true
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { executeSearch() })
                 )
                 Button(
                     onClick = { executeSearch() },
+                    enabled = !isSearching && searchQuery.isNotBlank(),
                     modifier = Modifier.testTag("execute_web_search")
                 ) {
-                    Icon(Icons.Default.Search, contentDescription = null)
+                    Icon(Icons.Default.Search, contentDescription = "Search")
                 }
             }
 
-            if (isSearching) {
-                Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            } else if (searchResults.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "Enter a search term and tap Search to query live web sources.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SearchCategory.entries.forEach { category ->
+                    FilterChip(
+                        selected = selectedCategory == category,
+                        onClick = {
+                            selectedCategory = category
+                            if (searchQuery.isNotBlank() && hasSearched) {
+                                executeSearch(category)
+                            }
+                        },
+                        label = { Text("${category.icon} ${category.label}") }
                     )
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(searchResults) { item ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text(
-                                    text = item.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = item.source,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = item.snippet,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
+            }
+
+            when {
+                isSearching -> {
+                    Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+                searchError != null && searchResults.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(searchError ?: "Search failed.", color = MaterialTheme.colorScheme.error)
+                            Button(onClick = { executeSearch() }) { Text("Retry") }
+                        }
+                    }
+                }
+                searchResults.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = if (hasSearched) "No results found. Try another keyword or source filter."
+                            else "Enter a search term and tap Search to query live web sources.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(searchResults) { item ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(enabled = item.url.isNotBlank()) {
+                                        runCatching {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.url)))
+                                        }.onFailure {
+                                            Toast.makeText(context, "Unable to open URL", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "${item.source} • ${item.category}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                        if (item.url.isNotBlank()) {
+                                            Icon(
+                                                Icons.Default.OpenInBrowser,
+                                                contentDescription = "Open source",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = item.title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = item.snippet,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 4,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    if (item.url.isNotBlank()) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = item.url,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.outline,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
