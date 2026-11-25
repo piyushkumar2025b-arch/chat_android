@@ -89,16 +89,19 @@ fun StudioScreen(
                 0 -> ImageStudioScreen(onSendPromptToChat = onSendPromptToChat)
                 1 -> ImageEditorScreen(
                     onBack = { selectedStudioTab = 0 },
-                    onSendImageToChat = onSendImageToChat
+                    onSendImageToChat = onSendImageToChat,
+                    showTopBar = false
                 )
                 2 -> MusicStudioScreen()
                 3 -> CodeStudioScreen(
                     onBack = { selectedStudioTab = 0 },
-                    onSendCodeToChat = { code, name -> onSendPromptToChat("Code from Studio ($name):\n$code") }
+                    onSendCodeToChat = { code, name -> onSendPromptToChat("Code from Studio ($name):\n$code") },
+                    showTopBar = false
                 )
                 4 -> MarkdownStudioScreen(
                     onBack = { selectedStudioTab = 0 },
-                    onSendMarkdownToChat = onSendPromptToChat
+                    onSendMarkdownToChat = onSendPromptToChat,
+                    showTopBar = false
                 )
                 5 -> VideoStudioScreen(onSendPromptToChat = onSendPromptToChat)
                 6 -> UniversalMediaPlayerScreen(

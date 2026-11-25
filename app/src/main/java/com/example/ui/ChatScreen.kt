@@ -1877,19 +1877,19 @@ private fun SessionDrawerRow(
                     color = contentColor.copy(alpha = 0.7f)
                 )
             }
-            IconButton(onClick = onRename, modifier = Modifier.size(30.dp)) {
+            IconButton(onClick = onRename, modifier = Modifier.size(36.dp)) {
                 Icon(
                     Icons.Default.Edit,
                     contentDescription = "Rename chat",
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(16.dp),
                     tint = contentColor.copy(alpha = 0.7f)
                 )
             }
-            IconButton(onClick = onDelete, modifier = Modifier.size(30.dp)) {
+            IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
                 Icon(
                     Icons.Default.Delete,
                     contentDescription = "Delete chat",
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(16.dp),
                     tint = contentColor.copy(alpha = 0.7f)
                 )
             }

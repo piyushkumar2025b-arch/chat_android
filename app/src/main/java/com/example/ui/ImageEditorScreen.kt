@@ -86,7 +86,8 @@ data class DrawnLine(
 @Composable
 fun ImageEditorScreen(
     onBack: () -> Unit,
-    onSendImageToChat: (Bitmap) -> Unit = {}
+    onSendImageToChat: (Bitmap) -> Unit = {},
+    showTopBar: Boolean = true
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -127,67 +128,69 @@ fun ImageEditorScreen(
         return bitmap
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("AI Image & Sketch Studio", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack, modifier = Modifier.testTag("image_editor_back")) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    // FIX BUG-04: High-visibility "Send to AI Chat" action button
-                    IconButton(
-                        onClick = {
-                            val bmp = generateBitmap()
-                            onSendImageToChat(bmp)
-                            Toast.makeText(context, "Image sent to AI Chat prompt!", Toast.LENGTH_SHORT).show()
-                            onBack()
-                        },
-                        modifier = Modifier.testTag("send_image_to_chat_button")
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Send to AI Chat",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    IconButton(
-                        onClick = {
-                            lines.clear()
-                            Toast.makeText(context, "Canvas cleared", Toast.LENGTH_SHORT).show()
-                        }
-                    ) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear Canvas")
-                    }
-
-                    IconButton(
-                        onClick = {
-                            val bmp = generateBitmap()
-                            coroutineScope.launch {
-                                MediaSaver.saveBitmapToGallery(context, bmp, "OmniSketch")
-                            }
-                        },
-                        modifier = Modifier.testTag("save_sketch_button")
-                    ) {
-                        Icon(Icons.Default.Save, contentDescription = "Save Drawing")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
-                )
-            )
+    val sendAction = {
+        val bmp = generateBitmap()
+        onSendImageToChat(bmp)
+        Toast.makeText(context, "Image sent to chat", Toast.LENGTH_SHORT).show()
+        if (showTopBar) onBack()
+    }
+    val clearAction = {
+        lines.clear()
+        Toast.makeText(context, "Canvas cleared", Toast.LENGTH_SHORT).show()
+    }
+    val saveAction = {
+        val bmp = generateBitmap()
+        coroutineScope.launch {
+            MediaSaver.saveBitmapToGallery(context, bmp, "OmniSketch")
         }
-    ) { innerPadding ->
+        Unit
+    }
+
+    @Composable
+    fun EditorBody(modifier: Modifier = Modifier) {
         Column(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
-                .padding(innerPadding)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (!showTopBar) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Sketch Canvas",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        IconButton(
+                            onClick = clearAction,
+                            modifier = Modifier.testTag("clear_sketch_button")
+                        ) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear Canvas")
+                        }
+                        IconButton(
+                            onClick = saveAction,
+                            modifier = Modifier.testTag("save_sketch_button")
+                        ) {
+                            Icon(Icons.Default.Save, contentDescription = "Save Drawing")
+                        }
+                        IconButton(
+                            onClick = sendAction,
+                            modifier = Modifier.testTag("send_image_to_chat_button")
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Send to Chat",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
             // Drawing Surface
             Card(
                 modifier = Modifier
@@ -271,5 +274,51 @@ fun ImageEditorScreen(
                 }
             }
         }
+    }
+
+    if (showTopBar) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Sketch Pad", fontWeight = FontWeight.SemiBold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack, modifier = Modifier.testTag("image_editor_back")) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = sendAction,
+                            modifier = Modifier.testTag("send_image_to_chat_button")
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Send to Chat",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        IconButton(
+                            onClick = clearAction,
+                            modifier = Modifier.testTag("clear_sketch_button")
+                        ) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear Canvas")
+                        }
+                        IconButton(
+                            onClick = saveAction,
+                            modifier = Modifier.testTag("save_sketch_button")
+                        ) {
+                            Icon(Icons.Default.Save, contentDescription = "Save Drawing")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                )
+            }
+        ) { innerPadding ->
+            EditorBody(modifier = Modifier.padding(innerPadding))
+        }
+    } else {
+        EditorBody()
     }
 }

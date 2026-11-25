@@ -742,7 +742,7 @@ fun MusicStudioScreen(
             color = MaterialTheme.colorScheme.surface,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(150.dp)
+                .heightIn(min = 150.dp, max = 210.dp)
         ) {
             Column(
                 modifier = Modifier

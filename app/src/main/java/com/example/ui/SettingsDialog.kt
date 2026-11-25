@@ -272,6 +272,7 @@ fun SettingsDialog(
                                             cerebrasKey = preferencesManager.cerebrasApiKey
                                             huggingFaceKey = preferencesManager.huggingFaceApiKey
                                             youtubeKey = preferencesManager.youtubeApiKey
+                                            googleMapsKey = preferencesManager.googleMapsApiKey
                                             customUrl = preferencesManager.customBaseUrl
                                             customKey = preferencesManager.customApiKey
                                             customModel = preferencesManager.customModel

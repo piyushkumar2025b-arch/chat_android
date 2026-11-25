@@ -58,27 +58,27 @@ fun MarkdownStudioScreen(
     initialContent: String? = null,
     initialFileName: String? = null,
     onBack: () -> Unit,
-    onSendMarkdownToChat: (String) -> Unit = {}
+    onSendMarkdownToChat: (String) -> Unit = {},
+    showTopBar: Boolean = true
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
 
     val defaultDoc = """
-        # Project Documentation
+        # Notes & Writing
         
-        Welcome to the **OmniChat Markdown Studio**!
+        Welcome to **OmniChat Writing Pad**.
         
-        ## Features
-        - Multi-provider AI reasoning (Gemini, Groq, OpenRouter)
-        - Rich live markdown preview
-        - Productivity suite with Room SQLite database
+        ## Highlights
+        - Clean, distraction-free writing
+        - Live formatted preview
+        - Send drafts straight to chat
         
-        > "Intelligence is the ability to adapt to change." - Stephen Hawking
+        > "Simplicity is about subtracting the obvious and adding the meaningful."
         
-        ### Quick Code Sample
+        ### Code Snippet
         ```kotlin
-        val omni = OmniChatEngine.init()
-        omni.start()
+        fun greet(name: String) = "Hello, ${'$'}name!"
         ```
     """.trimIndent()
 
@@ -86,7 +86,6 @@ fun MarkdownStudioScreen(
     var fileName by remember { mutableStateOf(initialFileName ?: "Notes.md") }
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = Editor, 1 = Preview
 
-    // FIX BUG-05: Update when initial parameters change from chat attachment handoff
     LaunchedEffect(initialContent, initialFileName) {
         if (!initialContent.isNullOrBlank()) {
             markdownText = initialContent
@@ -96,47 +95,49 @@ fun MarkdownStudioScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(fileName, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack, modifier = Modifier.testTag("md_studio_back")) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = {
-                            clipboardManager.setText(AnnotatedString(markdownText))
-                            Toast.makeText(context, "Markdown copied to clipboard!", Toast.LENGTH_SHORT).show()
-                        }
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy Markdown")
-                    }
+    val copyMdAction = {
+        clipboardManager.setText(AnnotatedString(markdownText))
+        Toast.makeText(context, "Text copied!", Toast.LENGTH_SHORT).show()
+    }
+    val sendMdAction = {
+        onSendMarkdownToChat(markdownText)
+        Toast.makeText(context, "Sent to chat!", Toast.LENGTH_SHORT).show()
+        if (showTopBar) onBack()
+    }
 
-                    IconButton(
-                        onClick = {
-                            onSendMarkdownToChat(markdownText)
-                            Toast.makeText(context, "Sent to AI Chat!", Toast.LENGTH_SHORT).show()
-                            onBack()
-                        },
-                        modifier = Modifier.testTag("md_studio_send_chat")
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send to Chat", tint = MaterialTheme.colorScheme.primary)
+    @Composable
+    fun MarkdownEditorBody(modifier: Modifier = Modifier) {
+        Column(modifier = modifier.fillMaxSize()) {
+            if (!showTopBar) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = fileName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        IconButton(onClick = copyMdAction) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy Text")
+                        }
+                        IconButton(
+                            onClick = sendMdAction,
+                            modifier = Modifier.testTag("md_studio_send_chat")
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Send to Chat",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
-                )
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
+                }
+            }
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(
                     selected = selectedTab == 0,
@@ -258,5 +259,42 @@ fun MarkdownStudioScreen(
                 }
             }
         }
+    }
+
+    if (showTopBar) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(fileName, fontWeight = FontWeight.SemiBold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack, modifier = Modifier.testTag("md_studio_back")) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = copyMdAction) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy Text")
+                        }
+                        IconButton(
+                            onClick = sendMdAction,
+                            modifier = Modifier.testTag("md_studio_send_chat")
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Send to Chat",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                )
+            }
+        ) { innerPadding ->
+            MarkdownEditorBody(modifier = Modifier.padding(innerPadding))
+        }
+    } else {
+        MarkdownEditorBody()
     }
 }

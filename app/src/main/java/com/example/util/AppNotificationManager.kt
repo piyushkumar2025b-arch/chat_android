@@ -19,6 +19,21 @@ object AppNotificationManager {
     const val CHANNEL_FITNESS = "omnichat_fitness"
     const val CHANNEL_AI_TIPS = "omnichat_ai_tips"
 
+    const val PREFS_NAME = "omnichat_notifs_prefs"
+    const val PREF_STEP_ALERTS = "step_alerts"
+    const val PREF_AI_TIPS = "ai_tips"
+    const val PREF_CHAT_REMINDERS = "chat_reminders"
+
+    fun isChannelEnabled(context: Context, channelId: String): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return when (channelId) {
+            CHANNEL_FITNESS -> prefs.getBoolean(PREF_STEP_ALERTS, true)
+            CHANNEL_AI_TIPS -> prefs.getBoolean(PREF_AI_TIPS, true)
+            CHANNEL_REMINDERS -> prefs.getBoolean(PREF_CHAT_REMINDERS, true)
+            else -> true
+        }
+    }
+
     fun initChannels(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -71,6 +86,10 @@ object AppNotificationManager {
         notificationId: Int = System.currentTimeMillis().toInt()
     ): Boolean {
         initChannels(context)
+
+        if (!isChannelEnabled(context, channelId)) {
+            return false
+        }
 
         if (!hasNotificationPermission(context)) {
             return false

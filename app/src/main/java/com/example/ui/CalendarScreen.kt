@@ -1,6 +1,9 @@
 package com.example.ui
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,10 +19,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -31,6 +37,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -45,6 +53,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -61,6 +70,7 @@ import com.example.data.local.CalendarEventEntity
 import com.example.data.local.ProductivityDao
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
@@ -84,14 +94,13 @@ fun CalendarScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Productivity Calendar", fontWeight = FontWeight.Bold) },
+                title = { Text("Calendar", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack, modifier = Modifier.testTag("calendar_back")) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    // Consult AI Assistant button
                     if (events.isNotEmpty()) {
                         IconButton(
                             onClick = {
@@ -99,17 +108,17 @@ fun CalendarScreen(
                                     "- ${it.title} at ${dateFormat.format(Date(it.timestamp))} (${it.location}) [Priority: ${it.priority}]"
                                 }
                                 onSendScheduleToChat("Here is my upcoming schedule:\n$summary\n\nPlease summarize my priorities and suggest preparation tips.")
-                                Toast.makeText(context, "Schedule sent to OmniChat!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Schedule sent to chat!", Toast.LENGTH_SHORT).show()
                                 onBack()
                             },
                             modifier = Modifier.testTag("calendar_ai_brief_button")
                         ) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = "Consult AI Assistant", tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.AutoAwesome, contentDescription = "Ask AI about schedule", tint = MaterialTheme.colorScheme.primary)
                         }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         },
@@ -136,7 +145,8 @@ fun CalendarScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Row(
@@ -145,25 +155,24 @@ fun CalendarScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(44.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
+                            .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+                        Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     }
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
                     Column {
                         Text(
                             text = "${events.size} Scheduled Events",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "Room SQLite synchronized with OmniChat AI briefing engine",
+                            text = "Saved on this device • Tap AI icon to review schedule",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -199,7 +208,8 @@ fun CalendarScreen(
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Row(
@@ -207,11 +217,27 @@ fun CalendarScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = event.title,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = event.title,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        if (event.priority.isNotBlank() && event.priority != "Normal") {
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = if (event.priority == "High") MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainerHigh
+                                            ) {
+                                                Text(
+                                                    text = "${event.priority} Priority",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = if (event.priority == "High") MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                    }
                                     Row {
                                         IconButton(onClick = {
                                             editingEvent = event
@@ -275,28 +301,105 @@ fun CalendarScreen(
         var description by remember { mutableStateOf(editingEvent?.description ?: "") }
         var location by remember { mutableStateOf(editingEvent?.location ?: "") }
         var priority by remember { mutableStateOf(editingEvent?.priority ?: "Normal") }
+        var selectedTimestamp by remember { mutableLongStateOf(editingEvent?.timestamp ?: System.currentTimeMillis()) }
+
+        val dateOnlyFormat = remember { SimpleDateFormat("EEE, MMM d, yyyy", Locale.getDefault()) }
+        val timeOnlyFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
 
         AlertDialog(
             onDismissRequest = { showEditorDialog = false },
-            title = { Text(if (isEditing) "Edit Event" else "Schedule New Event") },
+            title = { Text(if (isEditing) "Edit Event" else "New Event") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it },
                         label = { Text("Event Title") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().testTag("calendar_title_input"),
+                        singleLine = true
                     )
                     OutlinedTextField(
                         value = location,
                         onValueChange = { location = it },
-                        label = { Text("Location / Link") },
-                        modifier = Modifier.fillMaxWidth()
+                        label = { Text("Location or Link") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val cal = Calendar.getInstance().apply { timeInMillis = selectedTimestamp }
+                                DatePickerDialog(
+                                    context,
+                                    { _, year, month, day ->
+                                        val updated = Calendar.getInstance().apply {
+                                            timeInMillis = selectedTimestamp
+                                            set(Calendar.YEAR, year)
+                                            set(Calendar.MONTH, month)
+                                            set(Calendar.DAY_OF_MONTH, day)
+                                        }
+                                        selectedTimestamp = updated.timeInMillis
+                                    },
+                                    cal.get(Calendar.YEAR),
+                                    cal.get(Calendar.MONTH),
+                                    cal.get(Calendar.DAY_OF_MONTH)
+                                ).show()
+                            },
+                            modifier = Modifier.weight(1f).testTag("calendar_pick_date_button")
+                        ) {
+                            Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(dateOnlyFormat.format(Date(selectedTimestamp)), fontSize = 12.sp, maxLines = 1)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                val cal = Calendar.getInstance().apply { timeInMillis = selectedTimestamp }
+                                TimePickerDialog(
+                                    context,
+                                    { _, hour, minute ->
+                                        val updated = Calendar.getInstance().apply {
+                                            timeInMillis = selectedTimestamp
+                                            set(Calendar.HOUR_OF_DAY, hour)
+                                            set(Calendar.MINUTE, minute)
+                                        }
+                                        selectedTimestamp = updated.timeInMillis
+                                    },
+                                    cal.get(Calendar.HOUR_OF_DAY),
+                                    cal.get(Calendar.MINUTE),
+                                    false
+                                ).show()
+                            },
+                            modifier = Modifier.testTag("calendar_pick_time_button")
+                        ) {
+                            Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(timeOnlyFormat.format(Date(selectedTimestamp)), fontSize = 12.sp, maxLines = 1)
+                        }
+                    }
+
+                    Text("Priority", style = MaterialTheme.typography.labelMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("Low", "Normal", "High").forEach { option ->
+                            FilterChip(
+                                selected = priority == option,
+                                onClick = { priority = option },
+                                label = { Text(option) },
+                                modifier = Modifier.testTag("calendar_priority_$option")
+                            )
+                        }
+                    }
+
                     OutlinedTextField(
                         value = description,
                         onValueChange = { description = it },
-                        label = { Text("Description & Notes") },
+                        label = { Text("Notes") },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 3
                     )
@@ -309,23 +412,25 @@ fun CalendarScreen(
                             coroutineScope.launch {
                                 val eventToSave = CalendarEventEntity(
                                     id = editingEvent?.id ?: UUID.randomUUID().toString(),
-                                    title = title,
-                                    description = description,
-                                    location = location,
+                                    title = title.trim(),
+                                    description = description.trim(),
+                                    location = location.trim(),
                                     priority = priority,
-                                    timestamp = editingEvent?.timestamp ?: System.currentTimeMillis()
+                                    timestamp = selectedTimestamp
                                 )
                                 productivityDao.insertEvent(eventToSave)
 
-                                // FIX BUG-07: Dynamic toast accurately reporting updated vs scheduled
-                                val toastMessage = if (isEditing) "Event updated!" else "Event scheduled!"
-                                Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
+                                val toastMessage = if (isEditing) "Event updated!" else "Event saved!"
+                                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                    Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
+                                }
                                 showEditorDialog = false
                             }
                         }
-                    }
+                    },
+                    modifier = Modifier.testTag("calendar_save_button")
                 ) {
-                    Text(if (isEditing) "Update" else "Schedule")
+                    Text(if (isEditing) "Update" else "Save")
                 }
             },
             dismissButton = {

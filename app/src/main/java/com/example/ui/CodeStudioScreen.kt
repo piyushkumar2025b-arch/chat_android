@@ -61,15 +61,16 @@ fun CodeStudioScreen(
     initialFileName: String? = null,
     initialLanguage: String? = null,
     onBack: () -> Unit,
-    onSendCodeToChat: (code: String, filename: String) -> Unit = { _, _ -> }
+    onSendCodeToChat: (code: String, filename: String) -> Unit = { _, _ -> },
+    showTopBar: Boolean = true
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
 
     val defaultCode = """
-        // OmniChat Interactive Code Studio
+        // OmniChat Code Editor
         fun main() {
-            println("Hello, OmniChat Multi-Agent Intelligence!")
+            println("Hello, OmniChat!")
         }
     """.trimIndent()
 
@@ -79,7 +80,7 @@ fun CodeStudioScreen(
     var consoleOutput by remember { mutableStateOf("") }
     var isRunning by remember { mutableStateOf(false) }
 
-    // FIX BUG-05: Update when initial parameters change (e.g. from chat attachment handoff)
+    // Update when initial parameters change (e.g. from chat attachment handoff)
     LaunchedEffect(initialCode, initialFileName, initialLanguage) {
         if (!initialCode.isNullOrBlank()) {
             codeText = initialCode
@@ -94,49 +95,52 @@ fun CodeStudioScreen(
 
     val languages = listOf("Kotlin", "Python", "JavaScript", "HTML", "Rust", "SQL")
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(fileName, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack, modifier = Modifier.testTag("code_studio_back")) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = {
-                            clipboardManager.setText(AnnotatedString(codeText))
-                            Toast.makeText(context, "Code copied to clipboard!", Toast.LENGTH_SHORT).show()
-                        }
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy Code")
-                    }
+    val copyCodeAction = {
+        clipboardManager.setText(AnnotatedString(codeText))
+        Toast.makeText(context, "Code copied!", Toast.LENGTH_SHORT).show()
+    }
+    val sendCodeAction = {
+        onSendCodeToChat(codeText, fileName)
+        Toast.makeText(context, "Sent to chat!", Toast.LENGTH_SHORT).show()
+        if (showTopBar) onBack()
+    }
 
-                    IconButton(
-                        onClick = {
-                            onSendCodeToChat(codeText, fileName)
-                            Toast.makeText(context, "Sent to AI Chat!", Toast.LENGTH_SHORT).show()
-                            onBack()
-                        },
-                        modifier = Modifier.testTag("code_studio_send_chat")
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send to Chat", tint = MaterialTheme.colorScheme.primary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
-                )
-            )
-        }
-    ) { innerPadding ->
+    @Composable
+    fun CodeEditorBody(modifier: Modifier = Modifier) {
         Column(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
-                .padding(innerPadding)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (!showTopBar) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = fileName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        IconButton(onClick = copyCodeAction) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy Code")
+                        }
+                        IconButton(
+                            onClick = sendCodeAction,
+                            modifier = Modifier.testTag("code_studio_send_chat")
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Send to Chat",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
             // Language selector & File naming
             Row(
                 modifier = Modifier
@@ -241,6 +245,43 @@ fun CodeStudioScreen(
                 }
             }
         }
+    }
+
+    if (showTopBar) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(fileName, fontWeight = FontWeight.SemiBold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack, modifier = Modifier.testTag("code_studio_back")) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = copyCodeAction) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy Code")
+                        }
+                        IconButton(
+                            onClick = sendCodeAction,
+                            modifier = Modifier.testTag("code_studio_send_chat")
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Send to Chat",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                )
+            }
+        ) { innerPadding ->
+            CodeEditorBody(modifier = Modifier.padding(innerPadding))
+        }
+    } else {
+        CodeEditorBody()
     }
 }
 

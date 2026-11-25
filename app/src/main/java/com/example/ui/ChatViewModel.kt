@@ -1079,7 +1079,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     val limit = preferencesManager.dailyLimit
                     appendErrorMessage(
                         sessionId,
-                        "Daily request limit reached ($limit requests). Open Settings → Daily Request Budget to raise the limit or reset today's usage."
+                        "Daily request limit reached ($limit requests). Open Settings → Daily Limit to raise the limit or reset today's usage."
                     )
                     return@launch
                 }

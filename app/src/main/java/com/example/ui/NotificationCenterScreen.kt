@@ -103,13 +103,12 @@ fun NotificationCenterScreen(
     ) {
         // Top App Bar
         Surface(
-            tonalElevation = 2.dp,
             color = MaterialTheme.colorScheme.surface
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (onBack != null) {
@@ -120,41 +119,29 @@ fun NotificationCenterScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Notifications,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Column {
                     Text(
-                        text = "App Notifications Center",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        text = "Notifications",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = if (isNotificationAllowed) "System Alerts Enabled 🔔" else "Permission Required ⚠️",
+                        text = if (isNotificationAllowed) "System alerts are on" else "Permission needed to show alerts",
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (isNotificationAllowed) Color(0xFF10B981) else MaterialTheme.colorScheme.error
+                        color = if (isNotificationAllowed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                     )
                 }
             }
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(16.dp)
+                .testTag("notifications_list"),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // Permission Card if disabled
             if (!isNotificationAllowed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -172,13 +159,13 @@ fun NotificationCenterScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    "Notifications are Disabled",
-                                    fontWeight = FontWeight.Bold,
+                                    "Notifications Turned Off",
+                                    fontWeight = FontWeight.SemiBold,
                                     style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                                 Text(
-                                    "Enable notifications to receive real alerts for fitness milestones, AI insights, and scheduled reminders.",
+                                    "Allow notifications to receive step goals, AI tips, and reminders.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
@@ -196,25 +183,27 @@ fun NotificationCenterScreen(
                 }
             }
 
-            // Quick Send / Real Test Notifications
+            // Quick Test Alerts
             item {
-                ElevatedCard(
-                    shape = RoundedCornerShape(18.dp),
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "Send Real App Notifications",
+                                "Test Notifications",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            "Dispatch live Android OS notifications right now to verify lock-screen, status bar, and banner delivery:",
+                            "Send a real notification now to check how alerts look on your device:",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -227,37 +216,45 @@ fun NotificationCenterScreen(
                         ) {
                             FilledTonalButton(
                                 onClick = {
+                                    if (!AppNotificationManager.isChannelEnabled(context, AppNotificationManager.CHANNEL_REMINDERS)) {
+                                        Toast.makeText(context, "Turn on Task & Chat Reminders below first.", Toast.LENGTH_SHORT).show()
+                                        return@FilledTonalButton
+                                    }
                                     val success = AppNotificationManager.sendNotification(
                                         context = context,
-                                        title = "⚡ Instant OmniChat Alert",
-                                        body = "Your local workspace is active and responsive! Tap to resume conversation.",
+                                        title = "OmniChat Reminder",
+                                        body = "Your workspace is ready. Tap to continue chatting.",
                                         channelId = AppNotificationManager.CHANNEL_REMINDERS
                                     )
-                                    if (success) Toast.makeText(context, "Notification sent! 🔔", Toast.LENGTH_SHORT).show()
+                                    if (success) Toast.makeText(context, "Notification sent!", Toast.LENGTH_SHORT).show()
                                     else if (!isNotificationAllowed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                         permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                     }
                                 },
                                 modifier = Modifier.weight(1f).testTag("send_test_notif_btn")
                             ) {
-                                Text("Instant Alert")
+                                Text("Quick Alert")
                             }
 
                             FilledTonalButton(
                                 onClick = {
+                                    if (!AppNotificationManager.isChannelEnabled(context, AppNotificationManager.CHANNEL_FITNESS)) {
+                                        Toast.makeText(context, "Turn on Step Goal Alerts below first.", Toast.LENGTH_SHORT).show()
+                                        return@FilledTonalButton
+                                    }
                                     val success = AppNotificationManager.sendStepGoalAchieved(
                                         context = context,
                                         steps = 10_240,
                                         goal = 10_000
                                     )
-                                    if (success) Toast.makeText(context, "Step goal notification sent! 🏆", Toast.LENGTH_SHORT).show()
+                                    if (success) Toast.makeText(context, "Step goal alert sent!", Toast.LENGTH_SHORT).show()
                                     else if (!isNotificationAllowed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                         permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                     }
                                 },
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("Fitness Goal")
+                                Text("Step Goal")
                             }
                         }
 
@@ -265,12 +262,16 @@ fun NotificationCenterScreen(
 
                         FilledTonalButton(
                             onClick = {
+                                if (!AppNotificationManager.isChannelEnabled(context, AppNotificationManager.CHANNEL_AI_TIPS)) {
+                                    Toast.makeText(context, "Turn on AI Tips below first.", Toast.LENGTH_SHORT).show()
+                                    return@FilledTonalButton
+                                }
                                 val success = AppNotificationManager.sendAiTip(
                                     context = context,
-                                    topic = "RAG & Grounded Search",
-                                    tip = "Use OmniChat's RAG Knowledge Hub to ingest internal PDFs and docs for instant contextual answers."
+                                    topic = "My Docs",
+                                    tip = "Add your PDFs or notes in My Docs to get answers grounded in your own files."
                                 )
-                                if (success) Toast.makeText(context, "AI Insight notification sent! 💡", Toast.LENGTH_SHORT).show()
+                                if (success) Toast.makeText(context, "AI tip notification sent!", Toast.LENGTH_SHORT).show()
                                 else if (!isNotificationAllowed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                     permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                 }
@@ -279,7 +280,7 @@ fun NotificationCenterScreen(
                         ) {
                             Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Send AI Knowledge Digest")
+                            Text("Send AI Tip")
                         }
                     }
                 }
@@ -287,18 +288,20 @@ fun NotificationCenterScreen(
 
             // Custom Notification Creator
             item {
-                ElevatedCard(
-                    shape = RoundedCornerShape(18.dp),
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.AddAlert, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "Custom Notification Dispatcher",
+                                "Send Custom Reminder",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                         Spacer(modifier = Modifier.height(12.dp))
@@ -306,7 +309,7 @@ fun NotificationCenterScreen(
                         OutlinedTextField(
                             value = customTitle,
                             onValueChange = { customTitle = it },
-                            label = { Text("Notification Title") },
+                            label = { Text("Title") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -316,7 +319,7 @@ fun NotificationCenterScreen(
                         OutlinedTextField(
                             value = customBody,
                             onValueChange = { customBody = it },
-                            label = { Text("Message Body") },
+                            label = { Text("Message") },
                             modifier = Modifier.fillMaxWidth(),
                             minLines = 2
                         )
@@ -329,6 +332,10 @@ fun NotificationCenterScreen(
                                     Toast.makeText(context, "Title and message cannot be empty", Toast.LENGTH_SHORT).show()
                                     return@Button
                                 }
+                                if (!AppNotificationManager.isChannelEnabled(context, AppNotificationManager.CHANNEL_REMINDERS)) {
+                                    Toast.makeText(context, "Turn on Task & Chat Reminders below first.", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
                                 val sent = AppNotificationManager.sendNotification(
                                     context = context,
                                     title = customTitle.trim(),
@@ -336,12 +343,12 @@ fun NotificationCenterScreen(
                                     channelId = AppNotificationManager.CHANNEL_REMINDERS
                                 )
                                 if (sent) {
-                                    Toast.makeText(context, "Custom notification dispatched! 📲", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Reminder notification sent!", Toast.LENGTH_SHORT).show()
                                 } else {
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                         permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                     } else {
-                                        Toast.makeText(context, "Notifications are turned off in system settings.", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Notifications are turned off in device settings.", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             },
@@ -349,7 +356,7 @@ fun NotificationCenterScreen(
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Post Custom Notification")
+                            Text("Send Notification")
                         }
                     }
                 }
@@ -357,38 +364,44 @@ fun NotificationCenterScreen(
 
             // Notification Channels & Toggles
             item {
-                ElevatedCard(
-                    shape = RoundedCornerShape(18.dp),
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "Channel Preferences",
+                            "Alert Types",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.SemiBold
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         // Step Alerts
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Icon(Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Column {
-                                    Text("Step Goal Milestones", fontWeight = FontWeight.SemiBold)
-                                    Text("Alert when reaching daily 10k target", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Step Goal Alerts", fontWeight = FontWeight.SemiBold)
+                                    Text("Notify when reaching 10,000 steps", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
+                            Spacer(modifier = Modifier.width(12.dp))
                             Switch(
                                 checked = stepAlertsEnabled,
                                 onCheckedChange = {
                                     stepAlertsEnabled = it
                                     prefs.edit().putBoolean("step_alerts", it).apply()
-                                }
+                                },
+                                modifier = Modifier.testTag("switch_step_alerts")
                             )
                         }
 
@@ -397,23 +410,27 @@ fun NotificationCenterScreen(
                         // AI Tips
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Column {
-                                    Text("AI Insights & Digests", fontWeight = FontWeight.SemiBold)
-                                    Text("Knowledge base updates and summaries", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("AI Tips & Summaries", fontWeight = FontWeight.SemiBold)
+                                    Text("Helpful tips and short digests", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
+                            Spacer(modifier = Modifier.width(12.dp))
                             Switch(
                                 checked = aiTipsEnabled,
                                 onCheckedChange = {
                                     aiTipsEnabled = it
                                     prefs.edit().putBoolean("ai_tips", it).apply()
-                                }
+                                },
+                                modifier = Modifier.testTag("switch_ai_tips")
                             )
                         }
 
@@ -422,23 +439,27 @@ fun NotificationCenterScreen(
                         // Chat Reminders
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text("Task & Chat Reminders", fontWeight = FontWeight.SemiBold)
-                                    Text("Scheduled workspace notifications", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Custom and scheduled reminders", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
+                            Spacer(modifier = Modifier.width(12.dp))
                             Switch(
                                 checked = chatRemindersEnabled,
                                 onCheckedChange = {
                                     chatRemindersEnabled = it
                                     prefs.edit().putBoolean("chat_reminders", it).apply()
-                                }
+                                },
+                                modifier = Modifier.testTag("switch_chat_reminders")
                             )
                         }
                     }
