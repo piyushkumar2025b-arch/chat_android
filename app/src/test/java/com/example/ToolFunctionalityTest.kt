@@ -335,4 +335,21 @@ class ToolFunctionalityTest {
         // Division by zero safety
         assertEquals("Cannot divide by 0", com.example.ui.evaluateMathExpression("10 / 0", isRad = true))
     }
+
+    @Test
+    fun testRunCodeSandboxDiagnosticsAndEvaluation() {
+        val kotlinOut = com.example.ui.runCodeSandbox("fun main() {\n println(\"Hello\")\n println(2 + 3 * 4)\n}", "Kotlin")
+        assertTrue(kotlinOut.contains("Syntax OK"))
+        assertTrue(kotlinOut.contains("> Hello"))
+        assertTrue(kotlinOut.contains("> 14"))
+
+        val badKotlin = com.example.ui.runCodeSandbox("fun main() {\n println(\"unclosed\n}", "Kotlin")
+        assertTrue(badKotlin.contains("[SYNTAX CHECK]"))
+
+        val sqlOut = com.example.ui.runCodeSandbox("SELECT * FROM users;", "SQL")
+        assertTrue(sqlOut.contains("Statement 1 [SELECT]: syntax verified"))
+
+        val htmlOut = com.example.ui.runCodeSandbox("<html><head><title>Omni</title></head><body><h1>Hi</h1></body></html>", "HTML")
+        assertTrue(htmlOut.contains("Document title: Omni"))
+    }
 }

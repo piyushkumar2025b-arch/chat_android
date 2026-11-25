@@ -237,7 +237,8 @@ fun MemoryScreen(
                         editorTarget = memory
                         showEditor = true
                     },
-                    onDelete = { deleteTarget = memory }
+                    onDelete = { deleteTarget = memory },
+                    onCategoryClick = { cat -> selectedCategory = cat }
                 )
             }
         }
@@ -296,7 +297,8 @@ private fun MemoryCard(
     memory: MemoryEntity,
     onTogglePin: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onCategoryClick: (String) -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -306,9 +308,10 @@ private fun MemoryCard(
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val categoryLabel = memory.category.ifBlank { "General" }
                 AssistChip(
-                    onClick = {},
-                    label = { Text(memory.category.ifBlank { "General" }) }
+                    onClick = { onCategoryClick(categoryLabel) },
+                    label = { Text(categoryLabel) }
                 )
                 if (memory.isPinned) {
                     Spacer(Modifier.size(6.dp))

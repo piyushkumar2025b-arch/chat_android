@@ -199,10 +199,7 @@ fun CodeStudioScreen(
                 Button(
                     onClick = {
                         isRunning = true
-                        consoleOutput = "Compiling & executing $selectedLanguage sandbox...\n" +
-                                "[RUN] Status: 200 OK\n" +
-                                "[OUTPUT]: Output verified without syntax defects.\n" +
-                                "Execution finished in 18ms."
+                        consoleOutput = runCodeSandbox(codeText, selectedLanguage)
                         isRunning = false
                     },
                     modifier = Modifier.testTag("run_code_button")
@@ -244,5 +241,118 @@ fun CodeStudioScreen(
                 }
             }
         }
+    }
+}
+
+internal fun runCodeSandbox(code: String, language: String): String {
+    val startNs = System.nanoTime()
+    if (code.isBlank()) {
+        return "[ERROR] Editor buffer is empty. Enter $language code to inspect or run."
+    }
+
+    val issues = mutableListOf<String>()
+    val stack = ArrayDeque<Pair<Char, Int>>()
+    val pairs = mapOf(')' to '(', '}' to '{', ']' to '[')
+    val lines = code.lines()
+
+    lines.forEachIndexed { idx, line ->
+        val lineNo = idx + 1
+        var inSingleQuote = false
+        var inDoubleQuote = false
+        var escaped = false
+        for (ch in line) {
+            if (escaped) {
+                escaped = false
+                continue
+            }
+            if (ch == '\\' && (inSingleQuote || inDoubleQuote)) {
+                escaped = true
+                continue
+            }
+            if (ch == '"' && !inSingleQuote) {
+                inDoubleQuote = !inDoubleQuote
+            } else if (ch == '\'' && !inDoubleQuote) {
+                inSingleQuote = !inSingleQuote
+            } else if (!inSingleQuote && !inDoubleQuote) {
+                if (ch == '(' || ch == '{' || ch == '[') {
+                    stack.addLast(ch to lineNo)
+                } else if (ch in pairs) {
+                    val expected = pairs[ch]
+                    if (stack.isEmpty() || stack.last().first != expected) {
+                        issues.add("Line $lineNo: Unexpected closing '$ch'")
+                    } else {
+                        stack.removeLast()
+                    }
+                }
+            }
+        }
+        if (inDoubleQuote) issues.add("Line $lineNo: Unterminated string literal (\")")
+        if (inSingleQuote && language !in listOf("SQL", "HTML")) {
+            issues.add("Line $lineNo: Unterminated quote (')")
+        }
+    }
+
+    while (stack.isNotEmpty()) {
+        val (unclosed, lineNo) = stack.removeLast()
+        issues.add("Line $lineNo: Unclosed '$unclosed'")
+    }
+
+    val outputs = mutableListOf<String>()
+    when (language) {
+        "HTML" -> {
+            val titleMatch = Regex("<title[^>]*>(.*?)</title>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)).find(code)
+            val tagCount = Regex("<[a-zA-Z][a-zA-Z0-9]*\\b[^>]*>").findAll(code).count()
+            outputs.add("Document title: ${titleMatch?.groupValues?.get(1)?.trim() ?: "(none)"}")
+            outputs.add("Parsed HTML elements: $tagCount tags across ${lines.size} lines")
+        }
+        "SQL" -> {
+            val statements = code.split(";").map { it.trim() }.filter { it.isNotEmpty() }
+            val validKeywords = listOf("SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP", "WITH", "PRAGMA")
+            statements.forEachIndexed { idx, stmt ->
+                val verb = stmt.substringBefore(' ').substringBefore('\n').uppercase()
+                if (verb !in validKeywords) {
+                    issues.add("Statement ${idx + 1}: Unrecognized SQL command '$verb'")
+                } else {
+                    outputs.add("Statement ${idx + 1} [$verb]: syntax verified")
+                }
+            }
+        }
+        else -> {
+            val printRegex = Regex("""(?:println|print|console\.log)\s*\((.*)\)""")
+            for (line in lines) {
+                val trimmed = line.trim()
+                if (trimmed.startsWith("//") || trimmed.startsWith("#")) continue
+                val match = printRegex.find(trimmed)
+                if (match != null) {
+                    val expr = match.groupValues[1].trim()
+                    val unquoted = if ((expr.startsWith("\"") && expr.endsWith("\"")) ||
+                        (expr.startsWith("'") && expr.endsWith("'"))
+                    ) {
+                        expr.substring(1, expr.length - 1)
+                    } else {
+                        val mathEval = evaluateMathExpression(expr)
+                        if (mathEval != "Error") mathEval else expr
+                    }
+                    outputs.add(unquoted)
+                }
+            }
+        }
+    }
+
+    val elapsedMs = ((System.nanoTime() - startNs) / 1_000_000.0).coerceAtLeast(0.1)
+    return buildString {
+        if (issues.isNotEmpty()) {
+            appendLine("[SYNTAX CHECK] Found ${issues.size} issue(s):")
+            issues.forEach { appendLine("  • $it") }
+        } else {
+            appendLine("[$language Sandbox] Syntax OK (${lines.size} lines)")
+        }
+        if (outputs.isNotEmpty()) {
+            appendLine("[OUTPUT]")
+            outputs.forEach { appendLine("> $it") }
+        } else if (issues.isEmpty()) {
+            appendLine("[INFO] No stdout calls detected (add println/print/console.log to emit output).")
+        }
+        append("Completed in ${"%.1f".format(elapsedMs)} ms")
     }
 }

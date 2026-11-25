@@ -258,7 +258,8 @@ fun PromptLibraryScreen(
                         editorTarget = prompt
                         showEditor = true
                     },
-                    onDelete = { deleteTarget = prompt }
+                    onDelete = { deleteTarget = prompt },
+                    onCategoryClick = { cat -> selectedCategory = cat }
                 )
             }
 
@@ -343,7 +344,8 @@ private fun PromptCard(
     onUse: () -> Unit,
     onToggleFavorite: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onCategoryClick: (String) -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -363,9 +365,10 @@ private fun PromptCard(
                     )
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        val categoryLabel = prompt.category.ifBlank { "General" }
                         AssistChip(
-                            onClick = {},
-                            label = { Text(prompt.category.ifBlank { "General" }) }
+                            onClick = { onCategoryClick(categoryLabel) },
+                            label = { Text(categoryLabel) }
                         )
                         val variables = placeholderKeys(prompt.content).size
                         if (variables > 0) {

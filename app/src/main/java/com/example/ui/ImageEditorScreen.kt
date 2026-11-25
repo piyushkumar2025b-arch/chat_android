@@ -45,6 +45,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,10 +55,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.example.data.remote.MediaSaver
+import kotlinx.coroutines.launch
 
 enum class ColorPreset(val label: String) {
     BW("Black & White"),
@@ -82,9 +87,11 @@ fun ImageEditorScreen(
     onSendImageToChat: (Bitmap) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val lines = remember { mutableStateListOf<DrawnLine>() }
     var currentColor by remember { mutableStateOf(Color(0xFF6366F1)) }
     var strokeWidth by remember { mutableFloatStateOf(10f) }
+    var canvasSize by remember { mutableStateOf(IntSize(720, 720)) }
 
     val colorPalette = listOf(
         Color(0xFF6366F1), // Indigo
@@ -97,10 +104,10 @@ fun ImageEditorScreen(
         Color(0xFFFFFFFF)  // White
     )
 
-    // Helper to render lines into Bitmap for export
+    // Helper to render lines into Bitmap matching actual canvas bounds
     fun generateBitmap(): Bitmap {
-        val width = 720
-        val height = 720
+        val width = canvasSize.width.coerceAtLeast(720)
+        val height = canvasSize.height.coerceAtLeast(720)
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = AndroidCanvas(bitmap)
         canvas.drawColor(android.graphics.Color.WHITE)
@@ -156,8 +163,12 @@ fun ImageEditorScreen(
 
                     IconButton(
                         onClick = {
-                            Toast.makeText(context, "Canvas snapshot ready", Toast.LENGTH_SHORT).show()
-                        }
+                            val bmp = generateBitmap()
+                            coroutineScope.launch {
+                                MediaSaver.saveBitmapToGallery(context, bmp, "OmniSketch")
+                            }
+                        },
+                        modifier = Modifier.testTag("save_sketch_button")
                     ) {
                         Icon(Icons.Default.Save, contentDescription = "Save Drawing")
                     }
@@ -187,6 +198,7 @@ fun ImageEditorScreen(
                 Canvas(
                     modifier = Modifier
                         .fillMaxSize()
+                        .onSizeChanged { canvasSize = it }
                         .pointerInput(true) {
                             detectDragGestures { change, dragAmount ->
                                 change.consume()

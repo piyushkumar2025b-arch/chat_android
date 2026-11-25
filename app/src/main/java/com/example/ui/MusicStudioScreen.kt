@@ -83,6 +83,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -145,8 +146,9 @@ fun MusicStudioScreen(
 
     // Playback Tracking
     var currentPositionMs by remember { mutableLongStateOf(0L) }
-    var totalDurationMs by remember { mutableLongStateOf(184000L) } // ~3:04
+    var totalDurationMs by remember { mutableLongStateOf((SoundPreset.SCIFI_LASER.defaultDurationSec * 1000L).toLong()) }
     var isLooping by remember { mutableStateOf(true) }
+    val latestLooping by rememberUpdatedState(isLooping)
 
     // Tune & Equalizer Settings
     var playbackSpeed by remember { mutableFloatStateOf(1.0f) } // 0.5x to 2.0x
@@ -176,12 +178,27 @@ fun MusicStudioScreen(
         )
     }
 
+    fun playBuiltInSynth(preset: SoundPreset) {
+        coroutineScope.launch {
+            AudioSynthesizer.playSound(preset, volumeBooster.coerceIn(0.1f, 1.0f)) {
+                if (latestLooping && !isUploadedSong && isPlaying) {
+                    currentPositionMs = 0L
+                    playBuiltInSynth(preset)
+                } else {
+                    isPlaying = false
+                    currentPositionMs = 0L
+                }
+            }
+        }
+    }
+
     // Audio file picker launcher
     val audioPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
             try {
+                AudioSynthesizer.stopSound()
                 mediaPlayer?.release()
                 mediaPlayer = null
                 customAudioUri = uri
@@ -189,7 +206,13 @@ fun MusicStudioScreen(
                 val mp = MediaPlayer().apply {
                     setDataSource(context, uri)
                     prepare()
-                    isLooping = true
+                    this.isLooping = latestLooping
+                    setOnCompletionListener {
+                        if (!latestLooping) {
+                            isPlaying = false
+                            currentPositionMs = 0L
+                        }
+                    }
                 }
                 mediaPlayer = mp
                 isUploadedSong = true
@@ -209,7 +232,7 @@ fun MusicStudioScreen(
     }
 
     // Timer updater coroutine while playing
-    LaunchedEffect(isPlaying, isUploadedSong) {
+    LaunchedEffect(isPlaying, isUploadedSong, totalDurationMs) {
         while (isActive && isPlaying) {
             delay(80)
             if (isUploadedSong && mediaPlayer != null) {
@@ -217,14 +240,7 @@ fun MusicStudioScreen(
                     currentPositionMs = mediaPlayer!!.currentPosition.toLong()
                 } catch (_: Exception) {}
             } else {
-                currentPositionMs += 80
-                if (currentPositionMs >= totalDurationMs) {
-                    if (isLooping) {
-                        currentPositionMs = 0L
-                    } else {
-                        isPlaying = false
-                    }
-                }
+                currentPositionMs = (currentPositionMs + 80).coerceAtMost(totalDurationMs)
             }
         }
     }
@@ -341,7 +357,7 @@ fun MusicStudioScreen(
                     FilledTonalButton(
                         onClick = {
                             audioPickerLauncher.launch(
-                                arrayOf("audio/*", "application/ogg", "*/*")
+                                arrayOf("audio/*", "application/ogg")
                             )
                         },
                         modifier = Modifier.testTag("upload_song_btn")
@@ -635,11 +651,11 @@ fun MusicStudioScreen(
                             if (isUploadedSong) {
                                 try { mediaPlayer?.start() } catch (_: Exception) {}
                             } else {
-                                coroutineScope.launch {
-                                    val currentPreset = builtInTracks.firstOrNull { it.title == currentSongTitle }?.preset
-                                        ?: SoundPreset.SCIFI_LASER
-                                    AudioSynthesizer.playSound(currentPreset, volumeBooster)
-                                }
+                                val currentPreset = builtInTracks.firstOrNull { it.title == currentSongTitle }?.preset
+                                    ?: SoundPreset.SCIFI_LASER
+                                currentPositionMs = 0L
+                                totalDurationMs = (currentPreset.defaultDurationSec * 1000L).toLong().coerceAtLeast(500L)
+                                playBuiltInSynth(currentPreset)
                             }
                         }
                     },
@@ -739,12 +755,10 @@ fun MusicStudioScreen(
                                         currentSongTitle = track.title
                                         currentSongArtist = track.artist
                                         currentBpm = track.bpm
-                                        totalDurationMs = 184000L
+                                        totalDurationMs = (track.preset.defaultDurationSec * 1000L).toLong().coerceAtLeast(500L)
                                         currentPositionMs = 0L
                                         isPlaying = true
-                                        coroutineScope.launch {
-                                            AudioSynthesizer.playSound(track.preset, volumeBooster)
-                                        }
+                                        playBuiltInSynth(track.preset)
                                     },
                                     label = { Text("${track.title} (${track.bpm} BPM)") },
                                     colors = FilterChipDefaults.filterChipColors(
