@@ -4,7 +4,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -97,16 +99,17 @@ fun ChatMessageItem(
             // Assistant avatar
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(34.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.AutoAwesome,
                     contentDescription = "AI Assistant",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(20.dp)
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
@@ -139,22 +142,22 @@ fun ChatMessageItem(
             // Message Bubble
             Surface(
                 shape = RoundedCornerShape(
-                    topStart = 18.dp,
-                    topEnd = 18.dp,
-                    bottomStart = if (isUser) 18.dp else 4.dp,
-                    bottomEnd = if (isUser) 4.dp else 18.dp
+                    topStart = 16.dp,
+                    topEnd = 16.dp,
+                    bottomStart = if (isUser) 16.dp else 4.dp,
+                    bottomEnd = if (isUser) 4.dp else 16.dp
                 ),
                 color = when {
                     message.isError -> MaterialTheme.colorScheme.errorContainer
                     isUser -> MaterialTheme.colorScheme.primary
-                    else -> MaterialTheme.colorScheme.surfaceVariant
+                    else -> MaterialTheme.colorScheme.surface
                 },
                 contentColor = when {
                     message.isError -> MaterialTheme.colorScheme.onErrorContainer
                     isUser -> MaterialTheme.colorScheme.onPrimary
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    else -> MaterialTheme.colorScheme.onSurface
                 },
-                tonalElevation = if (isUser) 0.dp else 1.dp
+                border = if (!isUser && !message.isError) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null
             ) {
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                     if (!isUser && message.modelId.isNotBlank()) {
@@ -251,7 +254,8 @@ fun ChatMessageItem(
                                         val isWeb = art.type == ArtifactType.HTML_WEB || art.type == ArtifactType.SVG
                                         Surface(
                                             shape = RoundedCornerShape(8.dp),
-                                            color = if (isWeb) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
+                                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                             modifier = Modifier
                                                 .clickable { onOpenArtifact?.invoke(art) }
                                                 .testTag("message_artifact_chip_${art.id}")
@@ -264,14 +268,14 @@ fun ChatMessageItem(
                                                     imageVector = art.type.getIcon(),
                                                     contentDescription = null,
                                                     modifier = Modifier.size(13.dp),
-                                                    tint = if (isWeb) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                                                    tint = MaterialTheme.colorScheme.primary
                                                 )
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Text(
-                                                    text = "${art.title} • ${if (isWeb) "Preview" else "Artifact"}",
+                                                    text = "${art.title} • ${if (isWeb) "Preview" else "Snippet"}",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontWeight = FontWeight.SemiBold,
-                                                    color = if (isWeb) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                                                    color = MaterialTheme.colorScheme.onSurface
                                                 )
                                             }
                                         }
@@ -281,7 +285,7 @@ fun ChatMessageItem(
 
                             MarkdownText(
                                 text = message.content,
-                                textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textColor = MaterialTheme.colorScheme.onSurface,
                                 onOpenArtifact = { title, lang, code ->
                                     val matched = messageArtifacts.firstOrNull { it.content == code }
                                         ?: ArtifactItem(
@@ -342,11 +346,11 @@ fun ChatMessageItem(
                     if (onContinue != null) {
                         Surface(
                             shape = RoundedCornerShape(14.dp),
-                            color = if (isContinuing) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.85f)
-                            },
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = BorderStroke(
+                                1.dp,
+                                if (isContinuing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                            ),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(14.dp))
                                 .clickable(enabled = !isGenerating && !isContinuing) { onContinue() }
@@ -361,26 +365,26 @@ fun ChatMessageItem(
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(12.dp),
                                         strokeWidth = 1.5.dp,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
                                         text = "Continuing...",
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                 } else {
                                     Icon(
                                         imageVector = Icons.Default.FastForward,
                                         contentDescription = "Continue reply",
                                         modifier = Modifier.size(14.dp),
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                        tint = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
                                         text = "Continue",
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
@@ -434,16 +438,17 @@ fun ChatMessageItem(
             Spacer(modifier = Modifier.width(8.dp))
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(34.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Person,
                     contentDescription = "User",
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(20.dp)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }

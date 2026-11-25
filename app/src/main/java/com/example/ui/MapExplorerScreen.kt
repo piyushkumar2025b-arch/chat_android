@@ -9,7 +9,9 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -402,27 +404,28 @@ fun MapExplorerScreen(
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(CircleShape)
-                        .background(if (hasGoogleMapsKey) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer),
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.Explore,
                         contentDescription = null,
-                        tint = if (hasGoogleMapsKey) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(22.dp)
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "Google Maps & Travel Explorer",
+                        "Maps & Places",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        if (hasGoogleMapsKey) "Google Maps API Active • Interactive Roadmap, Satellite & Geocoding"
-                        else "Add Google Maps API Key to unlock high-res Satellite & Google Places",
+                        if (hasGoogleMapsKey) "Google Maps active • Street, satellite & places"
+                        else "Search cities and explore maps",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -436,8 +439,8 @@ fun MapExplorerScreen(
                 ) {
                     Icon(
                         Icons.Default.Key,
-                        contentDescription = "Configure Google Maps Key",
-                        tint = if (hasGoogleMapsKey) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        contentDescription = "Google Maps Key",
+                        tint = if (hasGoogleMapsKey) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -448,25 +451,27 @@ fun MapExplorerScreen(
             item {
                 Card(
                     shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier.padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Map, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                        Icon(Icons.Default.Map, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Activate Google Maps", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Add your Google Maps API key to view high-resolution Google Satellite, Hybrid, and Terrain imagery.", style = MaterialTheme.typography.bodySmall)
+                            Text("Unlock Google Maps", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Text("Add a Google Maps key for satellite view and place search.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Button(
+                        Spacer(modifier = Modifier.width(8.dp))
+                        OutlinedButton(
                             onClick = {
                                 keyDialogInput = preferencesManager.googleMapsApiKey
                                 showKeyDialog = true
                             },
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(10.dp)
                         ) {
                             Text("Add Key")
                         }
@@ -478,8 +483,9 @@ fun MapExplorerScreen(
         // Search Bar Card
         item {
             Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -557,8 +563,9 @@ fun MapExplorerScreen(
             }
             items(searchResults) { loc ->
                 Card(
-                    shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
@@ -589,9 +596,9 @@ fun MapExplorerScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Map Style & Provider", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                Text("Map Style", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                 if (selectedLayer.isGoogle && !hasGoogleMapsKey) {
-                    Text("API Key Required", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                    Text("Key needed", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))
@@ -622,7 +629,8 @@ fun MapExplorerScreen(
         item {
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column {
@@ -871,21 +879,17 @@ fun MapExplorerScreen(
                                 Text("Plan Itinerary", style = MaterialTheme.typography.labelSmall)
                             }
 
-                            Button(
+                            OutlinedButton(
                                 onClick = {
-                                    val prompt = "Tell me the rich history, cultural significance, and fascinating facts about: ${currentLocation.displayName}"
+                                    val prompt = "Tell me the history and interesting facts about: ${currentLocation.displayName}"
                                     onSendLocationToChat(prompt)
                                 },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                ),
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Ask AI History", style = MaterialTheme.typography.labelSmall)
+                                Text("Local History", style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }

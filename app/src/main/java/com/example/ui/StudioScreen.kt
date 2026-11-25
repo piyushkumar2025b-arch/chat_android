@@ -46,14 +46,14 @@ fun StudioScreen(
 ) {
     var selectedStudioTab by remember { mutableIntStateOf(initialTab) }
     val tabs = listOf(
-        Triple("Image Gen", Icons.Default.Image, 0),
-        Triple("Photo Editor", Icons.Default.Tune, 1),
-        Triple("Music & Beats", Icons.Default.GraphicEq, 2),
-        Triple("Code & HTML", Icons.Default.Code, 3),
-        Triple("Markdown Hub", Icons.Default.Description, 4),
-        Triple("Video Motion", Icons.Default.Videocam, 5),
-        Triple("Media Player", Icons.Default.GraphicEq, 6),
-        Triple("Sound Synth", Icons.AutoMirrored.Filled.VolumeUp, 7)
+        Triple("Images", Icons.Default.Image, 0),
+        Triple("Draw", Icons.Default.Tune, 1),
+        Triple("Music", Icons.Default.GraphicEq, 2),
+        Triple("Code", Icons.Default.Code, 3),
+        Triple("Writing", Icons.Default.Description, 4),
+        Triple("Video", Icons.Default.Videocam, 5),
+        Triple("Player", Icons.Default.GraphicEq, 6),
+        Triple("Sounds", Icons.AutoMirrored.Filled.VolumeUp, 7)
     )
 
     Column(
@@ -64,16 +64,14 @@ fun StudioScreen(
             edgePadding = 12.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp)
-                .clip(RoundedCornerShape(12.dp))
                 .testTag("studio_tab_row"),
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
             tabs.forEach { (title, icon, index) ->
                 Tab(
                     selected = selectedStudioTab == index,
                     onClick = { selectedStudioTab = index },
-                    text = { Text(title, fontWeight = if (selectedStudioTab == index) FontWeight.Bold else FontWeight.Normal) },
+                    text = { Text(title, maxLines = 1, fontWeight = if (selectedStudioTab == index) FontWeight.SemiBold else FontWeight.Normal) },
                     icon = { Icon(icon, contentDescription = title) },
                     modifier = Modifier.testTag("studio_tab_$index")
                 )

@@ -12,6 +12,7 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -316,29 +317,29 @@ fun YouTubeScreen(
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.errorContainer),
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.VideoLibrary,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(22.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "YouTube Search & Player",
+                        "YouTube",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        if (hasKey) "YouTube Data API v3 Active • Search & In-App Player"
-                        else "Add YouTube API Key in Settings to search any video",
+                        if (hasKey) "Search and watch videos or summarize with AI"
+                        else "Add a YouTube key in Settings to search all videos",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
@@ -353,14 +354,15 @@ fun YouTubeScreen(
             item {
                 Card(
                     shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier.padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Key, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                        Icon(Icons.Default.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text("YouTube API Key Setup", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
@@ -645,8 +647,9 @@ fun YouTubeScreen(
         // Search Input Card
         item {
             Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -659,7 +662,7 @@ fun YouTubeScreen(
                         modifier = Modifier
                             .weight(1f)
                             .testTag("youtube_search_input"),
-                        placeholder = { Text("Search videos on YouTube...") },
+                        placeholder = { Text("Search YouTube...") },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
@@ -693,19 +696,24 @@ fun YouTubeScreen(
         // Video Results or Featured Videos
         item {
             Text(
-                if (searchResults.isNotEmpty()) "Search Results (${searchResults.size})" else "Featured AI & Tech Videos",
+                if (searchResults.isNotEmpty()) "Search Results (${searchResults.size})" else "Popular Videos",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.SemiBold
             )
         }
 
         val displayList = if (searchResults.isNotEmpty()) searchResults else FEATURED_VIDEOS
         items(displayList) { video ->
+            val isSelected = activeVideo?.videoId == video.videoId
             Card(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (activeVideo?.videoId == video.videoId) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                    containerColor = if (isSelected) MaterialTheme.colorScheme.surfaceContainerHigh
+                    else MaterialTheme.colorScheme.surface
+                ),
+                border = BorderStroke(
+                    width = if (isSelected) 2.dp else 1.dp,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
                 ),
                 modifier = Modifier
                     .fillMaxWidth()

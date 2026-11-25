@@ -1,7 +1,9 @@
 package com.example.ui
 
 import java.util.Locale
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -76,14 +78,14 @@ fun CalculatorScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Omni Calculator & Converter", fontWeight = FontWeight.Bold) },
+                title = { Text("Calculator & Units", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack, modifier = Modifier.testTag("calc_back_button")) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -132,8 +134,9 @@ private fun StandardCalculatorView(onSendResultToChat: (String) -> Unit) {
         // Display Screen
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(20.dp)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            shape = RoundedCornerShape(16.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -192,18 +195,19 @@ private fun StandardCalculatorView(onSendResultToChat: (String) -> Unit) {
                 .weight(1f)
         ) {
             items(buttons) { btn ->
-                val isOp = btn in listOf("÷", "×", "-", "+", "=")
+                val isOp = btn in listOf("÷", "×", "-", "+")
                 val isSpecial = btn in listOf("C", "⌫", "(", ")")
                 val bgColor = when {
                     btn == "=" -> MaterialTheme.colorScheme.primary
-                    isOp -> MaterialTheme.colorScheme.primaryContainer
-                    isSpecial -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
-                    else -> MaterialTheme.colorScheme.surfaceContainerHighest
+                    isOp -> MaterialTheme.colorScheme.surfaceContainerHigh
+                    isSpecial -> MaterialTheme.colorScheme.surfaceContainerLow
+                    else -> MaterialTheme.colorScheme.surface
                 }
                 val textColor = when {
                     btn == "=" -> MaterialTheme.colorScheme.onPrimary
-                    isOp -> MaterialTheme.colorScheme.onPrimaryContainer
-                    isSpecial -> MaterialTheme.colorScheme.onErrorContainer
+                    isOp -> MaterialTheme.colorScheme.primary
+                    btn == "C" -> MaterialTheme.colorScheme.error
+                    isSpecial -> MaterialTheme.colorScheme.onSurfaceVariant
                     else -> MaterialTheme.colorScheme.onSurface
                 }
 
@@ -214,6 +218,10 @@ private fun StandardCalculatorView(onSendResultToChat: (String) -> Unit) {
                         .aspectRatio(1.15f, matchHeightConstraintsFirst = false)
                         .clip(CircleShape)
                         .background(bgColor)
+                        .then(
+                            if (btn != "=") Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                            else Modifier
+                        )
                         .clickable {
                             when (btn) {
                                 "C" -> {
@@ -349,7 +357,7 @@ private fun UnitConverterView() {
                 }
             }
 
-            // Swap Button (Fixing BUG-06)
+            // Swap Button
             IconButton(
                 onClick = {
                     val temp = fromUnit
@@ -359,12 +367,13 @@ private fun UnitConverterView() {
                 modifier = Modifier
                     .padding(horizontal = 8.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
             ) {
                 Icon(
                     Icons.Default.SwapHoriz,
                     contentDescription = "Swap Units",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -402,7 +411,8 @@ private fun UnitConverterView() {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(
@@ -412,22 +422,22 @@ private fun UnitConverterView() {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Converted Result",
+                    text = "Result",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "%.4f %s".format(outputNum, toUnit),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "$inputNum $fromUnit = %.4f $toUnit".format(outputNum),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

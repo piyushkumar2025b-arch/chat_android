@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -150,28 +151,30 @@ fun RagKnowledgeScreen(
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primaryContainer),
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainer),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Hub,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                "RAG Knowledge Hub",
+                                "My Docs",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                "Local Vector Store • Semantic Search • Embeddings",
+                                "Saved files & notes for smarter replies",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -186,7 +189,7 @@ fun RagKnowledgeScreen(
                         onClick = { viewModel.refreshRagStats() },
                         modifier = Modifier.testTag("rag_refresh_button")
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh Stats")
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -203,14 +206,15 @@ fun RagKnowledgeScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            // RAG Status & Engine Telemetry Card
+            // Status Card
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = MaterialTheme.colorScheme.surface
                     ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth().testTag("rag_telemetry_card")
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -219,7 +223,10 @@ fun RagKnowledgeScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.FactCheck,
                                     contentDescription = null,
@@ -228,9 +235,9 @@ fun RagKnowledgeScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    "RAG Grounding in Chat",
+                                    "Use My Docs in Chat",
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                             Switch(
@@ -242,15 +249,15 @@ fun RagKnowledgeScreen(
 
                         Text(
                             text = if (isRagEnabled)
-                                "Active: Chat queries will semantically retrieve and ground responses with relevant knowledge base chunks."
+                                "On: Chat looks through your saved files and notes before replying."
                             else
-                                "Disabled: Standard chat generation without private document grounding.",
+                                "Off: Chat replies normally without searching your saved files.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Spacer(modifier = Modifier.height(12.dp))
 
                         // Stats Grid
@@ -259,20 +266,20 @@ fun RagKnowledgeScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column {
-                                Text("Documents", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Files", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text("${ragStats.totalDocuments}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             }
                             Column {
-                                Text("Indexed Chunks", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("${ragStats.totalChunks}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                                Text("Sections", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("${ragStats.totalChunks}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             }
                             Column {
-                                Text("Embedding Engine", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Search Mode", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(
                                     ragStats.activeEmbeddingModel,
                                     style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (ragStats.isGeminiEmbeddingAvailable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
@@ -280,13 +287,14 @@ fun RagKnowledgeScreen(
                 }
             }
 
-            // Interactive Semantic Retrieval Sandbox / Query Inspector
+            // Search Test Card
             item {
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                        containerColor = MaterialTheme.colorScheme.surface
                     ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth().testTag("rag_search_sandbox_card")
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -299,14 +307,14 @@ fun RagKnowledgeScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "Semantic Search Sandbox",
+                                "Test Doc Search",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
 
                         Text(
-                            "Test vector retrieval live against your indexed chunks to inspect similarity scores and citations.",
+                            "Type a question to see which parts of your saved files match best.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -316,7 +324,7 @@ fun RagKnowledgeScreen(
                         OutlinedTextField(
                             value = testQuery,
                             onValueChange = { testQuery = it },
-                            placeholder = { Text("Enter a concept or query to test retrieval...") },
+                            placeholder = { Text("Ask something to check your docs...") },
                             modifier = Modifier.fillMaxWidth().testTag("rag_test_query_input"),
                             singleLine = true,
                             trailingIcon = {
@@ -351,7 +359,7 @@ fun RagKnowledgeScreen(
                                 } else {
                                     Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Test RAG Retrieval")
+                                    Text("Search My Docs")
                                 }
                             }
                         }
@@ -470,8 +478,9 @@ fun RagKnowledgeScreen(
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth().testTag("rag_internal_sources_card")
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
@@ -490,12 +499,12 @@ fun RagKnowledgeScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        "Built-in Internal Sources",
+                                        "Built-in Guides",
                                         style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
-                                        "${InternalKnowledgeSources.sources.size} Curated Reference Sources Available",
+                                        "${InternalKnowledgeSources.sources.size} starter guides ready to add",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -532,7 +541,7 @@ fun RagKnowledgeScreen(
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.Note, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Import Notes Hub", maxLines = 1)
+                                Text("Import Notes", maxLines = 1)
                             }
 
                             Button(
@@ -545,7 +554,7 @@ fun RagKnowledgeScreen(
                             ) {
                                 Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Load All Sources", maxLines = 1)
+                                Text("Add All Guides", maxLines = 1)
                             }
 
                             if (documents.isNotEmpty()) {
@@ -565,9 +574,9 @@ fun RagKnowledgeScreen(
                                 modifier = Modifier.padding(top = 12.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                                 Text(
-                                    "Tap any source to inspect or ingest individually into local vector store:",
+                                    "Tap any guide to preview or add to My Docs:",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -654,7 +663,7 @@ fun RagKnowledgeScreen(
                                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                                                         modifier = Modifier.height(30.dp)
                                                     ) {
-                                                        Text("Ingest", style = MaterialTheme.typography.labelSmall)
+                                                        Text("Add", style = MaterialTheme.typography.labelSmall)
                                                     }
                                                 }
                                             }
@@ -671,8 +680,9 @@ fun RagKnowledgeScreen(
             if (documents.isEmpty()) {
                 item {
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
@@ -687,12 +697,12 @@ fun RagKnowledgeScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                "No documents in Knowledge Base yet",
+                                "No saved docs yet",
                                 style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                "Upload PDF, Word, Code or add notes to empower the AI with custom retrieval.",
+                                "Upload PDFs, text files, or notes so the AI can find answers inside them.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -704,7 +714,7 @@ fun RagKnowledgeScreen(
                                     }
                                 }
                             ) {
-                                Text("Populate Starter Knowledge Base")
+                                Text("Add Starter Guides")
                             }
                         }
                     }
@@ -712,10 +722,11 @@ fun RagKnowledgeScreen(
             } else {
                 items(documents, key = { it.id }) { doc ->
                     Card(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                            containerColor = MaterialTheme.colorScheme.surface
                         ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
@@ -735,8 +746,8 @@ fun RagKnowledgeScreen(
                             Box(
                                 modifier = Modifier
                                     .size(40.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainer),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -747,8 +758,8 @@ fun RagKnowledgeScreen(
                                         else -> Icons.Default.FolderOpen
                                     },
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.size(22.dp)
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
 
@@ -816,11 +827,11 @@ fun RagKnowledgeScreen(
 
         AlertDialog(
             onDismissRequest = { showAddNoteDialog = false },
-            title = { Text("Add Note to Knowledge Base", fontWeight = FontWeight.Bold) },
+            title = { Text("Add Note to My Docs", fontWeight = FontWeight.SemiBold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        "Enter notes, documentation, facts, or instructions. They will be segmented into semantic vectors for RAG retrieval.",
+                        "Write or paste notes so the AI can look them up during chat.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -828,15 +839,15 @@ fun RagKnowledgeScreen(
                         value = noteTitle,
                         onValueChange = { noteTitle = it },
                         label = { Text("Title / Topic") },
-                        placeholder = { Text("e.g., Company Policies 2026") },
+                        placeholder = { Text("e.g., Trip Plan 2026") },
                         modifier = Modifier.fillMaxWidth().testTag("add_note_title_input"),
                         singleLine = true
                     )
                     OutlinedTextField(
                         value = noteContent,
                         onValueChange = { noteContent = it },
-                        label = { Text("Document Content") },
-                        placeholder = { Text("Paste or type document content...") },
+                        label = { Text("Note Text") },
+                        placeholder = { Text("Paste or type your note...") },
                         modifier = Modifier.fillMaxWidth().height(160.dp).testTag("add_note_content_input")
                     )
                 }
@@ -855,7 +866,7 @@ fun RagKnowledgeScreen(
                     enabled = noteContent.isNotBlank(),
                     modifier = Modifier.testTag("save_note_button")
                 ) {
-                    Text("Index Document")
+                    Text("Save Note")
                 }
             },
             dismissButton = {
@@ -870,16 +881,16 @@ fun RagKnowledgeScreen(
     if (showClearConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showClearConfirmDialog = false },
-            title = { Text("Clear Entire Knowledge Base?", fontWeight = FontWeight.Bold) },
+            title = { Text("Clear all saved docs?", fontWeight = FontWeight.SemiBold) },
             text = {
-                Text("This will remove all indexed documents, vectors, and chunks from local storage.")
+                Text("This removes all saved documents and notes from My Docs.")
             },
             confirmButton = {
                 Button(
                     onClick = {
                         viewModel.clearEntireRag()
                         showClearConfirmDialog = false
-                        Toast.makeText(context, "Knowledge base cleared", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Saved docs cleared", Toast.LENGTH_SHORT).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
@@ -930,14 +941,15 @@ fun RagKnowledgeScreen(
                         items(loadedChunksForDoc) { chunk ->
                             Surface(
                                 shape = RoundedCornerShape(10.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Text(
-                                        "Chunk #${chunk.chunkIndex + 1} (${chunk.content.length} chars)",
+                                        "Section #${chunk.chunkIndex + 1} (${chunk.content.length} chars)",
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
@@ -971,7 +983,7 @@ fun RagKnowledgeScreen(
                     Text(src.iconEmoji, style = MaterialTheme.typography.titleLarge)
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
-                        Text(src.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(src.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                         Text(src.category, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
                 }
@@ -984,7 +996,8 @@ fun RagKnowledgeScreen(
                     Spacer(modifier = Modifier.height(10.dp))
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth().height(260.dp)
                     ) {
                         LazyColumn(modifier = Modifier.padding(12.dp)) {
@@ -1008,7 +1021,7 @@ fun RagKnowledgeScreen(
                         viewingInternalSourceDetail = null
                     }
                 ) {
-                    Text("Ingest to RAG")
+                    Text("Add to My Docs")
                 }
             },
             dismissButton = {

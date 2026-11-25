@@ -1,5 +1,6 @@
 package com.example.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -103,14 +104,14 @@ fun PromptLibraryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Prompt Library", fontWeight = FontWeight.Bold) },
+                title = { Text("Saved Prompts", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         },
@@ -134,10 +135,11 @@ fun PromptLibraryScreen(
         ) {
             item {
                 Card(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    )
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Row(
                         modifier = Modifier
@@ -148,21 +150,21 @@ fun PromptLibraryScreen(
                         Icon(
                             Icons.Default.Bookmarks,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(30.dp)
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
                         )
                         Spacer(Modifier.size(12.dp))
                         Column {
                             Text(
-                                "${prompts.size} reusable prompts",
+                                "${prompts.size} saved prompts",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                "Tap Use to send a template to the composer. Placeholders like {{topic}} are filled in first.",
+                                "Tap Use to load a prompt into chat. Blanks like {{topic}} are filled in first.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.82f)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -348,10 +350,11 @@ private fun PromptCard(
     onCategoryClick: (String) -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-        )
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -359,7 +362,7 @@ private fun PromptCard(
                     Text(
                         text = prompt.title,
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -374,7 +377,7 @@ private fun PromptCard(
                         if (variables > 0) {
                             Spacer(Modifier.size(6.dp))
                             Text(
-                                "$variables variable${if (variables == 1) "" else "s"}",
+                                "$variables blank${if (variables == 1) "" else "s"}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -500,13 +503,13 @@ private fun PromptVariablesDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Fill in the variables") },
+        title = { Text("Fill in blanks") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     prompt.title,
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold
                 )
                 keys.forEach { key ->
                     OutlinedTextField(
@@ -518,7 +521,7 @@ private fun PromptVariablesDialog(
                     )
                 }
                 Text(
-                    "Blank fields keep their {{placeholder}} so you can edit in the composer.",
+                    "Empty fields stay as {{blank}} so you can edit them in chat.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

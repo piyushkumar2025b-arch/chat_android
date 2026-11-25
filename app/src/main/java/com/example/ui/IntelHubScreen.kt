@@ -2,11 +2,14 @@ package com.example.ui
 
 import android.graphics.Bitmap
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,19 +17,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.Note
+import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
@@ -42,14 +46,15 @@ import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Bookmarks
-import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -57,6 +62,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -65,13 +71,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 data class HubToolItem(
     val id: Int,
     val title: String,
     val subtitle: String,
-    val icon: ImageVector
+    val icon: ImageVector,
+    val category: String
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -84,148 +92,198 @@ fun IntelHubScreen(
     onApplyApiKey: (String) -> Unit = {},
     onOpenSettings: () -> Unit = {}
 ) {
-    // 0 = Hub Overview, 1 = Notes, 2 = Calendar, 3 = Secrets Vault, 4 = Calculator,
-    // 5 = Web Search, 6 = News, 7 = Step Counter, 8 = Media Player, 9 = Read Aloud,
-    // 10 = Image Studio, 11 = 2048, 12 = Creative Studio, 13 = Knowledge Base,
-    // 14 = AI Persona, 15 = AI Academy, 16 = YouTube Intel, 17 = Map Explorer,
-    // 18 = Notification Center, 19 = Focus & Habits, 20 = AI Memory, 21 = Prompt Library
     var selectedHubTab by remember { mutableIntStateOf(0) }
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf("All") }
 
-    // CRITICAL FIX FOR BUG-02:
-    // When inside any sub-tab (selectedHubTab != 0), hardware/system back returns to Hub Overview (0)
-    // instead of prematurely popping out to Chat!
     BackHandler(enabled = selectedHubTab != 0) {
         selectedHubTab = 0
     }
 
-    val tools = listOf(
-        HubToolItem(1, "Notes", "Rich markdown notes with tags & SQLite persistence", Icons.AutoMirrored.Filled.Note),
-        HubToolItem(2, "Calendar", "Schedule meetings & dispatch AI briefings", Icons.Default.CalendarMonth),
-        HubToolItem(3, "Secrets Vault", "PIN-protected encrypted storage for keys & passwords", Icons.Default.Key),
-        HubToolItem(4, "Calculator", "Scientific calculator & interactive unit converter", Icons.Default.Calculate),
-        HubToolItem(5, "Live Search", "Query DuckDuckGo & forward research to AI", Icons.Default.Search),
-        HubToolItem(6, "AI News", "Latest AI, Android, and Silicon intelligence", Icons.Default.Newspaper),
-        HubToolItem(7, "Step Counter", "Activity tracking with AI Health Coach advice", Icons.AutoMirrored.Filled.DirectionsRun),
-        HubToolItem(8, "Media Player", "Universal audio playback with release safety", Icons.Default.PlayCircle),
-        HubToolItem(9, "Read Aloud", "Text-to-speech audio reader for documents", Icons.Default.RecordVoiceOver),
-        HubToolItem(10, "Image Studio", "Sketch, annotate, and send image to AI chat", Icons.Default.Image),
-        HubToolItem(11, "2048 Game", "Mind puzzle with AI game advisor integration", Icons.Default.SportsEsports),
-        HubToolItem(12, "Creative Studio", "Multi-track audio, image, and video generators", Icons.Default.Palette),
-        HubToolItem(13, "Knowledge Base", "RAG engine: ingest documents, chunk & semantic search", Icons.AutoMirrored.Filled.MenuBook),
-        HubToolItem(14, "AI Persona", "Behavior presets, custom instructions & test drive", Icons.Default.Face),
-        HubToolItem(15, "AI Academy", "Curated learning paths with AI topic explainers", Icons.Default.School),
-        HubToolItem(16, "YouTube Intel", "Search videos, transcripts & summarize into chat", Icons.Default.OndemandVideo),
-        HubToolItem(17, "Map Explorer", "Search places, coordinates & route planning", Icons.Default.Map),
-        HubToolItem(18, "Notifications", "Permissions, test alerts & notification history", Icons.Default.Notifications),
-        HubToolItem(19, "Focus & Habits", "Pomodoro timer, daily streaks & focus analytics", Icons.Default.Timer),
-        HubToolItem(20, "AI Memory", "Long-term facts the assistant remembers across chats", Icons.Default.Psychology),
-        HubToolItem(21, "Prompt Library", "Reusable prompt templates with variable placeholders", Icons.Default.Bookmarks)
-    )
+    val categories = remember { listOf("All", "Write", "Search", "Media", "Daily") }
+
+    val tools = remember {
+        listOf(
+            HubToolItem(1, "Notes", "Write and organize your notes", Icons.AutoMirrored.Filled.Note, "Write"),
+            HubToolItem(13, "My Docs", "Save files so AI can answer from them", Icons.AutoMirrored.Filled.MenuBook, "Write"),
+            HubToolItem(21, "Saved Prompts", "Quick reusable message templates", Icons.Default.Bookmarks, "Write"),
+            HubToolItem(20, "AI Memory", "Facts the AI remembers for you", Icons.Default.Psychology, "Write"),
+            HubToolItem(14, "AI Style", "Choose how the AI talks to you", Icons.Default.Face, "Write"),
+            HubToolItem(5, "Web Search", "Search the web and ask AI about it", Icons.Default.Search, "Search"),
+            HubToolItem(6, "News", "Today's top tech and AI headlines", Icons.Default.Newspaper, "Search"),
+            HubToolItem(16, "YouTube", "Find videos and get fast summaries", Icons.Default.OndemandVideo, "Search"),
+            HubToolItem(17, "Maps", "Look up places and plan routes", Icons.Default.Map, "Search"),
+            HubToolItem(15, "Learn AI", "Short, easy guides on how AI works", Icons.Default.School, "Search"),
+            HubToolItem(12, "Create Studio", "Make images, music, code, and video", Icons.Default.Palette, "Media"),
+            HubToolItem(10, "Draw & Edit", "Sketch or edit photos for chat", Icons.Default.Image, "Media"),
+            HubToolItem(8, "Media Player", "Play audio files and relaxing tracks", Icons.Default.PlayCircle, "Media"),
+            HubToolItem(9, "Read Aloud", "Listen to text read out loud", Icons.Default.RecordVoiceOver, "Media"),
+            HubToolItem(2, "Calendar", "Plan events and daily schedules", Icons.Default.CalendarMonth, "Daily"),
+            HubToolItem(19, "Focus & Habits", "Focus timer and daily habit streaks", Icons.Default.Timer, "Daily"),
+            HubToolItem(4, "Calculator", "Math calculator and unit converter", Icons.Default.Calculate, "Daily"),
+            HubToolItem(7, "Step Counter", "Track steps and daily activity", Icons.AutoMirrored.Filled.DirectionsRun, "Daily"),
+            HubToolItem(3, "Passwords & Keys", "Keep logins and keys locked safely", Icons.Default.Key, "Daily"),
+            HubToolItem(18, "Alerts", "Manage reminders and notifications", Icons.Default.Notifications, "Daily"),
+            HubToolItem(11, "2048 Game", "Classic number puzzle game", Icons.Default.SportsEsports, "Daily")
+        )
+    }
+
+    val visibleTools = remember(searchQuery, selectedCategory, tools) {
+        val q = searchQuery.trim().lowercase()
+        tools.filter { tool ->
+            val catOk = selectedCategory == "All" || tool.category == selectedCategory
+            val queryOk = q.isEmpty() ||
+                tool.title.lowercase().contains(q) ||
+                tool.subtitle.lowercase().contains(q)
+            catOk && queryOk
+        }
+    }
 
     when (selectedHubTab) {
         0 -> {
             Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
                 topBar = {
-                    TopAppBar(
-                        title = { Text("Omni Intel Hub", fontWeight = FontWeight.Bold) },
-                        navigationIcon = {
-                            IconButton(onClick = onBackToChat, modifier = Modifier.testTag("hub_back_to_chat")) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Chat")
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    Column {
+                        TopAppBar(
+                            title = {
+                                Column {
+                                    Text("All Tools", fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        "Pick a tool to open or send to chat",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            },
+                            navigationIcon = {
+                                IconButton(
+                                    onClick = onBackToChat,
+                                    modifier = Modifier.testTag("hub_back_to_chat")
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Chat")
+                                }
+                            },
+                            colors = TopAppBarDefaults.topAppBarColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            )
                         )
-                    )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    }
                 }
             ) { innerPadding ->
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
-                        .padding(16.dp)
+                        .padding(horizontal = 16.dp)
                 ) {
-                    // Hero Banner
-                    Card(
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search tools…") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(18.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.Widgets,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(40.dp)
+                        categories.forEach { category ->
+                            FilterChip(
+                                selected = selectedCategory == category,
+                                onClick = { selectedCategory = category },
+                                label = { Text(category, maxLines = 1) }
                             )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column {
-                                Text(
-                                    text = "Productivity & Intel Suite",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                                Text(
-                                    text = "All tools integrate bi-directionally with OmniChat multi-provider AI.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                )
-                            }
                         }
                     }
 
-                    // Tools Grid
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        items(tools) { item ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { selectedHubTab = item.id }
-                                    .testTag("hub_tool_${item.id}"),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                                )
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (visibleTools.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No tools match \"$searchQuery\"",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(bottom = 24.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            items(visibleTools, key = { it.id }) { item ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { selectedHubTab = item.id }
+                                        .testTag("hub_tool_${item.id}"),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surface
+                                    ),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(44.dp)
-                                            .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.primaryContainer),
-                                        contentAlignment = Alignment.Center
+                                    Column(
+                                        modifier = Modifier.padding(14.dp),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Icon(
-                                            item.icon,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(MaterialTheme.colorScheme.surfaceContainer),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                item.icon,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            Text(
+                                                text = item.title,
+                                                fontWeight = FontWeight.SemiBold,
+                                                style = MaterialTheme.typography.titleSmall,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = item.subtitle,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
                                     }
-                                    Text(
-                                        text = item.title,
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.titleSmall
-                                    )
-                                    Text(
-                                        text = item.subtitle,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 2
-                                    )
                                 }
                             }
                         }
@@ -281,20 +339,23 @@ fun IntelHubScreen(
         )
         12 -> Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Creative Studio", fontWeight = FontWeight.Bold) },
-                    navigationIcon = {
-                        IconButton(
-                            onClick = { selectedHubTab = 0 },
-                            modifier = Modifier.testTag("hub_studio_back")
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                Column {
+                    TopAppBar(
+                        title = { Text("Create Studio", fontWeight = FontWeight.SemiBold) },
+                        navigationIcon = {
+                            IconButton(
+                                onClick = { selectedHubTab = 0 },
+                                modifier = Modifier.testTag("hub_studio_back")
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
                     )
-                )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
             }
         ) { innerPadding ->
             StudioScreen(

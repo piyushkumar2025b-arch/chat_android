@@ -172,10 +172,10 @@ private val CODE_MIME_TYPES = arrayOf(
 )
 
 private val CHAT_SUGGESTIONS: List<Pair<String, ImageVector>> = listOf(
-    "Explain a complex topic with a simple, real-world analogy." to Icons.Default.Psychology,
-    "Summarize the key points of a document I attach." to Icons.Default.Description,
-    "Review a code snippet and suggest concrete improvements." to Icons.Default.Code,
-    "Draft a focused plan for my day with three priorities." to Icons.Default.Speed
+    "Explain a tough topic in simple words." to Icons.Default.Psychology,
+    "Summarize the main points of a file I add." to Icons.Default.Description,
+    "Check this code and suggest easy fixes." to Icons.Default.Code,
+    "Help me plan my top three tasks for today." to Icons.Default.Speed
 )
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -406,14 +406,14 @@ fun ChatScreen(viewModel: ChatViewModel) {
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = { Text("Creative Studio", fontWeight = FontWeight.Bold) },
+                        title = { Text("Create Studio", fontWeight = FontWeight.SemiBold) },
                         navigationIcon = {
                             IconButton(onClick = { viewModel.navigateToSection(AppSection.CHAT) }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer
+                            containerColor = MaterialTheme.colorScheme.surface
                         )
                     )
                 }
@@ -587,10 +587,15 @@ fun ChatScreen(viewModel: ChatViewModel) {
                     topBar = {
                         TopAppBar(
                             title = {
-                                Column {
+                                Column(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { showProviderSheet = true }
+                                        .padding(vertical = 2.dp, horizontal = 4.dp)
+                                ) {
                                     Text(
                                         text = activeSessionTitle,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         style = MaterialTheme.typography.titleMedium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -649,7 +654,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                             modifier = Modifier.testTag("open_chat_search_button")
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("Knowledge Base (RAG)") },
+                                            text = { Text("My Docs") },
                                             leadingIcon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
                                             onClick = {
                                                 showOverflowMenu = false
@@ -658,7 +663,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                             modifier = Modifier.testTag("open_knowledge_base_button")
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("Artifacts (${currentSessionArtifacts.size})") },
+                                            text = { Text("Saved Snippets (${currentSessionArtifacts.size})") },
                                             leadingIcon = { Icon(Icons.Default.Widgets, contentDescription = null) },
                                             onClick = {
                                                 showOverflowMenu = false
@@ -675,7 +680,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                             }
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("Prompt Library") },
+                                            text = { Text("Saved Prompts") },
                                             leadingIcon = { Icon(Icons.Default.Bookmarks, contentDescription = null) },
                                             onClick = {
                                                 showOverflowMenu = false
@@ -700,7 +705,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                         )
                                         HorizontalDivider()
                                         DropdownMenuItem(
-                                            text = { Text("Export chat as Markdown") },
+                                            text = { Text("Save chat as Text") },
                                             leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
                                             onClick = {
                                                 showOverflowMenu = false
@@ -715,7 +720,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                             }
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("Export chat as JSON") },
+                                            text = { Text("Save chat as JSON") },
                                             leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
                                             onClick = {
                                                 showOverflowMenu = false
@@ -764,7 +769,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                 }
                             },
                             colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer
+                                containerColor = MaterialTheme.colorScheme.surface
                             )
                         )
                     }
@@ -781,6 +786,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             isRagEnabled = isRagEnabled,
                             usageStats = usageStats,
                             onOpenProviders = { showProviderSheet = true },
+                            onOpenTools = { viewModel.navigateToSection(AppSection.INTEL_HUB) },
                             onToggleRag = { viewModel.toggleRag() },
                             onOpenUsage = { showUsageSheet = true }
                         )
@@ -853,7 +859,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             FlowRow(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -872,10 +878,12 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .imePadding(),
-                            color = MaterialTheme.colorScheme.surfaceContainer,
-                            tonalElevation = 6.dp
+                            color = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 0.dp
                         ) {
-                            Row(
+                            Column {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 10.dp, vertical = 8.dp),
@@ -988,6 +996,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                             else MaterialTheme.colorScheme.outline
                                         )
                                     }
+                                }
                                 }
                             }
                         }
@@ -1231,65 +1240,82 @@ private fun ProviderQuickBar(
     isRagEnabled: Boolean,
     usageStats: UsageStats,
     onOpenProviders: () -> Unit,
+    onOpenTools: () -> Unit,
     onToggleRag: () -> Unit,
     onOpenUsage: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .background(MaterialTheme.colorScheme.surface)
     ) {
-        AssistChip(
-            onClick = onOpenProviders,
-            label = {
-                Text(
-                    "${activeProvider.displayName.substringBefore(" (")} · $activeModelName",
-                    maxLines = 1
-                )
-            },
-            leadingIcon = {
-                Icon(Icons.Default.Psychology, contentDescription = null, modifier = Modifier.size(16.dp))
-            },
-            trailingIcon = {
-                Icon(Icons.Default.ArrowDropDown, contentDescription = "Change provider", modifier = Modifier.size(18.dp))
-            },
-            modifier = Modifier.testTag("provider_selector_chip")
-        )
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AssistChip(
+                onClick = onOpenProviders,
+                label = {
+                    Text(
+                        "${activeProvider.displayName.substringBefore(" (")} · $activeModelName",
+                        maxLines = 1
+                    )
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.Psychology, contentDescription = null, modifier = Modifier.size(16.dp))
+                },
+                trailingIcon = {
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Change model", modifier = Modifier.size(18.dp))
+                },
+                modifier = Modifier.testTag("provider_selector_chip")
+            )
 
-        FilterChip(
-            selected = isRagEnabled,
-            onClick = onToggleRag,
-            label = { Text(if (isRagEnabled) "Knowledge ON" else "Knowledge OFF") },
-            leadingIcon = {
-                Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp))
-            },
-            modifier = Modifier.testTag("rag_toggle_chip")
-        )
+            AssistChip(
+                onClick = onOpenTools,
+                label = { Text("Tools") },
+                leadingIcon = {
+                    Icon(Icons.Default.Widgets, contentDescription = null, modifier = Modifier.size(16.dp))
+                },
+                modifier = Modifier.testTag("quick_tools_chip")
+            )
 
-        AssistChip(
-            onClick = onOpenUsage,
-            label = {
-                Text(
-                    if (usageStats.dailyLimit > 0) {
-                        "${usageStats.requestsToday}/${usageStats.dailyLimit} today"
-                    } else {
-                        "${usageStats.requestsToday} requests"
-                    }
-                )
-            },
-            leadingIcon = {
-                Icon(
-                    if (usageStats.isLimitReached) Icons.Default.ErrorOutline else Icons.Default.Speed,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-            },
-            modifier = Modifier.testTag("usage_chip")
-        )
+            FilterChip(
+                selected = isRagEnabled,
+                onClick = onToggleRag,
+                label = { Text(if (isRagEnabled) "My Docs: On" else "My Docs: Off") },
+                leadingIcon = {
+                    Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp))
+                },
+                modifier = Modifier.testTag("rag_toggle_chip")
+            )
+
+            AssistChip(
+                onClick = onOpenUsage,
+                label = {
+                    Text(
+                        if (usageStats.dailyLimit > 0) {
+                            "${usageStats.requestsToday}/${usageStats.dailyLimit} today"
+                        } else {
+                            "${usageStats.requestsToday} today"
+                        }
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        if (usageStats.isLimitReached) Icons.Default.ErrorOutline else Icons.Default.Speed,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                modifier = Modifier.testTag("usage_chip")
+            )
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -1302,35 +1328,36 @@ private fun EmptyChatState(
         modifier = modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .padding(horizontal = 24.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
+        Surface(
+            modifier = Modifier.size(64.dp),
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
-            Icon(
-                Icons.Default.AutoAwesome,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(36.dp)
-            )
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(14.dp))
 
         Text(
-            text = "How can I help today?",
+            text = "How can I help?",
             style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.SemiBold
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Ask anything, attach a file, or pull grounded answers from your knowledge base.",
+            text = "Ask anything, attach a file, or tap an idea below.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -1341,23 +1368,25 @@ private fun EmptyChatState(
         CHAT_SUGGESTIONS.forEach { (prompt, icon) ->
             Surface(
                 shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .widthIn(max = 520.dp)
                     .padding(vertical = 4.dp)
                     .clickable { onSuggestion(prompt) }
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         icon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = prompt,
                         style = MaterialTheme.typography.bodyMedium,
@@ -1394,12 +1423,12 @@ private fun ChatMessageBubble(
 
     val bubbleColor = when {
         isError -> MaterialTheme.colorScheme.errorContainer
-        isUser -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        isUser -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.surface
     }
     val contentColor = when {
         isError -> MaterialTheme.colorScheme.onErrorContainer
-        isUser -> MaterialTheme.colorScheme.onPrimaryContainer
+        isUser -> MaterialTheme.colorScheme.onPrimary
         else -> MaterialTheme.colorScheme.onSurface
     }
 
@@ -1409,19 +1438,20 @@ private fun ChatMessageBubble(
         verticalAlignment = Alignment.Top
     ) {
         if (!isUser) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
+            Surface(
+                modifier = Modifier.size(32.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
-                Icon(
-                    Icons.Default.AutoAwesome,
-                    contentDescription = "AI assistant",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(18.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.AutoAwesome,
+                        contentDescription = "AI assistant",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
             Spacer(modifier = Modifier.width(8.dp))
         }
@@ -1439,14 +1469,18 @@ private fun ChatMessageBubble(
                 ),
                 color = bubbleColor,
                 contentColor = contentColor,
-                border = if (isFocused) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
+                border = when {
+                    isFocused -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                    !isUser && !isError -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    else -> null
+                }
             ) {
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                     if (!isUser) {
                         Text(
                             text = message.modelName.ifBlank { providerName },
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(bottom = 6.dp)
                         )
@@ -1572,8 +1606,8 @@ private fun ChatMessageBubble(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         listOf(
-                            "Explain simpler",
-                            "Give a concrete example",
+                            "Make it simpler",
+                            "Show an example",
                             "What should I do next?"
                         ).forEach { suggestion ->
                             AssistChip(
@@ -1588,19 +1622,20 @@ private fun ChatMessageBubble(
 
         if (isUser) {
             Spacer(modifier = Modifier.width(8.dp))
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondaryContainer),
-                contentAlignment = Alignment.Center
+            Surface(
+                modifier = Modifier.size(32.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = "You",
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(18.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = "You",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
     }
@@ -1650,11 +1685,11 @@ private fun OmniChatDrawer(
                 Text(
                     text = "OmniChat",
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
                 Text(
-                    text = "Multi-provider AI workspace",
+                    text = "AI chat & everyday tools",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
@@ -1701,7 +1736,7 @@ private fun OmniChatDrawer(
 
             item {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
-                DrawerSectionLabel("Workspace")
+                DrawerSectionLabel("Tools")
             }
 
             item {
@@ -1710,12 +1745,12 @@ private fun OmniChatDrawer(
                 }
             }
             item {
-                DrawerNavRow(Icons.Default.Widgets, "Intel Hub & Productivity", currentSection == AppSection.INTEL_HUB) {
+                DrawerNavRow(Icons.Default.Widgets, "All Tools", currentSection == AppSection.INTEL_HUB) {
                     onNavigate(AppSection.INTEL_HUB)
                 }
             }
             item {
-                DrawerNavRow(Icons.Default.Palette, "Creative Studio", currentSection == AppSection.CREATIVE_STUDIO) {
+                DrawerNavRow(Icons.Default.Palette, "Create Studio", currentSection == AppSection.CREATIVE_STUDIO) {
                     onNavigate(AppSection.CREATIVE_STUDIO)
                 }
             }
@@ -1725,7 +1760,7 @@ private fun OmniChatDrawer(
                 }
             }
             item {
-                DrawerNavRow(Icons.Default.Description, "Markdown Studio", currentSection == AppSection.MARKDOWN_STUDIO) {
+                DrawerNavRow(Icons.Default.Description, "Writing Pad", currentSection == AppSection.MARKDOWN_STUDIO) {
                     onNavigate(AppSection.MARKDOWN_STUDIO)
                 }
             }
@@ -1737,7 +1772,7 @@ private fun OmniChatDrawer(
             item {
                 DrawerNavRow(
                     Icons.AutoMirrored.Filled.MenuBook,
-                    "Knowledge Base (RAG)",
+                    "My Docs",
                     currentSection == AppSection.RAG_KNOWLEDGE
                 ) {
                     onNavigate(AppSection.RAG_KNOWLEDGE)
@@ -1754,7 +1789,7 @@ private fun OmniChatDrawer(
                 }
             }
             item {
-                DrawerNavRow(Icons.Default.Bookmarks, "Prompt Library", currentSection == AppSection.PROMPT_LIBRARY) {
+                DrawerNavRow(Icons.Default.Bookmarks, "Saved Prompts", currentSection == AppSection.PROMPT_LIBRARY) {
                     onNavigate(AppSection.PROMPT_LIBRARY)
                 }
             }
@@ -1775,10 +1810,10 @@ private fun OmniChatDrawer(
 
             item {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
-                DrawerSectionLabel("Preferences")
+                DrawerSectionLabel("Settings")
             }
-            item { DrawerNavRow(Icons.Default.Settings, "Settings & API Keys", false, onOpenSettings) }
-            item { DrawerNavRow(Icons.Default.Palette, "Themes & Appearance", false, onOpenThemes) }
+            item { DrawerNavRow(Icons.Default.Settings, "Settings & Keys", false, onOpenSettings) }
+            item { DrawerNavRow(Icons.Default.Palette, "Appearance", false, onOpenThemes) }
             item { DrawerNavRow(Icons.Default.Speed, "Usage & Limits", false, onOpenUsage) }
         }
     }

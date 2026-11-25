@@ -1,8 +1,10 @@
 package com.example.ui
 
 import android.text.format.DateUtils
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -90,8 +92,8 @@ private data class FocusTimerMode(
 )
 
 private val FOCUS_MODES = listOf(
-    FocusTimerMode("Focus", 25, "Classic pomodoro sprint"),
-    FocusTimerMode("Deep Work", 50, "Extended concentration block"),
+    FocusTimerMode("Focus", 25, "25-minute focus sprint"),
+    FocusTimerMode("Deep Work", 50, "Long focus block"),
     FocusTimerMode("Break", 5, "Step away and recharge")
 )
 
@@ -179,9 +181,9 @@ fun FocusHabitsScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Focus & Habits", fontWeight = FontWeight.Bold)
+                        Text("Focus & Habits", fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Deep work timer, streaks & daily momentum",
+                            "Focus timer and daily habits",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -193,7 +195,7 @@ fun FocusHabitsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         },
@@ -279,8 +281,9 @@ fun FocusHabitsScreen(
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -288,20 +291,20 @@ fun FocusHabitsScreen(
                             Icon(
                                 Icons.Default.AutoAwesome,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                tint = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "AI focus coach",
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                "AI Focus Coach",
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            "Turn today's habits and focus time into a concrete plan with the assistant.",
+                            "Turn today's habits and focus time into a simple daily plan.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -361,8 +364,9 @@ fun FocusHabitsScreen(
                 item {
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            containerColor = MaterialTheme.colorScheme.surface
                         ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -485,10 +489,11 @@ private fun FocusStatCard(
 ) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = tint.copy(alpha = 0.14f))
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Column(modifier = Modifier.padding(vertical = 12.dp, horizontal = 10.dp)) {
+        Column(modifier = Modifier.padding(vertical = 12.dp, horizontal = 12.dp)) {
             Text(
                 value,
                 style = MaterialTheme.typography.titleLarge,
@@ -522,10 +527,11 @@ private fun TimerCard(
 ) {
     val mode = modes[selectedIndex]
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = MaterialTheme.colorScheme.surface
         ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -551,7 +557,7 @@ private fun TimerCard(
                 modifier = Modifier.size(220.dp),
                 contentAlignment = Alignment.Center
             ) {
-                val trackColor = MaterialTheme.colorScheme.surfaceVariant
+                val trackColor = MaterialTheme.colorScheme.outlineVariant
                 val accentColor = MaterialTheme.colorScheme.primary
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val strokeWidth = 16.dp.toPx()
@@ -640,14 +646,15 @@ private fun TimerCard(
                 Spacer(modifier = Modifier.height(10.dp))
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         notice,
                         modifier = Modifier.padding(10.dp),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -673,10 +680,14 @@ private fun HabitCard(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (today in checkedDays) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                MaterialTheme.colorScheme.surfaceContainerLow
             } else {
-                MaterialTheme.colorScheme.surfaceContainerHigh
+                MaterialTheme.colorScheme.surface
             }
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (today in checkedDays) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
         ),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -685,8 +696,8 @@ private fun HabitCard(
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(habit.emoji, fontSize = 20.sp)
@@ -778,9 +789,13 @@ private fun DayCell(
                 .background(
                     when {
                         checked -> MaterialTheme.colorScheme.primary
-                        isToday -> MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-                        else -> MaterialTheme.colorScheme.surfaceVariant
+                        else -> MaterialTheme.colorScheme.surfaceContainer
                     }
+                )
+                .then(
+                    if (isToday && !checked) {
+                        Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                    } else Modifier
                 ),
             contentAlignment = Alignment.Center
         ) {
@@ -806,8 +821,9 @@ private fun FocusSessionRow(
     Card(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
+            containerColor = MaterialTheme.colorScheme.surface
         ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -817,15 +833,15 @@ private fun FocusSessionRow(
             Box(
                 modifier = Modifier
                     .size(36.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.Timer,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
             Spacer(modifier = Modifier.width(12.dp))

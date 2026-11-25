@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -200,26 +201,26 @@ fun AiPersonaScreen(
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.tertiaryContainer),
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.Psychology,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(22.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "AI Persona & Behavior Studio",
+                        "AI Style",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        "Feed the AI how to act, talk, and behave exclusively with you",
+                        "Choose how the AI talks and helps you",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -227,11 +228,12 @@ fun AiPersonaScreen(
             }
         }
 
-        // Active Persona Banner
+        // Active Style Banner
         item {
             Card(
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -241,9 +243,9 @@ fun AiPersonaScreen(
                     Icon(Icons.Default.Face, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Active AI Behavior", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text("Current Style", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
                         Text(
-                            text = if (activePersonaId == "custom") "Custom Instructions Active"
+                            text = if (activePersonaId == "custom") "Custom Rules Active"
                             else PERSONA_PRESETS.firstOrNull { it.id == activePersonaId }?.name ?: "Default Assistant",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold
@@ -254,11 +256,11 @@ fun AiPersonaScreen(
                             preferencesManager.systemPrompt = PreferencesManager.DEFAULT_SYSTEM_PROMPT
                             preferencesManager.activePersonaId = "default"
                             activePersonaId = "default"
-                            Toast.makeText(context, "Reset to standard assistant behavior", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Reset to standard assistant style", Toast.LENGTH_SHORT).show()
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurface
                         ),
                         shape = RoundedCornerShape(8.dp)
                     ) {
@@ -268,21 +270,22 @@ fun AiPersonaScreen(
             }
         }
 
-        // Custom Instructions Input
+        // Custom Rules Input
         item {
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        "Feed Custom Behavior Instructions",
+                        "Write Custom Rules",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        "Describe how you want it to address you, its tone, vocabulary, rules, and style:",
+                        "Tell the AI how to talk, what tone to use, or rules to follow:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -311,8 +314,8 @@ fun AiPersonaScreen(
                             onClick = { runTestDrive(customInstructions) },
                             enabled = !isTesting && customInstructions.isNotBlank(),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.onSurface
                             ),
                             shape = RoundedCornerShape(10.dp)
                         ) {
@@ -321,7 +324,7 @@ fun AiPersonaScreen(
                             } else {
                                 Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Test Drive", style = MaterialTheme.typography.labelMedium)
+                                Text("Try It Out", style = MaterialTheme.typography.labelMedium)
                             }
                         }
 
@@ -332,7 +335,7 @@ fun AiPersonaScreen(
                         ) {
                             Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Save & Apply")
+                            Text("Save & Use")
                         }
                     }
                 }
@@ -345,14 +348,15 @@ fun AiPersonaScreen(
             item {
                 Card(
                     shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Test Reply Preview:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary)
+                            Text("Sample Reply:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(currentReply, style = MaterialTheme.typography.bodyMedium, lineHeight = 20.sp)
@@ -361,18 +365,22 @@ fun AiPersonaScreen(
             }
         }
 
-        // Curated Persona Presets
+        // Preset Styles
         item {
-            Text("Or Choose a Signature Persona", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Or Pick a Ready-Made Style", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         }
 
         items(PERSONA_PRESETS) { preset ->
             val isSelected = activePersonaId == preset.id
             Card(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                    containerColor = if (isSelected) MaterialTheme.colorScheme.surfaceContainerHigh
+                    else MaterialTheme.colorScheme.surface
+                ),
+                border = BorderStroke(
+                    width = if (isSelected) 2.dp else 1.dp,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -389,7 +397,7 @@ fun AiPersonaScreen(
                     Spacer(modifier = Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(preset.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                            Text(preset.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                             if (isSelected) {
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Icon(Icons.Default.Check, contentDescription = "Active", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
@@ -397,6 +405,7 @@ fun AiPersonaScreen(
                         }
                         Text(preset.tagLine, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
                             customInstructions = preset.prompt
@@ -404,7 +413,7 @@ fun AiPersonaScreen(
                         },
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text(if (isSelected) "Active" else "Select", style = MaterialTheme.typography.labelSmall)
+                        Text(if (isSelected) "Active" else "Use", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }

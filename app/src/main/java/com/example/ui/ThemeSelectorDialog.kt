@@ -79,9 +79,9 @@ fun ThemeSelectorDialog(
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
-                    Text("App Themes & Styling", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Appearance", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                     Text(
-                        text = "Customize your visual experience",
+                        text = "Pick a screen mode and accent color",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -95,11 +95,10 @@ fun ThemeSelectorDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Display Mode (Light / Dark / AMOLED / System)
                 Text(
-                    text = "Display Mode",
+                    text = "Screen Mode",
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold
                 )
 
                 FlowRow(
@@ -160,7 +159,7 @@ fun ThemeSelectorDialog(
                                 .testTag("theme_card_${theme.id}"),
                             shape = RoundedCornerShape(14.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceContainer
+                                containerColor = if (isSelected) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface
                             )
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {

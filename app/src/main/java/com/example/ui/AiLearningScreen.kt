@@ -2,7 +2,9 @@ package com.example.ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -73,64 +75,64 @@ data class ExternalResource(
 
 val AI_TOPICS = listOf(
     AiTopic(
-        title = "Transformers & LLM Fundamentals",
-        category = "Architecture",
-        summary = "How modern language models process and generate human language through self-attention mechanisms.",
+        title = "How AI Reads & Writes Text",
+        category = "Basics",
+        summary = "How AI breaks sentences into small pieces and predicts the best next word.",
         keyPoints = listOf(
-            "Tokens: Words and sub-words converted into numerical vectors",
-            "Self-Attention: Calculates how each word relates to every other word",
-            "Context Window: Total memory size of past tokens the model can remember",
-            "Temperature: Controls randomness and creativity (0.0 = deterministic, 1.0 = creative)"
+            "Tokens: Words and word parts turned into numbers the model can read",
+            "Attention: Checks how each word connects to every other word in a sentence",
+            "Memory Window: How much of the current chat the AI can see at once",
+            "Creativity: Controls whether replies stay safe and factual or more playful"
         ),
-        promptForAi = "Explain how Transformer neural networks and self-attention work using an intuitive, real-world metaphor. Break down tokens, embeddings, and context windows."
+        promptForAi = "Explain in simple everyday language how AI language models read text, use tokens and attention, and decide what word to write next."
     ),
     AiTopic(
-        title = "Prompt Engineering Masterclass",
+        title = "How to Write Better Prompts",
         category = "Prompting",
-        summary = "Techniques to elicit the most accurate, structured, and creative responses from any AI model.",
+        summary = "Easy ways to ask clearer questions and get much better AI answers.",
         keyPoints = listOf(
-            "Few-Shot: Giving 2-3 examples before asking for the task",
-            "Chain-of-Thought (CoT): Asking the model to 'think step by step'",
-            "ReAct: Combining reasoning and actions for complex problem solving",
-            "Role & Persona Framing: Setting domain expertise and constraints upfront"
+            "Show Examples: Give 2 or 3 sample answers before asking for yours",
+            "Step-by-Step: Ask the AI to think through a hard problem one step at a time",
+            "Set a Role: Tell the AI who to act as, like a teacher or editor",
+            "Add Rules: Mention the format, length, or style you want"
         ),
-        promptForAi = "Give me a practical masterclass in Prompt Engineering. Teach me Chain-of-Thought, Few-Shot prompting, and how to write system prompts with examples."
+        promptForAi = "Teach me simple rules for writing better AI prompts, with before-and-after examples anyone can use."
     ),
     AiTopic(
-        title = "AI Agents & Autonomous Tool Calling",
-        category = "Agents",
-        summary = "Systems that reason, plan, and call external tools (Web Search, APIs, Python, Files) autonomously.",
+        title = "AI Assistants & Tool Use",
+        category = "Tools",
+        summary = "How AI goes beyond chatting to search the web, read files, and run actions.",
         keyPoints = listOf(
-            "Function Calling: Generating structured JSON arguments for APIs",
-            "RAG (Retrieval-Augmented Generation): Injecting private documents into prompts",
-            "Model Context Protocol (MCP): Standardized connection to external data sources",
-            "Feedback Loops: Self-correcting and iterating until goal completion"
+            "Tool Calls: The AI fills in a structured request when it needs live info",
+            "My Docs Search: Pulls helpful facts from your saved files before answering",
+            "Connected Tools: Links the AI safely to search, maps, and calculators",
+            "Checking Work: Reviews its own steps and fixes mistakes before replying"
         ),
-        promptForAi = "Explain how Autonomous AI Agents and Function Calling work. How does an LLM decide when to call a tool or search the web?"
+        promptForAi = "Explain in plain English how AI assistants decide when to search the web, look up my documents, or use external tools."
     ),
     AiTopic(
-        title = "Multimodal Vision & Generative Media",
-        category = "Vision & Media",
-        summary = "How models perceive images, generate art, and analyze video through joint cross-modal embeddings.",
+        title = "How AI Understands & Makes Images",
+        category = "Images",
+        summary = "How AI recognizes what is in a photo and creates new artwork from a sentence.",
         keyPoints = listOf(
-            "Vision Tokens: Converting image patches into tokens compatible with text",
-            "Diffusion Models: Generating images by reversing gradual Gaussian noise",
-            "Flux & SDXL: Modern flow matching and latent diffusion architectures",
-            "Multimodal Reasoning: Answering complex spatial and OCR questions"
+            "Seeing Images: Breaks a picture into small squares the AI can understand",
+            "Image Creation: Starts from random static and gradually shapes a clear picture",
+            "Fast Models: Newer image engines create crisp art in just a few steps",
+            "Visual Q&A: Reads signs, charts, and objects directly from your photos"
         ),
-        promptForAi = "How do Multimodal LLMs and Diffusion models like Flux work under the hood? Explain how AI understands and generates images."
+        promptForAi = "Explain simply how AI can both read photos and generate brand-new images from text descriptions."
     ),
     AiTopic(
-        title = "Open-Source vs Proprietary Ecosystem",
+        title = "Open vs Cloud AI Models",
         category = "Models",
-        summary = "The state of modern open-weight models compared to commercial cloud APIs.",
+        summary = "How free open models compare to large cloud AI services.",
         keyPoints = listOf(
-            "Open Weights: Meta Llama 3.3, DeepSeek R1, Qwen 2.5 available to run anywhere",
-            "Proprietary APIs: Google Gemini 2.5, OpenAI GPT-4o, Anthropic Claude 3.5",
-            "LPUs & Hardware Acceleration: Groq LPU fast inference vs GPU clusters",
-            "Quantization: Running 70B models locally on phones and laptops using 4-bit weights"
+            "Open Models: Models like Llama, DeepSeek, and Qwen anyone can run or host",
+            "Cloud Models: Services like Gemini, GPT, and Claude with large built-in tools",
+            "Fast Hardware: Specialized chips make replies appear almost instantly",
+            "Smaller Versions: Compact models can even run right on laptops and phones"
         ),
-        promptForAi = "Compare the top open-weight models (Llama 3.3, DeepSeek R1, Qwen 2.5) with proprietary models. What are the pros, cons, and future directions?"
+        promptForAi = "Compare open AI models like Llama and DeepSeek with cloud models like Gemini and Claude in simple terms."
     )
 )
 
@@ -179,7 +181,7 @@ fun AiLearningScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val categories = listOf("All", "Architecture", "Prompting", "Agents", "Vision & Media", "Models")
+    val categories = listOf("All", "Basics", "Prompting", "Tools", "Images", "Models")
     var selectedCategory by remember { mutableStateOf("All") }
 
     val filteredTopics = remember(selectedCategory) {
@@ -216,26 +218,27 @@ fun AiLearningScreen(
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.School,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        "AI Learning Academy & Hub",
+                        "Learn AI",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        "Master Generative AI, Prompt Engineering & Agents • Interactive",
+                        "Simple guides to how AI works & better prompts",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -260,7 +263,8 @@ fun AiLearningScreen(
         items(filteredTopics) { topic ->
             Card(
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
@@ -271,14 +275,15 @@ fun AiLearningScreen(
                     ) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Text(
                                 topic.category,
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
                         }
                     }
@@ -325,14 +330,15 @@ fun AiLearningScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Curated Free Courses & Guides", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Free Courses & Guides", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
         }
 
         items(EXTERNAL_RESOURCES) { res ->
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
@@ -348,13 +354,14 @@ fun AiLearningScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(res.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                            Text(res.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f, fill = false))
                             Spacer(modifier = Modifier.width(8.dp))
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
-                                color = MaterialTheme.colorScheme.secondaryContainer
+                                color = MaterialTheme.colorScheme.surfaceContainer,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                             ) {
-                                Text(res.tag, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
+                                Text(res.tag, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                             }
                         }
                         Text("By ${res.provider}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)

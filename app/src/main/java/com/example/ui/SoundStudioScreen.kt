@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -116,26 +117,26 @@ fun SoundStudioScreen(
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.secondaryContainer),
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.GraphicEq,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(22.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        "AI Sound & Audio Studio",
+                        "Sound Maker",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        "Synthesize ambient audio, SFX & frequencies • Real-time DSP",
+                        "Play calming background sounds and effects",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -146,8 +147,9 @@ fun SoundStudioScreen(
         // Active Player Card with Waveform
         item {
             Card(
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -191,9 +193,9 @@ fun SoundStudioScreen(
 
                         if (!isPlaying) {
                             Text(
-                                "Ready to Synthesize",
+                                "Tap Play to listen",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -254,13 +256,14 @@ fun SoundStudioScreen(
                             },
                             modifier = Modifier
                                 .size(56.dp)
-                                .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape)
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
                                 .testTag("save_audio_button")
                         ) {
                             Icon(
                                 Icons.Default.Download,
                                 contentDescription = "Save Audio to Phone",
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(28.dp)
                             )
                         }
@@ -290,7 +293,7 @@ fun SoundStudioScreen(
 
         // Preset Library
         item {
-            Text("Sound FX & Synthesis Presets", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Sound Presets", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         }
 
         items(SoundPreset.values()) { preset ->
@@ -298,8 +301,12 @@ fun SoundStudioScreen(
             Card(
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                    containerColor = if (isSelected) MaterialTheme.colorScheme.surfaceContainerLow
+                    else MaterialTheme.colorScheme.surface
+                ),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
                 ),
                 modifier = Modifier
                     .fillMaxWidth()

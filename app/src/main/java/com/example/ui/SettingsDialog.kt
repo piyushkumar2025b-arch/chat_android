@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -103,7 +104,7 @@ fun SettingsDialog(
             .testTag("settings_dialog"),
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Settings & Customization", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             }
         },
         text = {
@@ -113,10 +114,11 @@ fun SettingsDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Themes & Appearance Action Button
+                // Appearance & Themes
                 Surface(
                     shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -131,26 +133,25 @@ fun SettingsDialog(
                             Icon(
                                 imageVector = Icons.Default.ColorLens,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(26.dp)
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "Color Themes & Modes",
+                                    text = "Appearance",
                                     style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = "5 themes • AMOLED • Dark / Light",
+                                    text = "5 colors • Light, Dark, or Black",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
 
-                        Button(
+                        OutlinedButton(
                             onClick = onOpenThemePicker,
                             modifier = Modifier.testTag("open_theme_picker_button")
                         ) {
@@ -159,10 +160,11 @@ fun SettingsDialog(
                     }
                 }
 
-                // Daily Limits & Usage Budget Action Card
+                // Daily Limit Card
                 Surface(
                     shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -177,28 +179,26 @@ fun SettingsDialog(
                             Icon(
                                 imageVector = Icons.Default.Speed,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.size(26.dp)
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "Daily Request Budget",
+                                    text = "Daily Limit",
                                     style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = if (preferencesManager.dailyLimit <= 0) "Unlimited requests/day" else "Cap: ${preferencesManager.dailyLimit} requests/day",
+                                    text = if (preferencesManager.dailyLimit <= 0) "No daily limit" else "${preferencesManager.dailyLimit} messages per day",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
 
-                        Button(
+                        OutlinedButton(
                             onClick = onOpenUsageLimits,
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             modifier = Modifier.testTag("open_usage_limits_button")
                         ) {
                             Text("Set Limit", fontSize = 12.sp, maxLines = 1)
@@ -218,18 +218,19 @@ fun SettingsDialog(
 
                 // Backup & Restore Keys Banner
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    shape = RoundedCornerShape(12.dp)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    shape = RoundedCornerShape(14.dp)
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                    Column(modifier = Modifier.padding(14.dp)) {
                         Text(
-                            text = "Keep & Backup Keys",
+                            text = "Backup Saved Keys",
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.SemiBold
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Copy all keys as a JSON backup to keep them safe, or paste a backup to restore.",
+                            text = "Copy your keys to move them safely, or paste a saved backup.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -294,7 +295,8 @@ fun SettingsDialog(
                 // Security Notice Banner
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -304,14 +306,14 @@ fun SettingsDialog(
                         Icon(
                             imageVector = Icons.Default.Security,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(20.dp).padding(top = 2.dp)
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp).padding(top = 2.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Security Warning: Keys configured here or injected via Secrets are stored securely on this device for testing. Do not share your APK publicly with unauthorized individuals.",
+                            text = "Your keys stay private on this device. Do not share exported key backups with anyone else.",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -403,20 +405,20 @@ fun SettingsDialog(
                 HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.4f))
 
                 // Custom Endpoint Options
-                Text("Custom OpenAI Endpoint (Optional)", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                Text("Custom AI Server (Optional)", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                 OutlinedTextField(
                     value = customUrl,
                     onValueChange = { customUrl = it },
-                    label = { Text("Base URL") },
+                    label = { Text("Server Address (URL)") },
                     placeholder = { Text("http://10.0.2.2:11434/v1/chat/completions") },
                     modifier = Modifier.fillMaxWidth().testTag("custom_url_input"),
                     singleLine = true
                 )
                 ApiKeyInputField(
-                    title = "Custom Endpoint API Key (Optional)",
+                    title = "Server Key (Optional)",
                     key = customKey,
                     onKeyChange = { customKey = it },
-                    placeholder = "Bearer token or key...",
+                    placeholder = "Paste key or leave blank...",
                     testTagPrefix = "custom_key"
                 )
                 OutlinedTextField(
@@ -430,13 +432,13 @@ fun SettingsDialog(
 
                 HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.4f))
 
-                // Temperature Slider
+                // Creativity Slider
                 Column {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Creativity / Temperature", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                        Text("Creativity", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                         Text(String.format(java.util.Locale.US, "%.2f", temperature), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                     }
                     Slider(
@@ -447,15 +449,15 @@ fun SettingsDialog(
                     )
                 }
 
-                // Max Output Length Slider (Elaborated Responses)
+                // Reply Length Slider
                 Column {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Max Output Length (Elaboration)", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                        Text("$maxTokens tokens", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text("Reply Length", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                        Text("$maxTokens words/parts", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                     Slider(
                         value = maxTokens.toFloat(),
@@ -465,15 +467,15 @@ fun SettingsDialog(
                         modifier = Modifier.fillMaxWidth().testTag("max_tokens_slider")
                     )
                     Text(
-                        "Larger token limits ensure full, richly elaborated answers without cutting off mid-sentence.",
+                        "Higher limits allow longer, more detailed replies without stopping early.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                // System Prompt
+                // Custom Rules
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("System Instructions", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text("Custom AI Rules", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                     OutlinedTextField(
                         value = systemPrompt,
                         onValueChange = { systemPrompt = it },
@@ -483,16 +485,16 @@ fun SettingsDialog(
                     )
                 }
 
-                // Context window budget
+                // Chat Memory Size
                 Column {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Context Budget", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                        Text("Chat Memory Size", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            "~${contextBudget / 1000}k tokens",
+                            "~${contextBudget / 1000}k",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -508,7 +510,7 @@ fun SettingsDialog(
                         modifier = Modifier.fillMaxWidth().testTag("context_budget_slider")
                     )
                     Text(
-                        "Older chat turns are trimmed automatically to keep requests fast and within provider limits.",
+                        "Controls how much of the earlier chat the AI keeps in mind while replying quickly.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Start
