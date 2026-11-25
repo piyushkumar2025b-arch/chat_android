@@ -3,22 +3,28 @@ package com.example.ui
 import java.util.Locale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Backspace
@@ -55,6 +61,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -118,38 +125,39 @@ private fun StandardCalculatorView(onSendResultToChat: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .widthIn(max = 520.dp)
             .padding(16.dp),
-        verticalArrangement = Arrangement.SpaceBetween
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Display Screen
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
+            modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(20.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
                 horizontalAlignment = Alignment.End
             ) {
                 Text(
                     text = expression.ifEmpty { "0" },
-                    fontSize = 24.sp,
+                    fontSize = 22.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     fontFamily = FontFamily.Monospace,
-                    maxLines = 2
+                    maxLines = 1,
+                    modifier = Modifier.horizontalScroll(rememberScrollState())
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = resultText,
-                    fontSize = 40.sp,
+                    fontSize = 36.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                     fontFamily = FontFamily.Monospace,
-                    maxLines = 1
+                    maxLines = 1,
+                    modifier = Modifier.horizontalScroll(rememberScrollState())
                 )
             }
         }
@@ -158,15 +166,15 @@ private fun StandardCalculatorView(onSendResultToChat: (String) -> Unit) {
         if (resultText != "0" && resultText != "Error") {
             OutlinedButton(
                 onClick = { onSendResultToChat("Calculator Result: $expression = $resultText") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp)
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Insert Result into AI Chat")
+                Text("Insert Result into AI Chat", maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+        } else {
+            Spacer(modifier = Modifier.weight(1f, fill = false))
         }
 
-        // Keypad Grid - includes Backspace (Fixing BUG-06)
+        // Keypad Grid - responsive circular/pill cells safe on all viewports
         val buttons = listOf(
             "C", "(", ")", "⌫",
             "7", "8", "9", "÷",
@@ -177,9 +185,11 @@ private fun StandardCalculatorView(onSendResultToChat: (String) -> Unit) {
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(4),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
         ) {
             items(buttons) { btn ->
                 val isOp = btn in listOf("÷", "×", "-", "+", "=")
@@ -199,7 +209,9 @@ private fun StandardCalculatorView(onSendResultToChat: (String) -> Unit) {
 
                 Box(
                     modifier = Modifier
-                        .size(68.dp)
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp, max = 66.dp)
+                        .aspectRatio(1.15f, matchHeightConstraintsFirst = false)
                         .clip(CircleShape)
                         .background(bgColor)
                         .clickable {
@@ -275,18 +287,24 @@ private fun UnitConverterView() {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Category Chips
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        // Category Chips (horizontally scrollable so Temperature never wraps/clips)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+        ) {
             categories.forEach { cat ->
                 FilterChip(
                     selected = category == cat,
                     onClick = {
                         category = cat
                     },
-                    label = { Text(cat) }
+                    label = { Text(cat, maxLines = 1) }
                 )
             }
         }
@@ -312,7 +330,11 @@ private fun UnitConverterView() {
                     onClick = { expandedFrom = true },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("From: $fromUnit")
+                    Text(
+                        text = "From: $fromUnit",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
                 DropdownMenu(expanded = expandedFrom, onDismissRequest = { expandedFrom = false }) {
                     unitOptions.forEach { u ->
@@ -352,7 +374,11 @@ private fun UnitConverterView() {
                     onClick = { expandedTo = true },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("To: $toUnit")
+                    Text(
+                        text = "To: $toUnit",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
                 DropdownMenu(expanded = expandedTo, onDismissRequest = { expandedTo = false }) {
                     unitOptions.forEach { u ->

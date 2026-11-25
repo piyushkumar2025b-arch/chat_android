@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -95,6 +96,7 @@ fun SettingsDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
         modifier = Modifier
+            .widthIn(max = 560.dp)
             .padding(16.dp)
             .fillMaxWidth()
             .imePadding()
@@ -119,10 +121,13 @@ fun SettingsDialog(
                 ) {
                     Row(
                         modifier = Modifier.padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.ColorLens,
                                 contentDescription = null,
@@ -138,7 +143,7 @@ fun SettingsDialog(
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Text(
-                                    text = "6 themes • AMOLED • Dark / Light",
+                                    text = "5 themes • AMOLED • Dark / Light",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                                 )
@@ -149,7 +154,7 @@ fun SettingsDialog(
                             onClick = onOpenThemePicker,
                             modifier = Modifier.testTag("open_theme_picker_button")
                         ) {
-                            Text("Change Theme", fontSize = 12.sp)
+                            Text("Themes", fontSize = 12.sp, maxLines = 1)
                         }
                     }
                 }
@@ -162,10 +167,13 @@ fun SettingsDialog(
                 ) {
                     Row(
                         modifier = Modifier.padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Speed,
                                 contentDescription = null,
@@ -193,7 +201,7 @@ fun SettingsDialog(
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             modifier = Modifier.testTag("open_usage_limits_button")
                         ) {
-                            Text("Set Limit", fontSize = 12.sp)
+                            Text("Set Limit", fontSize = 12.sp, maxLines = 1)
                         }
                     }
                 }

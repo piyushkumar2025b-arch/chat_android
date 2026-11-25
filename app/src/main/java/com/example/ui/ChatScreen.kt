@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -622,18 +623,6 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                     Icon(Icons.Default.Add, contentDescription = "New chat")
                                 }
                                 IconButton(
-                                    onClick = { viewModel.navigateToSection(AppSection.CHAT_SEARCH) },
-                                    modifier = Modifier.testTag("open_chat_search_button")
-                                ) {
-                                    Icon(Icons.Default.Search, contentDescription = "Search chats")
-                                }
-                                IconButton(
-                                    onClick = { viewModel.navigateToSection(AppSection.RAG_KNOWLEDGE) },
-                                    modifier = Modifier.testTag("open_knowledge_base_button")
-                                ) {
-                                    Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = "Knowledge base")
-                                }
-                                IconButton(
                                     onClick = { showSettingsDialog = true },
                                     modifier = Modifier.testTag("open_settings_button")
                                 ) {
@@ -656,7 +645,17 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                             onClick = {
                                                 showOverflowMenu = false
                                                 viewModel.navigateToSection(AppSection.CHAT_SEARCH)
-                                            }
+                                            },
+                                            modifier = Modifier.testTag("open_chat_search_button")
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Knowledge Base (RAG)") },
+                                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
+                                            onClick = {
+                                                showOverflowMenu = false
+                                                viewModel.navigateToSection(AppSection.RAG_KNOWLEDGE)
+                                            },
+                                            modifier = Modifier.testTag("open_knowledge_base_button")
                                         )
                                         DropdownMenuItem(
                                             text = { Text("Artifacts (${currentSessionArtifacts.size})") },
@@ -774,6 +773,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(innerPadding)
+                            .consumeWindowInsets(innerPadding)
                     ) {
                         ProviderQuickBar(
                             activeProvider = activeProvider,
@@ -902,11 +902,13 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                     onValueChange = { inputPrompt = it },
                                     placeholder = {
                                         Text(
-                                            if (activeProvider.requiresApiKey && !viewModel.isKeyConfigured(activeProvider)) {
+                                            text = if (activeProvider.requiresApiKey && !viewModel.isKeyConfigured(activeProvider)) {
                                                 "Add an API key or switch provider…"
                                             } else {
                                                 "Message ${activeModel.name}…"
-                                            }
+                                            },
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     },
                                     modifier = Modifier
@@ -1299,6 +1301,7 @@ private fun EmptyChatState(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -1610,11 +1613,11 @@ private fun MessageAction(
     description: String,
     active: Boolean = false
 ) {
-    IconButton(onClick = onClick, modifier = Modifier.size(28.dp)) {
+    IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
         Icon(
             icon,
             contentDescription = description,
-            modifier = Modifier.size(14.dp),
+            modifier = Modifier.size(16.dp),
             tint = if (active) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
         )

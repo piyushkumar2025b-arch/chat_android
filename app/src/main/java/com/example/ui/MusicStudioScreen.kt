@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -99,6 +100,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.remote.AudioSynthesizer
@@ -315,9 +317,12 @@ fun MusicStudioScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
                     if (onBack != null) {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -342,39 +347,41 @@ fun MusicStudioScreen(
                         Text(
                             text = "Music & Beat Studio",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = "Audio Visualizer • Tune Equalizer • ${currentBpm} BPM",
+                            text = "Visualizer • EQ • ${currentBpm} BPM",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    // Upload Song Button
-                    FilledTonalButton(
-                        onClick = {
-                            audioPickerLauncher.launch(
-                                arrayOf("audio/*", "application/ogg")
-                            )
-                        },
-                        modifier = Modifier.testTag("upload_song_btn")
-                    ) {
-                        Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Upload Song", style = MaterialTheme.typography.labelMedium)
-                    }
+                FilledTonalButton(
+                    onClick = {
+                        audioPickerLauncher.launch(
+                            arrayOf("audio/*", "application/ogg")
+                        )
+                    },
+                    modifier = Modifier.testTag("upload_song_btn")
+                ) {
+                    Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Upload", style = MaterialTheme.typography.labelMedium, maxLines = 1)
                 }
             }
         }
 
         // Live Beat Visualizer Display Canvas
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
+                .heightIn(min = 160.dp)
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
@@ -383,181 +390,193 @@ fun MusicStudioScreen(
                         )
                     )
                 )
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
-            when (visualizerMode) {
-                VisualizerMode.SPECTRUM_BARS -> {
-                    // 32-Band Dynamic Frequency Spectrum Bars
-                    Canvas(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .testTag("visualizer_spectrum_canvas")
+            // Top HUD: Live Song Title Tag (left) & Mode Selector Chips (right) — never overlaps Canvas or each other
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.Black.copy(alpha = 0.55f),
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val numBars = 32
-                        val barSpacing = 6.dp.toPx()
-                        val availableWidth = size.width - (numBars - 1) * barSpacing
-                        val barWidth = availableWidth / numBars
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(if (isPlaying) Color(0xFF22C55E) else Color(0xFF94A3B8))
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Column {
+                            Text(
+                                text = currentSongTitle,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "$currentSongArtist • ${playbackSpeed}x speed",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF94A3B8),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
 
-                        val bassFactor = (bassLevel + 10f) / 20f
-                        val midFactor = (midLevel + 10f) / 20f
-                        val trebleFactor = (trebleLevel + 10f) / 20f
+                Spacer(modifier = Modifier.width(8.dp))
 
-                        for (i in 0 until numBars) {
-                            val bandProgress = i.toFloat() / numBars
-                            val factor = when {
-                                bandProgress < 0.33f -> bassFactor
-                                bandProgress < 0.66f -> midFactor
-                                else -> trebleFactor
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    VisualizerMode.values().forEach { mode ->
+                        FilterChip(
+                            selected = visualizerMode == mode,
+                            onClick = { visualizerMode = mode },
+                            label = { Text(mode.icon, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                when (visualizerMode) {
+                    VisualizerMode.SPECTRUM_BARS -> {
+                        // 32-Band Dynamic Frequency Spectrum Bars
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("visualizer_spectrum_canvas")
+                        ) {
+                            val numBars = 32
+                            val barSpacing = 6.dp.toPx()
+                            val availableWidth = size.width - (numBars - 1) * barSpacing
+                            val barWidth = availableWidth / numBars
+
+                            val bassFactor = (bassLevel + 10f) / 20f
+                            val midFactor = (midLevel + 10f) / 20f
+                            val trebleFactor = (trebleLevel + 10f) / 20f
+
+                            for (i in 0 until numBars) {
+                                val bandProgress = i.toFloat() / numBars
+                                val factor = when {
+                                    bandProgress < 0.33f -> bassFactor
+                                    bandProgress < 0.66f -> midFactor
+                                    else -> trebleFactor
+                                }
+
+                                // Calculate dynamic reactive bar height
+                                val timeSec = currentPositionMs / 1000f
+                                val wave1 = abs(sin((i * 0.45f) + (timeSec * (currentBpm / 20f))))
+                                val wave2 = abs(sin((i * 0.8f) - (timeSec * 3f)))
+                                val activity = if (isPlaying) (wave1 * 0.6f + wave2 * 0.4f) else 0.08f
+                                val barHeight = ((size.height * 0.85f) * activity * factor * volumeBooster).coerceIn(8f, size.height * 0.95f)
+
+                                val x = i * (barWidth + barSpacing)
+                                val y = (size.height - barHeight) / 2f
+
+                                val barBrush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFF38BDF8),
+                                        Color(0xFF818CF8),
+                                        Color(0xFFC084FC)
+                                    ),
+                                    startY = y,
+                                    endY = y + barHeight
+                                )
+
+                                drawRoundRect(
+                                    brush = barBrush,
+                                    topLeft = Offset(x, y),
+                                    size = Size(barWidth, barHeight),
+                                    cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                                )
+                            }
+                        }
+                    }
+
+                    VisualizerMode.BEAT_RADAR -> {
+                        // Pulsing Radar Sphere with concentric ripple rings
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("visualizer_radar_canvas")
+                        ) {
+                            val center = Offset(size.width / 2f, size.height / 2f)
+                            val maxRadius = size.minDimension * 0.42f
+                            val currentScale = if (isPlaying) pulseAnim else 1.0f
+
+                            // Outer glowing rings
+                            for (ring in 1..4) {
+                                val r = (maxRadius * (ring / 4f) * currentScale).coerceAtLeast(10f)
+                                drawCircle(
+                                    color = Color(0xFF6366F1).copy(alpha = (0.5f / ring) * if (isPlaying) 1f else 0.2f),
+                                    center = center,
+                                    radius = r,
+                                    style = Stroke(width = 3.dp.toPx())
+                                )
                             }
 
-                            // Calculate dynamic reactive bar height
-                            val timeSec = currentPositionMs / 1000f
-                            val wave1 = abs(sin((i * 0.45f) + (timeSec * (currentBpm / 20f))))
-                            val wave2 = abs(sin((i * 0.8f) - (timeSec * 3f)))
-                            val activity = if (isPlaying) (wave1 * 0.6f + wave2 * 0.4f) else 0.08f
-                            val barHeight = ((size.height * 0.85f) * activity * factor * volumeBooster).coerceIn(8f, size.height * 0.95f)
-
-                            val x = i * (barWidth + barSpacing)
-                            val y = (size.height - barHeight) / 2f
-
-                            val barBrush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0xFF38BDF8),
-                                    Color(0xFF818CF8),
-                                    Color(0xFFC084FC)
-                                ),
-                                startY = y,
-                                endY = y + barHeight
-                            )
-
-                            drawRoundRect(
-                                brush = barBrush,
-                                topLeft = Offset(x, y),
-                                size = Size(barWidth, barHeight),
-                                cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
-                            )
-                        }
-                    }
-                }
-
-                VisualizerMode.BEAT_RADAR -> {
-                    // Pulsing Radar Sphere with concentric ripple rings
-                    Canvas(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .testTag("visualizer_radar_canvas")
-                    ) {
-                        val center = Offset(size.width / 2f, size.height / 2f)
-                        val maxRadius = size.minDimension * 0.42f
-                        val currentScale = if (isPlaying) pulseAnim else 1.0f
-
-                        // Outer glowing rings
-                        for (ring in 1..4) {
-                            val r = (maxRadius * (ring / 4f) * currentScale).coerceAtLeast(10f)
+                            // Center glowing orb
                             drawCircle(
-                                color = Color(0xFF6366F1).copy(alpha = (0.5f / ring) * if (isPlaying) 1f else 0.2f),
-                                center = center,
-                                radius = r,
-                                style = Stroke(width = 3.dp.toPx())
-                            )
-                        }
-
-                        // Center glowing orb
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(Color(0xFF38BDF8), Color(0xFF818CF8), Color(0xFF1E1B4B)),
+                                brush = Brush.radialGradient(
+                                    colors = listOf(Color(0xFF38BDF8), Color(0xFF818CF8), Color(0xFF1E1B4B)),
+                                    center = center,
+                                    radius = (maxRadius * 0.35f) * currentScale
+                                ),
                                 center = center,
                                 radius = (maxRadius * 0.35f) * currentScale
-                            ),
-                            center = center,
-                            radius = (maxRadius * 0.35f) * currentScale
-                        )
-                    }
-                }
-
-                VisualizerMode.WAVEFORM -> {
-                    // Continuous Waveform Oscilloscope Ribbon
-                    Canvas(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .testTag("visualizer_waveform_canvas")
-                    ) {
-                        val centerY = size.height / 2f
-                        val path = Path()
-                        val points = 80
-                        val step = size.width / points
-                        val amp = if (isPlaying) (size.height * 0.28f * (volumeBooster.coerceAtMost(1.2f))) else 10f
-
-                        for (i in 0..points) {
-                            val x = i * step
-                            val freq = (i.toFloat() / points) * 4f * PI.toFloat()
-                            val y = centerY + (sin(freq + wavePhase) * amp * sin(i.toFloat() / points * PI.toFloat()))
-                            if (i == 0) path.moveTo(x, y.toFloat()) else path.lineTo(x, y.toFloat())
+                            )
                         }
-
-                        drawPath(
-                            path = path,
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(Color(0xFF38BDF8), Color(0xFFE879F9), Color(0xFF34D399))
-                            ),
-                            style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
-                        )
                     }
-                }
-            }
 
-            // Visualizer Mode Selector Chips in Top-Right
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                VisualizerMode.values().forEach { mode ->
-                    FilterChip(
-                        selected = visualizerMode == mode,
-                        onClick = { visualizerMode = mode },
-                        label = { Text(mode.icon, fontSize = 12.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    )
-                }
-            }
+                    VisualizerMode.WAVEFORM -> {
+                        // Continuous Waveform Oscilloscope Ribbon
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("visualizer_waveform_canvas")
+                        ) {
+                            val centerY = size.height / 2f
+                            val path = Path()
+                            val points = 80
+                            val step = size.width / points
+                            val amp = if (isPlaying) (size.height * 0.28f * (volumeBooster.coerceAtMost(1.2f))) else 10f
 
-            // Live Song Title Tag in Bottom-Left
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color.Black.copy(alpha = 0.6f),
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(if (isPlaying) Color(0xFF22C55E) else Color(0xFF94A3B8))
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Column {
-                        Text(
-                            text = currentSongTitle,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "$currentSongArtist • ${playbackSpeed}x speed",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF94A3B8)
-                        )
+                            for (i in 0..points) {
+                                val x = i * step
+                                val freq = (i.toFloat() / points) * 4f * PI.toFloat()
+                                val y = centerY + (sin(freq + wavePhase) * amp * sin(i.toFloat() / points * PI.toFloat()))
+                                if (i == 0) path.moveTo(x, y.toFloat()) else path.lineTo(x, y.toFloat())
+                            }
+
+                            drawPath(
+                                path = path,
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(Color(0xFF38BDF8), Color(0xFFE879F9), Color(0xFF34D399))
+                                ),
+                                style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
+                            )
+                        }
                     }
                 }
             }
@@ -701,19 +720,19 @@ fun MusicStudioScreen(
             Tab(
                 selected = selectedControlTab == 0,
                 onClick = { selectedControlTab = 0 },
-                text = { Text("Tracks") },
+                text = { Text("Tracks", maxLines = 1, softWrap = false, fontSize = 12.sp) },
                 icon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null) }
             )
             Tab(
                 selected = selectedControlTab == 1,
                 onClick = { selectedControlTab = 1 },
-                text = { Text("Tune & Speed") },
+                text = { Text("Tune & Speed", maxLines = 1, softWrap = false, fontSize = 12.sp) },
                 icon = { Icon(Icons.Default.Speed, contentDescription = null) }
             )
             Tab(
                 selected = selectedControlTab == 2,
                 onClick = { selectedControlTab = 2 },
-                text = { Text("Equalizer") },
+                text = { Text("Equalizer", maxLines = 1, softWrap = false, fontSize = 12.sp) },
                 icon = { Icon(Icons.Default.Equalizer, contentDescription = null) }
             )
         }

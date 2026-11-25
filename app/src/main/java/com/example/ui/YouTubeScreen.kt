@@ -328,17 +328,21 @@ fun YouTubeScreen(
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         "YouTube Search & Player",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         if (hasKey) "YouTube Data API v3 Active • Search & In-App Player"
                         else "Add YouTube API Key in Settings to search any video",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -362,11 +366,12 @@ fun YouTubeScreen(
                             Text("YouTube API Key Setup", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                             Text("Enter your free Google Cloud YouTube Data API v3 key in Settings to search all videos.", style = MaterialTheme.typography.bodySmall)
                         }
+                        Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = onOpenSettings,
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Add Key")
+                            Text("Add Key", maxLines = 1)
                         }
                     }
                 }
@@ -528,12 +533,14 @@ fun YouTubeScreen(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            Row(
+                            Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
                                     Button(
                                         onClick = {
                                             isPlayingInsideApp = !isPlayingInsideApp
@@ -543,7 +550,9 @@ fun YouTubeScreen(
                                             contentColor = if (isPlayingInsideApp) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onError
                                         ),
                                         shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.testTag("toggle_in_app_player_button")
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("toggle_in_app_player_button")
                                     ) {
                                         Icon(
                                             if (isPlayingInsideApp) Icons.Default.Stop else Icons.Default.PlayArrow,
@@ -553,7 +562,9 @@ fun YouTubeScreen(
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
                                             if (isPlayingInsideApp) "Stop Player" else "Play in App",
-                                            style = MaterialTheme.typography.labelSmall
+                                            style = MaterialTheme.typography.labelSmall,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
 
@@ -567,15 +578,26 @@ fun YouTubeScreen(
                                             contentColor = MaterialTheme.colorScheme.onPrimary
                                         ),
                                         shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.testTag("summarize_video_ai_button")
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("summarize_video_ai_button")
                                     ) {
                                         Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Summarize with AI", style = MaterialTheme.typography.labelSmall)
+                                        Text(
+                                            "Summarize with AI",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                     }
                                 }
 
-                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     IconButton(
                                         onClick = {
                                             try {

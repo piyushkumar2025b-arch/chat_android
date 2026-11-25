@@ -6,18 +6,24 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ColorLens
@@ -46,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import com.example.ui.theme.AvailableThemes
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ThemeSelectorDialog(
     currentTheme: String,
@@ -58,6 +65,7 @@ fun ThemeSelectorDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
         modifier = Modifier
+            .widthIn(max = 540.dp)
             .padding(16.dp)
             .fillMaxWidth()
             .testTag("theme_selector_dialog"),
@@ -82,8 +90,10 @@ fun ThemeSelectorDialog(
         },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 // Display Mode (Light / Dark / AMOLED / System)
                 Text(
@@ -92,9 +102,10 @@ fun ThemeSelectorDialog(
                     fontWeight = FontWeight.Bold
                 )
 
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     val modes = listOf(
                         Triple("system", "System", Icons.Default.SettingsBrightness),
@@ -108,11 +119,11 @@ fun ThemeSelectorDialog(
                         FilterChip(
                             selected = isSelected,
                             onClick = { onThemeModeSelected(id) },
-                            label = { Text(label, fontSize = 11.sp) },
+                            label = { Text(label, fontSize = 12.sp, maxLines = 1) },
                             leadingIcon = {
-                                Icon(icon, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
                             },
-                            modifier = Modifier.weight(1f).testTag("theme_mode_$id")
+                            modifier = Modifier.testTag("theme_mode_$id")
                         )
                     }
                 }
@@ -132,7 +143,7 @@ fun ThemeSelectorDialog(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(260.dp)
+                        .heightIn(max = 280.dp)
                 ) {
                     items(AvailableThemes.themes) { theme ->
                         val isSelected = currentTheme == theme.id
