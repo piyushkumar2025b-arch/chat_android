@@ -256,8 +256,8 @@ class BackupManager(private val db: AppDatabase) {
                     title = item.optString("title", "New Chat"),
                     createdAt = item.optLong("createdAt", System.currentTimeMillis()),
                     updatedAt = item.optLong("updatedAt", System.currentTimeMillis()),
-                    providerId = item.optString("providerId", "pollinations"),
-                    modelId = item.optString("modelId", "openai")
+                    providerId = item.optString("providerId", "gemini"),
+                    modelId = item.optString("modelId", "gemini-3.8-flash")
                 )
             )
         }

@@ -58,7 +58,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.PreferencesManager
-import com.example.data.model.ProviderType
 import com.example.data.remote.AiService
 import kotlinx.coroutines.launch
 
@@ -154,20 +153,18 @@ fun AiPersonaScreen(
         isTesting = true
         testReply = null
         coroutineScope.launch {
-            val res = AiService.sendMessage(
-                provider = ProviderType.POLLINATIONS,
-                modelId = "openai",
-                prompt = q,
-                apiKey = "",
-                systemPrompt = systemPrompt,
+            val res = AiService.quickAssist(
+                taskPrompt = q,
+                systemInstruction = systemPrompt,
+                modelId = AiService.FAST_GEMINI_MODEL,
                 temperature = 0.7f,
-                customBaseUrl = ""
+                customGeminiApiKey = preferencesManager.geminiApiKey
             )
             isTesting = false
             res.onSuccess { text ->
                 testReply = text
             }.onFailure { err ->
-                testReply = "Error testing persona: ${err.localizedMessage}"
+                testReply = "Could not test this style right now: ${err.localizedMessage ?: "Unknown error"}"
             }
         }
     }
@@ -360,6 +357,17 @@ fun AiPersonaScreen(
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(currentReply, style = MaterialTheme.typography.bodyMedium, lineHeight = 20.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = {
+                                savePersona(customInstructions, activePersonaId)
+                                onApplyPersonaToChat("Hi! Can you introduce yourself briefly in this style?")
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Use Style & Start Chat")
+                        }
                     }
                 }
             }

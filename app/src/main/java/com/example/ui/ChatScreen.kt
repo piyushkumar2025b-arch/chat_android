@@ -10,6 +10,7 @@ import android.text.format.DateUtils
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -63,8 +64,10 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Refresh
@@ -190,6 +193,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
     val messages by viewModel.messages.collectAsState()
     val activeProvider by viewModel.activeProvider.collectAsState()
     val activeModel by viewModel.activeModel.collectAsState()
+    val quickAiMode by viewModel.quickAiMode.collectAsState()
     val sessions by viewModel.sessions.collectAsState()
     val activeSessionId by viewModel.activeSessionId.collectAsState()
     val pendingAttachments by viewModel.pendingAttachments.collectAsState()
@@ -310,7 +314,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
     val browseLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { attachPicked(it) }
     val documentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { attachPicked(it) }
     val codeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { attachPicked(it) }
-    val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { attachPicked(it) }
+    val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { attachPicked(it) }
 
     fun toggleSpeech(message: ChatMessage) {
         if (speakingMessageId == message.id) {
@@ -783,9 +787,24 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         ProviderQuickBar(
                             activeProvider = activeProvider,
                             activeModelName = activeModel.name,
+                            quickAiMode = quickAiMode,
                             isRagEnabled = isRagEnabled,
                             usageStats = usageStats,
                             onOpenProviders = { showProviderSheet = true },
+                            onCycleQuickMode = {
+                                val nextMode = when (quickAiMode) {
+                                    "balanced" -> "fast"
+                                    "fast" -> "deep"
+                                    else -> "balanced"
+                                }
+                                viewModel.setQuickAiMode(nextMode)
+                                val label = when (nextMode) {
+                                    "fast" -> "Fast replies"
+                                    "deep" -> "Deep think"
+                                    else -> "Balanced"
+                                }
+                                toast("Switched to $label")
+                            },
                             onOpenTools = { viewModel.navigateToSection(AppSection.INTEL_HUB) },
                             onToggleRag = { viewModel.toggleRag() },
                             onOpenUsage = { showUsageSheet = true }
@@ -806,7 +825,12 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             messages.isEmpty() -> {
                                 EmptyChatState(
                                     modifier = Modifier.weight(1f),
-                                    onSuggestion = { inputPrompt = it }
+                                    onSuggestion = { inputPrompt = it },
+                                    onPickPhoto = {
+                                        photoLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    }
                                 )
                             }
 
@@ -841,6 +865,22 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                                     code = code,
                                                     filename = codeFileName(title, language),
                                                     language = language
+                                                )
+                                            },
+                                            onSaveToNotes = {
+                                                val titleLine = message.content.lineSequence()
+                                                    .firstOrNull { it.isNotBlank() }
+                                                    ?.replace(Regex("^[#*\\s]+"), "")
+                                                    ?.take(48)
+                                                    ?: "Chat Note"
+                                                viewModel.saveNoteFromChat(titleLine, message.content) { _, msg ->
+                                                    toast(msg)
+                                                }
+                                            },
+                                            onOpenInWritingPad = {
+                                                viewModel.openMarkdownInStudio(
+                                                    content = message.content,
+                                                    filename = "Chat_Reply.md"
                                                 )
                                             },
                                             onEditMessage = {
@@ -1036,7 +1076,11 @@ fun ChatScreen(viewModel: ChatViewModel) {
             onDismiss = { showStorageSheet = false },
             onBrowsePhoneStorage = { browseLauncher.launch(arrayOf("*/*")) },
             onPickDocuments = { documentLauncher.launch(DOCUMENT_MIME_TYPES) },
-            onPickPhotos = { photoLauncher.launch("image/*") },
+            onPickPhotos = {
+                photoLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            },
             onPickCode = { codeLauncher.launch(CODE_MIME_TYPES) },
             onAddSampleFile = { sampleType ->
                 viewModel.addSampleAttachment(sampleType) { _, message -> toast(message) }
@@ -1237,13 +1281,20 @@ fun ChatScreen(viewModel: ChatViewModel) {
 private fun ProviderQuickBar(
     activeProvider: ProviderType,
     activeModelName: String,
+    quickAiMode: String,
     isRagEnabled: Boolean,
     usageStats: UsageStats,
     onOpenProviders: () -> Unit,
+    onCycleQuickMode: () -> Unit,
     onOpenTools: () -> Unit,
     onToggleRag: () -> Unit,
     onOpenUsage: () -> Unit
 ) {
+    val modeLabel = when (quickAiMode) {
+        "fast" -> "Fast"
+        "deep" -> "Deep"
+        else -> "Balanced"
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1273,6 +1324,15 @@ private fun ProviderQuickBar(
                     Icon(Icons.Default.ArrowDropDown, contentDescription = "Change model", modifier = Modifier.size(18.dp))
                 },
                 modifier = Modifier.testTag("provider_selector_chip")
+            )
+
+            AssistChip(
+                onClick = onCycleQuickMode,
+                label = { Text("Mode: $modeLabel") },
+                leadingIcon = {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                },
+                modifier = Modifier.testTag("quick_ai_mode_chip")
             )
 
             AssistChip(
@@ -1322,7 +1382,8 @@ private fun ProviderQuickBar(
 @Composable
 private fun EmptyChatState(
     modifier: Modifier = Modifier,
-    onSuggestion: (String) -> Unit
+    onSuggestion: (String) -> Unit,
+    onPickPhoto: () -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -1357,13 +1418,24 @@ private fun EmptyChatState(
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Ask anything, attach a file, or tap an idea below.",
+            text = "Built-in Gemini is ready. Ask anything, add a photo, or tap an idea below.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(14.dp))
+
+        AssistChip(
+            onClick = onPickPhoto,
+            label = { Text("Ask about a photo") },
+            leadingIcon = {
+                Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+            },
+            modifier = Modifier.testTag("empty_ask_photo_chip")
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
 
         CHAT_SUGGESTIONS.forEach { (prompt, icon) ->
             Surface(
@@ -1413,6 +1485,8 @@ private fun ChatMessageBubble(
     onStop: () -> Unit,
     onAttachmentClick: (ChatAttachment) -> Unit,
     onOpenCode: (title: String, language: String, code: String) -> Unit,
+    onSaveToNotes: () -> Unit = {},
+    onOpenInWritingPad: () -> Unit = {},
     onEditMessage: () -> Unit = {},
     onDeleteMessage: () -> Unit = {},
     onAskFollowUp: (String) -> Unit = {}
@@ -1587,6 +1661,10 @@ private fun ChatMessageBubble(
                             if (isSpeaking) "Stop reading" else "Read reply aloud",
                             active = isSpeaking
                         )
+                        if (message.content.isNotBlank() && !isError) {
+                            MessageAction(onSaveToNotes, Icons.Default.NoteAdd, "Save to Notes")
+                            MessageAction(onOpenInWritingPad, Icons.Default.Description, "Open in Writing Pad")
+                        }
                         if (isLastAssistant && !isGenerating) {
                             MessageAction(onRegenerate, Icons.Default.Refresh, "Regenerate reply")
                         }

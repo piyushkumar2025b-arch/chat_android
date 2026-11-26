@@ -86,7 +86,10 @@ fun StudioScreen(
 
         Box(modifier = Modifier.weight(1f)) {
             when (selectedStudioTab) {
-                0 -> ImageStudioScreen(onSendPromptToChat = onSendPromptToChat)
+                0 -> ImageStudioScreen(
+                    onSendPromptToChat = onSendPromptToChat,
+                    onSendImageToChat = onSendImageToChat
+                )
                 1 -> ImageEditorScreen(
                     onBack = { selectedStudioTab = 0 },
                     onSendImageToChat = onSendImageToChat,

@@ -1,14 +1,22 @@
 package com.example.ui
 
 import android.content.Intent
+import android.graphics.Bitmap
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -23,12 +31,11 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Movie
@@ -36,19 +43,22 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -56,38 +66,34 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import com.example.data.remote.MediaSaver
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
-import androidx.compose.ui.graphics.graphicsLayer
-import coil.compose.AsyncImage
-import java.net.URLEncoder
-import kotlin.random.Random
+import com.example.data.remote.AiService
+import com.example.data.remote.MediaSaver
+import kotlinx.coroutines.launch
 
-data class VideoGenerationItem(
+data class VideoStoryboardItem(
     val id: String,
     val prompt: String,
     val motionType: String,
     val style: String,
-    val videoPreviewUrl: String,
+    val duration: String,
+    val scriptText: String = "",
+    val keyframeBitmap: Bitmap? = null,
+    val keyframeError: String? = null,
+    val localVideoUri: Uri? = null,
     val timestamp: Long = System.currentTimeMillis()
 )
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun VideoStudioScreen(
     onSendPromptToChat: (String) -> Unit = {},
@@ -101,9 +107,10 @@ fun VideoStudioScreen(
     var selectedStyle by remember { mutableStateOf("Sci-Fi Cinema") }
     var selectedDuration by remember { mutableStateOf("5s") }
     var isGenerating by remember { mutableStateOf(false) }
-    var currentVideoItem by remember { mutableStateOf<VideoGenerationItem?>(null) }
-    var autoSaveVideo by remember { mutableStateOf(true) }
-    var isSavingVideo by remember { mutableStateOf(false) }
+    var generationError by remember { mutableStateOf<String?>(null) }
+    var currentItem by remember { mutableStateOf<VideoStoryboardItem?>(null) }
+    var autoSaveKeyframe by remember { mutableStateOf(true) }
+    var isSavingMedia by remember { mutableStateOf(false) }
     var showPreviewDialog by remember { mutableStateOf(false) }
 
     val motionTypes = listOf(
@@ -117,81 +124,105 @@ fun VideoStudioScreen(
 
     val styles = listOf(
         "Sci-Fi Cinema",
-        "Hyperrealistic 4K",
+        "Photorealistic 4K",
         "Anime Motion",
         "Cyberpunk Noir",
-        "Nature Documentary"
+        "Nature Film"
     )
 
     val durations = listOf("3s", "5s", "10s")
-
-    val videoHistory = remember { mutableStateListOf<VideoGenerationItem>() }
+    val storyboardHistory = remember { mutableStateListOf<VideoStoryboardItem>() }
 
     val videoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
-            val name = uri.lastPathSegment?.substringAfterLast('/') ?: "Custom Video"
-            val item = VideoGenerationItem(
+            val name = uri.lastPathSegment?.substringAfterLast('/') ?: "Phone Video"
+            val item = VideoStoryboardItem(
                 id = System.currentTimeMillis().toString(),
                 prompt = "Imported Video: $name",
                 motionType = selectedMotion,
-                style = "Imported Video File",
-                videoPreviewUrl = uri.toString()
+                style = "Local Video",
+                duration = selectedDuration,
+                scriptText = "Local video clip loaded from your device. Tap Play to open it in your video player, or describe a scene above to plan a new storyboard.",
+                localVideoUri = uri
             )
-            currentVideoItem = item
-            videoHistory.add(0, item)
+            currentItem = item
+            storyboardHistory.add(0, item)
             promptText = "Video Clip: $name"
+            generationError = null
             Toast.makeText(context, "Loaded video: $name", Toast.LENGTH_SHORT).show()
         }
     }
 
-    fun generateVideo() {
+    fun generateSceneAndStoryboard() {
         val rawPrompt = promptText.trim()
         if (rawPrompt.isEmpty()) {
-            Toast.makeText(context, "Please enter a video scene description", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Please describe the video scene first", Toast.LENGTH_SHORT).show()
             return
         }
 
-        isGenerating = true
-        val motionTag = when (selectedMotion) {
-            "Cinematic Drone" -> ", sweeping cinematic drone aerial camera movement, parallax motion blur"
-            "Slow Zoom-In" -> ", dramatic slow push in zoom, depth of field shifting, 60fps fluid motion"
-            "Orbit 360°" -> ", smooth 360 camera rotation orbit around subject, volumetric lighting"
-            "Hyperlapse" -> ", hyperlapse clouds and lights passing fast, smooth motion vector"
-            "Dynamic Dolly" -> ", steadycam dynamic dolly tracking shot, anamorphic lens flare"
-            else -> ", macro camera slow pan, high frame rate capture"
-        }
+        val motionChoice = selectedMotion
+        val styleChoice = selectedStyle
+        val durationChoice = selectedDuration
 
-        val styleTag = when (selectedStyle) {
-            "Sci-Fi Cinema" -> ", 8k cinematic film shot on Arri Alexa, blade runner atmosphere, anamorphic 2.39:1"
-            "Hyperrealistic 4K" -> ", photorealistic 4K UHD video capture, natural raytracing, ultra realistic"
-            "Anime Motion" -> ", high budget anime movie scene, fluid keyframe animation, ufotable style"
-            "Cyberpunk Noir" -> ", rainy neon cyberpunk street, reflections in puddles, cinematic film grain"
-            else -> ", BBC Earth documentary quality, golden hour sunlight, sharp wildlife detail"
-        }
+        coroutineScope.launch {
+            isGenerating = true
+            generationError = null
 
-        val fullPrompt = "$rawPrompt$motionTag$styleTag"
-        val seed = Random.nextInt(1000, 999999)
-        val encoded = URLEncoder.encode(fullPrompt, "UTF-8")
-        // Pollinations animated media stream endpoint
-        val previewUrl = "https://image.pollinations.ai/prompt/$encoded?width=1280&height=720&seed=$seed&nologo=true&model=flux"
+            val scriptPrompt = """
+                Create a short, easy-to-follow $durationChoice video scene plan for:
+                "$rawPrompt"
+                Camera motion: $motionChoice
+                Visual style: $styleChoice
 
-        val item = VideoGenerationItem(
-            id = System.currentTimeMillis().toString(),
-            prompt = rawPrompt,
-            motionType = selectedMotion,
-            style = selectedStyle,
-            videoPreviewUrl = previewUrl
-        )
+                Include:
+                1. Shot list with seconds (e.g., 0–2s, 2–5s)
+                2. Camera movement & lighting notes
+                3. One short voiceover or sound cue line
+            """.trimIndent()
 
-        currentVideoItem = item
-        videoHistory.add(0, item)
-        isGenerating = false
+            val scriptResult = AiService.quickAssist(
+                taskPrompt = scriptPrompt,
+                systemInstruction = "You are a helpful video director writing clear, simple shot plans.",
+                temperature = 0.6f
+            )
 
-        if (autoSaveVideo) {
-            coroutineScope.launch {
-                MediaSaver.saveVideoFromUrl(context, previewUrl, rawPrompt)
+            val imagePrompt = "$rawPrompt. Cinematic film keyframe still, camera angle: $motionChoice"
+            val keyframeResult = AiService.generateOrEditImage(
+                prompt = imagePrompt,
+                styleHint = styleChoice,
+                aspectRatio = "16:9"
+            )
+
+            val scriptText = scriptResult.getOrNull()
+            val keyframeBmp = keyframeResult.getOrNull()
+
+            if (scriptText == null && keyframeBmp == null) {
+                generationError = keyframeResult.exceptionOrNull()?.localizedMessage
+                    ?: scriptResult.exceptionOrNull()?.localizedMessage
+                    ?: "Could not build the scene plan right now. Please try again."
+                isGenerating = false
+                return@launch
+            }
+
+            val created = VideoStoryboardItem(
+                id = System.currentTimeMillis().toString(),
+                prompt = rawPrompt,
+                motionType = motionChoice,
+                style = styleChoice,
+                duration = durationChoice,
+                scriptText = scriptText ?: "Scene script unavailable (${scriptResult.exceptionOrNull()?.localizedMessage ?: "error"}).",
+                keyframeBitmap = keyframeBmp,
+                keyframeError = keyframeResult.exceptionOrNull()?.localizedMessage
+            )
+
+            currentItem = created
+            storyboardHistory.add(0, created)
+            isGenerating = false
+
+            if (autoSaveKeyframe && keyframeBmp != null) {
+                MediaSaver.saveBitmapToGallery(context, keyframeBmp, "Scene_$rawPrompt")
             }
         }
     }
@@ -226,12 +257,12 @@ fun VideoStudioScreen(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        "Video Maker",
+                        "Video Storyboard Maker",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        "Create short AI videos from text",
+                        "Write scene scripts, create keyframes, or open device clips",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -254,7 +285,7 @@ fun VideoStudioScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("video_prompt_input"),
-                        placeholder = { Text("Describe the action, camera, and motion...") },
+                        placeholder = { Text("Describe the scene, action, and mood...") },
                         maxLines = 4,
                         trailingIcon = {
                             if (promptText.isNotEmpty()) {
@@ -271,68 +302,74 @@ fun VideoStudioScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surface)
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Auto-Save to Phone Movies", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                            Text("Saves generated videos to /Movies/OmniChat", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Auto-Save Keyframe Image", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            Text("Saves preview frame to /Pictures/OmniChat", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Switch(
-                            checked = autoSaveVideo,
-                            onCheckedChange = { autoSaveVideo = it },
+                            checked = autoSaveKeyframe,
+                            onCheckedChange = { autoSaveKeyframe = it },
                             modifier = Modifier.testTag("auto_save_video_switch")
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    Row(
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            FilledTonalButton(
-                                onClick = { videoPickerLauncher.launch("video/*") },
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.testTag("import_video_button")
-                            ) {
-                                Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Import Video", style = MaterialTheme.typography.labelMedium)
-                            }
+                        FilledTonalButton(
+                            onClick = {
+                                videoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+                                )
+                            },
+                            enabled = !isGenerating,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.testTag("import_video_button")
+                        ) {
+                            Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Open Clip")
+                        }
 
-                            Button(
-                                onClick = {
-                                    promptText = "A neon-lit sports car drifting around a sharp rainy corner in neo-Tokyo with purple tire smoke and lens reflections"
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                ),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Sample", style = MaterialTheme.typography.labelMedium)
-                            }
+                        OutlinedButton(
+                            onClick = {
+                                promptText = "A silver sports car drifting around a rainy neon corner at night with glowing reflections"
+                            },
+                            enabled = !isGenerating,
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Sample Idea")
                         }
 
                         Button(
-                            onClick = { generateVideo() },
+                            onClick = { generateSceneAndStoryboard() },
                             enabled = !isGenerating,
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.testTag("generate_video_button")
                         ) {
                             if (isGenerating) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Building Scene…")
                             } else {
                                 Icon(Icons.Default.Movie, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Generate Video")
+                                Text("Build Storyboard")
                             }
                         }
                     }
@@ -360,7 +397,7 @@ fun VideoStudioScreen(
 
         // Style Chips
         item {
-            Text("Cinematic Style", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Text("Look & Mood", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(6.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(styles) { style ->
@@ -375,7 +412,7 @@ fun VideoStudioScreen(
 
         // Duration Chips
         item {
-            Text("Duration", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Text("Scene Length", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 durations.forEach { d ->
@@ -388,106 +425,251 @@ fun VideoStudioScreen(
             }
         }
 
-        // Active Video Card
-        if (currentVideoItem != null) {
-            val item = currentVideoItem!!
+        if (isGenerating) {
             item {
-                Text("Video Motion Render", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        CircularProgressIndicator()
+                        Text(
+                            "Writing shot script & creating keyframe preview…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+
+        val errMsg = generationError
+        if (errMsg != null) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "Could not build storyboard",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Text(
+                            errMsg,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Button(
+                            onClick = { generateSceneAndStoryboard() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
+                            )
+                        ) {
+                            Text("Try Again")
+                        }
+                    }
+                }
+            }
+        }
+
+        // Active Storyboard / Clip Card
+        val activeItem = currentItem
+        if (activeItem != null) {
+            item {
+                Text(
+                    if (activeItem.localVideoUri != null) "Imported Video Clip" else "Scene Script & Keyframe",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
                 Spacer(modifier = Modifier.height(8.dp))
                 Card(
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(16f / 9f)
-                                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                                .clickable { showPreviewDialog = true }
-                                .testTag("video_preview_box"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AsyncImage(
-                                model = item.videoPreviewUrl,
-                                contentDescription = item.prompt,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-
-                            // Interactive play overlay badge
+                        if (activeItem.keyframeBitmap != null || activeItem.localVideoUri != null) {
                             Box(
                                 modifier = Modifier
-                                    .size(54.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)),
+                                    .fillMaxWidth()
+                                    .aspectRatio(16f / 9f)
+                                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                    .clickable {
+                                        if (activeItem.localVideoUri != null) {
+                                            runCatching {
+                                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                    setDataAndType(activeItem.localVideoUri, "video/*")
+                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                }
+                                                context.startActivity(intent)
+                                            }.onFailure {
+                                                Toast.makeText(context, "No video player app found", Toast.LENGTH_SHORT).show()
+                                            }
+                                        } else {
+                                            showPreviewDialog = true
+                                        }
+                                    }
+                                    .testTag("video_preview_box"),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    Icons.Default.PlayArrow,
-                                    contentDescription = "Play Video Motion Preview",
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(34.dp)
-                                )
+                                val bmp = activeItem.keyframeBitmap
+                                if (bmp != null) {
+                                    Image(
+                                        bitmap = bmp.asImageBitmap(),
+                                        contentDescription = activeItem.prompt,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            Icons.Default.PlayArrow,
+                                            contentDescription = "Play Video",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(48.dp)
+                                        )
+                                        Text(
+                                            "Tap to play video clip",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
                         }
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        activeItem.prompt,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        "${activeItem.motionType} • ${activeItem.style} • ${activeItem.duration}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    IconButton(
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                isSavingMedia = true
+                                                val bmp = activeItem.keyframeBitmap
+                                                if (bmp != null) {
+                                                    MediaSaver.saveBitmapToGallery(context, bmp, "Scene_${activeItem.prompt}")
+                                                }
+                                                if (activeItem.scriptText.isNotBlank()) {
+                                                    val safeName = "SceneScript_${System.currentTimeMillis()}.txt"
+                                                    MediaSaver.saveDocumentToDownloads(
+                                                        context = context,
+                                                        fileName = safeName,
+                                                        content = "Scene: ${activeItem.prompt}\nCamera: ${activeItem.motionType}\nStyle: ${activeItem.style}\nLength: ${activeItem.duration}\n\n${activeItem.scriptText}"
+                                                    )
+                                                }
+                                                isSavingMedia = false
+                                            }
+                                        },
+                                        enabled = !isSavingMedia,
+                                        modifier = Modifier.testTag("save_video_to_phone_button")
+                                    ) {
+                                        if (isSavingMedia) {
+                                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                        } else {
+                                            Icon(Icons.Default.Download, contentDescription = "Save Keyframe & Script", tint = MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
+
+                                    if (activeItem.localVideoUri == null) {
+                                        IconButton(onClick = { generateSceneAndStoryboard() }) {
+                                            Icon(Icons.Default.Refresh, contentDescription = "Rebuild Storyboard")
+                                        }
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            val shareText = buildString {
+                                                appendLine("Scene: ${activeItem.prompt}")
+                                                appendLine("Camera: ${activeItem.motionType} | Style: ${activeItem.style} | Length: ${activeItem.duration}")
+                                                if (activeItem.scriptText.isNotBlank()) {
+                                                    appendLine()
+                                                    appendLine(activeItem.scriptText)
+                                                }
+                                            }
+                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                type = "text/plain"
+                                                putExtra(Intent.EXTRA_TEXT, shareText)
+                                            }
+                                            runCatching {
+                                                context.startActivity(Intent.createChooser(shareIntent, "Share Scene Plan"))
+                                            }
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.Share, contentDescription = "Share Scene Plan")
+                                    }
+                                }
+                            }
+
+                            if (!activeItem.keyframeError.isNullOrBlank()) {
                                 Text(
-                                    item.prompt,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    "${item.motionType} • ${item.style} • $selectedDuration",
+                                    "Keyframe preview note: ${activeItem.keyframeError}",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = MaterialTheme.colorScheme.error
                                 )
                             }
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                IconButton(
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            isSavingVideo = true
-                                            MediaSaver.saveVideoFromUrl(context, item.videoPreviewUrl, item.prompt)
-                                            isSavingVideo = false
-                                        }
-                                    },
-                                    enabled = !isSavingVideo,
-                                    modifier = Modifier.testTag("save_video_to_phone_button")
-                                ) {
-                                    if (isSavingVideo) {
-                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                    } else {
-                                        Icon(Icons.Default.Download, contentDescription = "Save to Movies", tint = MaterialTheme.colorScheme.primary)
-                                    }
+                            if (activeItem.scriptText.isNotBlank()) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Shot Plan", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                                 }
-                                IconButton(onClick = { generateVideo() }) {
-                                    Icon(Icons.Default.Refresh, contentDescription = "Re-render")
-                                }
-                                IconButton(
-                                    onClick = {
-                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                            type = "text/plain"
-                                            putExtra(Intent.EXTRA_TEXT, "Generated Video Motion Scene:\n${item.videoPreviewUrl}\n\nPrompt: ${item.prompt}")
-                                        }
-                                        try {
-                                            context.startActivity(Intent.createChooser(shareIntent, "Share Video"))
-                                        } catch (_: Exception) {}
-                                    }
-                                ) {
-                                    Icon(Icons.Default.Share, contentDescription = "Share")
-                                }
+                                Text(
+                                    text = activeItem.scriptText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            FilledTonalButton(
+                                onClick = {
+                                    onSendPromptToChat(
+                                        "Refine this ${activeItem.duration} video scene (${activeItem.motionType}, ${activeItem.style}):\n${activeItem.prompt}\n\nCurrent shot plan:\n${activeItem.scriptText}"
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Continue Planning in Chat")
                             }
                         }
                     }
@@ -498,45 +680,22 @@ fun VideoStudioScreen(
         item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 
-    if (showPreviewDialog && currentVideoItem != null) {
-        val active = currentVideoItem!!
-        val isLocalUri = active.videoPreviewUrl.startsWith("content://") || active.videoPreviewUrl.startsWith("file://")
-        val infiniteTransition = rememberInfiniteTransition(label = "video_motion_preview")
-        val animProgress by infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 4500, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "motion_progress"
-        )
-        val scale = 1.0f + (animProgress * 0.16f)
-        val shiftX = (animProgress - 0.5f) * 32f
-
+    if (showPreviewDialog && activeItemOrNull(currentItem) != null) {
+        val active = currentItem!!
+        val bmp = active.keyframeBitmap
         AlertDialog(
             onDismissRequest = { showPreviewDialog = false },
-            title = { Text("Motion Preview (${active.motionType})") },
+            title = { Text("Keyframe Preview (${active.motionType})") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(16f / 9f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        AsyncImage(
-                            model = active.videoPreviewUrl,
+                    if (bmp != null) {
+                        Image(
+                            bitmap = bmp.asImageBitmap(),
                             contentDescription = active.prompt,
                             modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    scaleX = scale
-                                    scaleY = scale
-                                    translationX = shiftX
-                                },
+                                .fillMaxWidth()
+                                .aspectRatio(16f / 9f)
+                                .clip(RoundedCornerShape(12.dp)),
                             contentScale = ContentScale.Crop
                         )
                     }
@@ -548,32 +707,13 @@ fun VideoStudioScreen(
                 }
             },
             confirmButton = {
-                if (isLocalUri) {
-                    Button(
-                        onClick = {
-                            runCatching {
-                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                    setDataAndType(Uri.parse(active.videoPreviewUrl), "video/*")
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                                context.startActivity(intent)
-                            }.onFailure {
-                                Toast.makeText(context, "No video player app found", Toast.LENGTH_SHORT).show()
-                            }
-                            showPreviewDialog = false
-                        }
-                    ) {
-                        Text("Open Player")
+                Button(
+                    onClick = {
+                        onSendPromptToChat("Video Scene (${active.motionType}, ${active.style}): ${active.prompt}\n\n${active.scriptText}")
+                        showPreviewDialog = false
                     }
-                } else {
-                    Button(
-                        onClick = {
-                            onSendPromptToChat("Video Scene Prompt (${active.motionType}, ${active.style}): ${active.prompt}")
-                            showPreviewDialog = false
-                        }
-                    ) {
-                        Text("Send to Chat")
-                    }
+                ) {
+                    Text("Send to Chat")
                 }
             },
             dismissButton = {
@@ -584,3 +724,6 @@ fun VideoStudioScreen(
         )
     }
 }
+
+private fun activeItemOrNull(item: VideoStoryboardItem?): VideoStoryboardItem? =
+    item?.takeIf { it.keyframeBitmap != null }

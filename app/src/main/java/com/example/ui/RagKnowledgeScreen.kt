@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ExpandLess
@@ -48,6 +49,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Visibility
+import com.example.data.remote.AiService
 import com.example.data.remote.InternalKnowledgeSources
 import com.example.data.remote.InternalKnowledgeSourceItem
 import androidx.compose.material3.AlertDialog
@@ -93,10 +95,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.KnowledgeChunkEntity
 import com.example.data.model.KnowledgeDocumentEntity
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -122,6 +123,8 @@ fun RagKnowledgeScreen(
     var isLoadingDocChunks by remember { mutableStateOf(false) }
     var showInternalSourcesLibrary by remember { mutableStateOf(false) }
     var viewingInternalSourceDetail by remember { mutableStateOf<InternalKnowledgeSourceItem?>(null) }
+    var ragAiAnswer by remember { mutableStateOf<String?>(null) }
+    var isAskingDocsAi by remember { mutableStateOf(false) }
 
     // File picker for document ingestion (PDF, DOCX, TXT, MD, code, JSON)
     val documentPickerLauncher = rememberLauncherForActivityResult(
@@ -343,23 +346,106 @@ fun RagKnowledgeScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Button(
+                            OutlinedButton(
                                 onClick = {
                                     if (testQuery.isNotBlank()) {
                                         viewModel.testRagQuery(testQuery)
                                     }
                                 },
-                                enabled = testQuery.isNotBlank() && !isRagProcessing,
+                                enabled = testQuery.isNotBlank() && !isRagProcessing && !isAskingDocsAi,
                                 modifier = Modifier.weight(1f).testTag("rag_execute_search_button")
                             ) {
                                 if (isRagProcessing) {
-                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text("Searching...")
                                 } else {
                                     Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Search My Docs")
+                                    Text("Search Docs", maxLines = 1)
+                                }
+                            }
+
+                            Button(
+                                onClick = {
+                                    val q = testQuery.trim()
+                                    if (q.isBlank()) return@Button
+                                    coroutineScope.launch {
+                                        isAskingDocsAi = true
+                                        ragAiAnswer = null
+                                        viewModel.testRagQuery(q)
+                                        val retrieved = withContext(Dispatchers.IO) {
+                                            viewModel.ragEngine.retrieveRelevantChunks(
+                                                q,
+                                                topK = 5,
+                                                geminiApiKey = viewModel.preferencesManager.geminiApiKey
+                                            )
+                                        }
+                                        if (retrieved.isEmpty()) {
+                                            isAskingDocsAi = false
+                                            ragAiAnswer = "No matching sections were found in My Docs. Try adding a document or starter guide below first."
+                                            return@launch
+                                        }
+                                        val contextPassages = retrieved.joinToString("\n\n") { item ->
+                                            "[Source: ${item.chunk.docTitle}]:\n${item.chunk.content}"
+                                        }
+                                        val res = AiService.quickAssist(
+                                            taskPrompt = "Answer this question using ONLY the user's saved document excerpts below, and cite the document titles:\n\nQuestion: $q\n\nExcerpts:\n$contextPassages",
+                                            systemInstruction = "Answer clearly in plain language based only on the provided document excerpts.",
+                                            customGeminiApiKey = viewModel.preferencesManager.geminiApiKey
+                                        )
+                                        isAskingDocsAi = false
+                                        res.onSuccess { ragAiAnswer = it }
+                                            .onFailure { err ->
+                                                Toast.makeText(
+                                                    context,
+                                                    err.localizedMessage ?: "Ask My Docs failed",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                    }
+                                },
+                                enabled = testQuery.isNotBlank() && !isAskingDocsAi && !isRagProcessing,
+                                modifier = Modifier.weight(1f).testTag("rag_ask_ai_button")
+                            ) {
+                                if (isAskingDocsAi) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Answering…", maxLines = 1)
+                                } else {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Ask My Docs", maxLines = 1)
+                                }
+                            }
+                        }
+
+                        val currentDocAnswer = ragAiAnswer
+                        if (currentDocAnswer != null) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                                modifier = Modifier.fillMaxWidth().testTag("rag_ai_answer_card")
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            "AI Answer from Your Docs",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        IconButton(onClick = { ragAiAnswer = null }, modifier = Modifier.size(24.dp)) {
+                                            Icon(Icons.Default.Close, contentDescription = "Close AI answer", modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                    Text(currentDocAnswer, style = MaterialTheme.typography.bodySmall)
                                 }
                             }
                         }
@@ -368,7 +454,7 @@ fun RagKnowledgeScreen(
                         AnimatedVisibility(visible = testSearchResults.isNotEmpty()) {
                             Column(modifier = Modifier.padding(top = 14.dp)) {
                                 Text(
-                                    "Top Retrieved Passages (${testSearchResults.size} matches):",
+                                    "Matching Sections (${testSearchResults.size} found):",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary

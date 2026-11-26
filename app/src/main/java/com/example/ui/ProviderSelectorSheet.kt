@@ -139,7 +139,62 @@ fun ProviderSelectorSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 1-Tap Simple Mode Presets for effortless Built-in Gemini switching
+            Text(
+                text = "Quick Modes (No Key Needed)",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val quickPresets = listOf(
+                    Triple("Balanced", "gemini-3.8-flash", "Smart everyday"),
+                    Triple("Fast", "gemini-3.5-flash-lite", "Quick replies"),
+                    Triple("Deep", "gemini-4-argon", "Hard thinking")
+                )
+                quickPresets.forEach { (title, modelId, hint) ->
+                    val presetModel = AvailableModels.findModel(modelId, ProviderType.GEMINI.id)
+                    val isPicked = selectedProvider == ProviderType.GEMINI && selectedModel.id == presetModel.id
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isPicked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(
+                            width = if (isPicked) 1.5.dp else 1.dp,
+                            color = if (isPicked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                onModelSelected(ProviderType.GEMINI, presetModel)
+                                onDismiss()
+                            }
+                            .testTag("quick_preset_${title.lowercase()}")
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isPicked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = hint,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isPicked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Provider filter tabs
             LazyRow(
@@ -203,8 +258,20 @@ fun ProviderSelectorSheet(
                             )
                         }
 
-                        // If provider requires key, show quick paste / edit affordances
-                        if (activeFilterProvider.requiresApiKey) {
+                        if (activeFilterProvider == ProviderType.GEMINI) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer
+                            ) {
+                                Text(
+                                    text = "Ready",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        } else if (activeFilterProvider.requiresApiKey) {
                             val currentKey = getKeyForProvider(activeFilterProvider)
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 if (currentKey.isNotBlank()) {

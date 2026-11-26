@@ -3,6 +3,7 @@ package com.example.ui
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,6 +26,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -31,6 +34,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,6 +59,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.data.remote.AiService
 import com.example.data.remote.SearchCategory
 import com.example.data.remote.WebSearchResult
 import com.example.data.remote.WebSearchService
@@ -75,11 +80,14 @@ fun WebSearchScreen(
     var searchError by remember { mutableStateOf<String?>(null) }
     var hasSearched by remember { mutableStateOf(false) }
     val searchResults = remember { mutableStateListOf<WebSearchResult>() }
+    var aiAnswer by remember { mutableStateOf<String?>(null) }
+    var isAiAnswering by remember { mutableStateOf(false) }
 
     fun executeSearch(categoryOverride: SearchCategory = selectedCategory) {
         if (searchQuery.isBlank()) return
         isSearching = true
         searchError = null
+        aiAnswer = null
         coroutineScope.launch {
             WebSearchService.search(searchQuery, categoryOverride)
                 .onSuccess { results ->
@@ -98,7 +106,7 @@ fun WebSearchScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Live Web Intelligence", fontWeight = FontWeight.Bold) },
+                title = { Text("Web Search", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack, modifier = Modifier.testTag("web_search_back")) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -200,6 +208,69 @@ fun WebSearchScreen(
                     }
                 }
                 else -> {
+                    FilledTonalButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                isAiAnswering = true
+                                val contextText = searchResults.take(6).joinToString("\n\n") {
+                                    "Title: ${it.title}\nSource: ${it.source}\nSnippet: ${it.snippet}"
+                                }
+                                val res = AiService.quickAssist(
+                                    taskPrompt = "Answer \"$searchQuery\" simply and clearly using only these search results. Mention the source names when helpful:\n\n$contextText",
+                                    systemInstruction = "Give a short, plain-language answer based on the search results."
+                                )
+                                isAiAnswering = false
+                                res.onSuccess { aiAnswer = it }
+                                    .onFailure { err ->
+                                        Toast.makeText(
+                                            context,
+                                            err.localizedMessage ?: "AI Answer failed",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                            }
+                        },
+                        enabled = !isAiAnswering,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("web_search_ai_answer_button"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        if (isAiAnswering) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Summarizing Results…")
+                        } else {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Get AI Quick Answer")
+                        }
+                    }
+
+                    val currentAiAnswer = aiAnswer
+                    if (currentAiAnswer != null) {
+                        Card(
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("AI Answer", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    IconButton(onClick = { aiAnswer = null }, modifier = Modifier.size(28.dp)) {
+                                        Icon(Icons.Default.Close, contentDescription = "Close AI answer", modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                                Text(currentAiAnswer, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+
                     LazyColumn(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(12.dp)

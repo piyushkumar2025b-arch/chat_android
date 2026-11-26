@@ -3,13 +3,17 @@ package com.example.ui
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
 import android.net.Uri
-import android.os.Environment
+import android.os.Build
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,29 +35,31 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -62,120 +68,188 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import com.example.data.remote.MediaSaver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.content.FileProvider
-import coil.compose.AsyncImage
-import coil.imageLoader
-import coil.request.ImageRequest
-import coil.request.SuccessResult
+import com.example.data.remote.AiService
+import com.example.data.remote.MediaSaver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
-import java.net.URLEncoder
-import kotlin.random.Random
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 data class GeneratedImage(
     val id: String,
     val prompt: String,
-    val imageUrl: String,
+    val bitmap: Bitmap,
     val style: String,
     val aspectRatio: String,
+    val wasEditedFromPhoto: Boolean = false,
     val timestamp: Long = System.currentTimeMillis()
 )
+
+sealed interface ImageStudioUiState {
+    data object Idle : ImageStudioUiState
+    data class Loading(val statusText: String) : ImageStudioUiState
+    data class Success(val item: GeneratedImage) : ImageStudioUiState
+    data class Error(val message: String) : ImageStudioUiState
+}
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ImageStudioScreen(
     onSendPromptToChat: (String) -> Unit = {},
+    onSendImageToChat: (Bitmap) -> Unit = { _ -> onSendPromptToChat("[Image Created in Studio]") },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     var promptText by remember { mutableStateOf("") }
-    var selectedStyle by remember { mutableStateOf("Photorealistic") }
+    var selectedStyle by remember { mutableStateOf("Natural") }
     var selectedRatio by remember { mutableStateOf("1:1") }
-    var currentSeed by remember { mutableStateOf(Random.nextInt(1000, 999999)) }
-    var isGenerating by remember { mutableStateOf(false) }
-    var currentImageUrl by remember { mutableStateOf<String?>(null) }
-    var previewFullscreenUrl by remember { mutableStateOf<String?>(null) }
     var autoSaveToGallery by remember { mutableStateOf(true) }
     var isSavingCurrent by remember { mutableStateOf(false) }
+    var isImprovingPrompt by remember { mutableStateOf(false) }
+    var referenceBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var uiState by remember { mutableStateOf<ImageStudioUiState>(ImageStudioUiState.Idle) }
+    var previewFullscreenItem by remember { mutableStateOf<GeneratedImage?>(null) }
 
-    val styles = listOf("Photorealistic", "Anime & Manga", "Cyberpunk", "Cinematic 3D", "Digital Art", "Fantasy Art", "Minimalist")
-    val aspectRatios = listOf(
-        Pair("1:1", Pair(1024, 1024)),
-        Pair("16:9", Pair(1280, 720)),
-        Pair("9:16", Pair(720, 1280)),
-        Pair("4:3", Pair(1024, 768))
+    val styles = listOf(
+        "Natural",
+        "Photorealistic",
+        "Anime & Manga",
+        "Digital Art",
+        "3D Render",
+        "Watercolor",
+        "Minimalist"
     )
-
+    val aspectRatios = listOf("1:1", "16:9", "9:16", "4:3")
     val imageHistory = remember { mutableStateListOf<GeneratedImage>() }
 
-    fun generateImage() {
-        val rawPrompt = promptText.trim()
-        if (rawPrompt.isEmpty()) {
-            Toast.makeText(context, "Please enter an image prompt", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        isGenerating = true
-        val styleTag = when (selectedStyle) {
-            "Photorealistic" -> ", 8k resolution, cinematic lighting, photorealistic, ultra-detailed, 35mm photograph"
-            "Anime & Manga" -> ", anime aesthetic, vibrant colors, makoto shinkai style, studio ghibli lighting, sharp outline"
-            "Cyberpunk" -> ", cyberpunk city, neon glowing lights, futuristic octane render, dark cinematic atmosphere"
-            "Cinematic 3D" -> ", unreal engine 5 render, cinematic volumetric lighting, 3D digital art, hyper-detailed"
-            "Digital Art" -> ", modern digital illustration, artstation trending, vibrant palette, concept artwork"
-            "Fantasy Art" -> ", mythical fantasy environment, magical glowing particles, epic majestic atmosphere"
-            "Minimalist" -> ", minimalist graphic design, clean vectors, flat colors, modern aesthetic"
-            else -> ""
-        }
-
-        val fullPrompt = "$rawPrompt$styleTag"
-        val dims = aspectRatios.firstOrNull { it.first == selectedRatio }?.second ?: Pair(1024, 1024)
-        val encoded = URLEncoder.encode(fullPrompt, "UTF-8")
-        val seed = currentSeed
-        val url = "https://image.pollinations.ai/prompt/$encoded?width=${dims.first}&height=${dims.second}&seed=$seed&nologo=true&model=flux"
-
-        currentImageUrl = url
-        imageHistory.add(0, GeneratedImage(
-            id = System.currentTimeMillis().toString(),
-            prompt = rawPrompt,
-            imageUrl = url,
-            style = selectedStyle,
-            aspectRatio = selectedRatio
-        ))
-        isGenerating = false
-
-        if (autoSaveToGallery) {
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
             coroutineScope.launch {
-                MediaSaver.saveImageFromUrl(context, url, rawPrompt)
+                val decoded = decodeScaledGalleryBitmap(context, uri, maxDimension = 1280)
+                if (decoded != null) {
+                    referenceBitmap = decoded
+                    Toast.makeText(context, "Photo loaded for AI editing", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Could not open that photo", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
 
-    fun enhancePrompt() {
-        val p = promptText.trim()
-        if (p.isEmpty()) {
-            promptText = "A futuristic glowing cybernetic city floating in the sky with waterfalls and neon airships"
-        } else {
-            promptText = "$p, masterpiece, intricate dramatic lighting, volumetric shadows, award winning composition"
+    fun generateOrEdit() {
+        val rawPrompt = promptText.trim()
+        if (rawPrompt.isEmpty()) {
+            Toast.makeText(context, "Please describe the image you want", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val sourceRef = referenceBitmap
+        val styleChoice = selectedStyle
+        val ratioChoice = selectedRatio
+
+        coroutineScope.launch {
+            uiState = ImageStudioUiState.Loading(
+                if (sourceRef != null) "Editing photo with AI (may take 20–60s)…"
+                else "Creating image with AI (may take 20–60s)…"
+            )
+            val result = AiService.generateOrEditImage(
+                prompt = rawPrompt,
+                inputBitmap = sourceRef,
+                styleHint = styleChoice,
+                aspectRatio = ratioChoice
+            )
+            result.onSuccess { bmp ->
+                val created = GeneratedImage(
+                    id = System.currentTimeMillis().toString(),
+                    prompt = rawPrompt,
+                    bitmap = bmp,
+                    style = styleChoice,
+                    aspectRatio = ratioChoice,
+                    wasEditedFromPhoto = sourceRef != null
+                )
+                imageHistory.add(0, created)
+                uiState = ImageStudioUiState.Success(created)
+                if (autoSaveToGallery) {
+                    MediaSaver.saveBitmapToGallery(context, bmp, rawPrompt)
+                }
+            }.onFailure { err ->
+                val msg = err.localizedMessage?.takeIf { it.isNotBlank() }
+                    ?: "Image generation failed. Please try again."
+                uiState = ImageStudioUiState.Error(msg)
+            }
         }
     }
+
+    fun improvePromptWithAi() {
+        val current = promptText.trim()
+        val task = if (current.isEmpty()) {
+            "Write one vivid, clear, 2-sentence image prompt for an imaginative scene. Return only the prompt text."
+        } else {
+            val modeNote = if (referenceBitmap != null) {
+                "The user is editing an uploaded photo."
+            } else {
+                "The user is generating a brand-new image."
+            }
+            "Rewrite and enrich this image prompt so it produces clear, cohesive artwork ($modeNote Style: $selectedStyle). Keep the user's subject and return only the improved prompt text:\n\n$current"
+        }
+
+        coroutineScope.launch {
+            isImprovingPrompt = true
+            val res = AiService.quickAssist(
+                taskPrompt = task,
+                systemInstruction = "You write concise, clear image prompts. Return only the prompt with no quotes or explanation.",
+                temperature = 0.6f
+            )
+            isImprovingPrompt = false
+            res.onSuccess { improved ->
+                promptText = improved.trim().removeSurrounding("\"")
+            }.onFailure { err ->
+                Toast.makeText(
+                    context,
+                    err.localizedMessage ?: "Could not improve prompt right now",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    fun shareBitmapItem(item: GeneratedImage) {
+        coroutineScope.launch {
+            val saveRes = MediaSaver.saveBitmapToGallery(context, item.bitmap, item.prompt)
+            saveRes.onSuccess { uri ->
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_TEXT, "Created in OmniChat: ${item.prompt}")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                runCatching {
+                    context.startActivity(Intent.createChooser(shareIntent, "Share Image"))
+                }.onFailure {
+                    Toast.makeText(context, "No app found to share image", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    val isGenerating = uiState is ImageStudioUiState.Loading
 
     LazyColumn(
         modifier = modifier
@@ -211,7 +285,7 @@ fun ImageStudioScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "Generate high-res images powered by Flux AI • 100% Free",
+                        "Create pictures from text or edit your own photos",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -219,7 +293,7 @@ fun ImageStudioScreen(
             }
         }
 
-        // Prompt Input Card
+        // Prompt + Optional Photo Edit Input Card
         item {
             Card(
                 shape = RoundedCornerShape(14.dp),
@@ -228,13 +302,65 @@ fun ImageStudioScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
+                    // Optional reference photo bar
+                    val refBmp = referenceBitmap
+                    if (refBmp != null) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Image(
+                                    bitmap = refBmp.asImageBitmap(),
+                                    contentDescription = "Photo to edit",
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .clip(RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Photo Attached for Editing",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        "Describe what to change, remove, or restyle",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { referenceBitmap = null },
+                                    modifier = Modifier.testTag("clear_reference_photo_button")
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove photo")
+                                }
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = promptText,
                         onValueChange = { promptText = it },
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("image_prompt_input"),
-                        placeholder = { Text("Describe what you want to imagine...") },
+                        placeholder = {
+                            Text(
+                                if (referenceBitmap != null) "Describe what to change in this photo..."
+                                else "Describe what you want to see..."
+                            )
+                        },
                         maxLines = 4,
                         trailingIcon = {
                             if (promptText.isNotEmpty()) {
@@ -251,14 +377,14 @@ fun ImageStudioScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surface)
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Auto-Save to Phone Gallery", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                            Text("Saves generated photos to /Pictures/OmniChat", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Auto-Save to Gallery", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            Text("Saves to /Pictures/OmniChat", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Switch(
                             checked = autoSaveToGallery,
@@ -267,41 +393,61 @@ fun ImageStudioScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    Row(
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(
-                            onClick = { enhancePrompt() },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                            ),
-                            shape = RoundedCornerShape(10.dp)
+                        OutlinedButton(
+                            onClick = {
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                            enabled = !isGenerating,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.testTag("pick_photo_to_edit_button")
                         ) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Enhance Prompt", style = MaterialTheme.typography.labelMedium)
+                            Text(if (referenceBitmap != null) "Change Photo" else "Edit a Photo")
+                        }
+
+                        FilledTonalButton(
+                            onClick = { improvePromptWithAi() },
+                            enabled = !isImprovingPrompt && !isGenerating,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.testTag("improve_image_prompt_button")
+                        ) {
+                            if (isImprovingPrompt) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Improve Prompt")
                         }
 
                         Button(
-                            onClick = {
-                                currentSeed = Random.nextInt(1000, 999999)
-                                generateImage()
-                            },
+                            onClick = { generateOrEdit() },
                             enabled = !isGenerating,
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.testTag("generate_image_button")
                         ) {
                             if (isGenerating) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Creating…")
                             } else {
                                 Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Generate")
+                                Text(if (referenceBitmap != null) "Apply Edit" else "Create Image")
                             }
                         }
                     }
@@ -309,9 +455,9 @@ fun ImageStudioScreen(
             }
         }
 
-        // Style Selector Chips
+        // Art Style Selector
         item {
-            Text("Art Style", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Text("Style", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(6.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(styles) { style ->
@@ -329,10 +475,10 @@ fun ImageStudioScreen(
 
         // Aspect Ratio Selector
         item {
-            Text("Aspect Ratio", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Text("Shape", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                aspectRatios.forEach { (ratio, _) ->
+                aspectRatios.forEach { ratio ->
                     FilterChip(
                         selected = selectedRatio == ratio,
                         onClick = { selectedRatio = ratio },
@@ -342,128 +488,218 @@ fun ImageStudioScreen(
             }
         }
 
-        // Current Generated Preview
-        if (currentImageUrl != null) {
-            item {
-                Text("Latest Creation", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(8.dp))
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column {
-                        val ratioFloat = when (selectedRatio) {
-                            "16:9" -> 16f / 9f
-                            "9:16" -> 9f / 16f
-                            "4:3" -> 4f / 3f
-                            else -> 1f
-                        }
-                        Box(
+        // State-driven result / progress / error area
+        when (val state = uiState) {
+            is ImageStudioUiState.Loading -> {
+                item {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .aspectRatio(ratioFloat.coerceIn(0.6f, 1.8f))
-                                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                                .clickable { previewFullscreenUrl = currentImageUrl },
-                            contentAlignment = Alignment.Center
+                                .padding(28.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            AsyncImage(
-                                model = currentImageUrl,
-                                contentDescription = promptText,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
+                            CircularProgressIndicator()
+                            Text(
+                                state.statusText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                "Powered by built-in Google Gemini Image AI",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
+                }
+            }
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+            is ImageStudioUiState.Error -> {
+                item {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    promptText.ifEmpty { "Generated Art" },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1
+                            Text(
+                                "Could not create image",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Text(
+                                state.message,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Button(
+                                onClick = { generateOrEdit() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.error,
+                                    contentColor = MaterialTheme.colorScheme.onError
                                 )
-                                Text(
-                                    "$selectedStyle • $selectedRatio",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Try Again")
+                            }
+                        }
+                    }
+                }
+            }
+
+            is ImageStudioUiState.Success -> {
+                val item = state.item
+                item {
+                    Text("Latest Creation", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column {
+                            val ratioFloat = when (item.aspectRatio) {
+                                "16:9" -> 16f / 9f
+                                "9:16" -> 9f / 16f
+                                "4:3" -> 4f / 3f
+                                else -> 1f
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(ratioFloat.coerceIn(0.6f, 1.8f))
+                                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                                    .clickable { previewFullscreenItem = item },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    bitmap = item.bitmap.asImageBitmap(),
+                                    contentDescription = item.prompt,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
                                 )
                             }
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                IconButton(
-                                    onClick = {
-                                        val url = currentImageUrl ?: return@IconButton
-                                        coroutineScope.launch {
-                                            isSavingCurrent = true
-                                            MediaSaver.saveImageFromUrl(context, url, promptText)
-                                            isSavingCurrent = false
-                                        }
-                                    },
-                                    enabled = !isSavingCurrent,
-                                    modifier = Modifier.testTag("save_image_to_phone_button")
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    if (isSavingCurrent) {
-                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                    } else {
-                                        Icon(Icons.Default.Download, contentDescription = "Save to Phone Gallery", tint = MaterialTheme.colorScheme.primary)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            item.prompt,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            "${if (item.wasEditedFromPhoto) "Edited Photo" else item.style} • ${item.aspectRatio}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        IconButton(
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    isSavingCurrent = true
+                                                    MediaSaver.saveBitmapToGallery(context, item.bitmap, item.prompt)
+                                                    isSavingCurrent = false
+                                                }
+                                            },
+                                            enabled = !isSavingCurrent,
+                                            modifier = Modifier.testTag("save_image_to_phone_button")
+                                        ) {
+                                            if (isSavingCurrent) {
+                                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                            } else {
+                                                Icon(Icons.Default.Download, contentDescription = "Save to Phone Gallery", tint = MaterialTheme.colorScheme.primary)
+                                            }
+                                        }
+                                        IconButton(onClick = { generateOrEdit() }) {
+                                            Icon(Icons.Default.Refresh, contentDescription = "Create another")
+                                        }
+                                        IconButton(onClick = { shareBitmapItem(item) }) {
+                                            Icon(Icons.Default.Share, contentDescription = "Share image")
+                                        }
                                     }
                                 }
-                                IconButton(
-                                    onClick = {
-                                        currentSeed = Random.nextInt(1000, 999999)
-                                        generateImage()
-                                    }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = "Regenerate")
-                                }
-                                IconButton(
-                                    onClick = {
-                                        val url = currentImageUrl ?: return@IconButton
-                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                            type = "text/plain"
-                                            putExtra(Intent.EXTRA_TEXT, "Generated with OmniChat AI:\n$url\n\nPrompt: $promptText")
-                                        }
-                                        try {
-                                            context.startActivity(Intent.createChooser(shareIntent, "Share Image"))
-                                        } catch (_: Exception) {}
+                                    OutlinedButton(
+                                        onClick = {
+                                            referenceBitmap = item.bitmap
+                                            promptText = ""
+                                            Toast.makeText(context, "Loaded image for editing", Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Edit This", maxLines = 1)
                                     }
-                                ) {
-                                    Icon(Icons.Default.Share, contentDescription = "Share")
+
+                                    FilledTonalButton(
+                                        onClick = { onSendImageToChat(item.bitmap) },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Ask Chat", maxLines = 1)
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+
+            ImageStudioUiState.Idle -> Unit
         }
 
         // History Gallery
-        if (imageHistory.size > 1) {
+        val historyItems = if (uiState is ImageStudioUiState.Success) imageHistory.drop(1) else imageHistory.toList()
+        if (historyItems.isNotEmpty()) {
             item {
-                Text("Creation History", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Previous Creations", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
 
-            items(imageHistory.drop(1)) { item ->
+            items(historyItems, key = { it.id }) { item ->
                 Card(
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { previewFullscreenUrl = item.imageUrl }
+                        .clickable { previewFullscreenItem = item }
                 ) {
                     Row(
                         modifier = Modifier.padding(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        AsyncImage(
-                            model = item.imageUrl,
+                        Image(
+                            bitmap = item.bitmap.asImageBitmap(),
                             contentDescription = item.prompt,
                             modifier = Modifier
                                 .size(70.dp)
@@ -472,14 +708,24 @@ fun ImageStudioScreen(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(item.prompt, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                            Text(
+                                item.prompt,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("${item.style} • ${item.aspectRatio}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            Text(
+                                "${item.style} • ${item.aspectRatio}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                         IconButton(
                             onClick = {
                                 coroutineScope.launch {
-                                    MediaSaver.saveImageFromUrl(context, item.imageUrl, item.prompt)
+                                    MediaSaver.saveBitmapToGallery(context, item.bitmap, item.prompt)
                                 }
                             }
                         ) {
@@ -494,9 +740,10 @@ fun ImageStudioScreen(
     }
 
     // Fullscreen Dialog
-    if (previewFullscreenUrl != null) {
+    val fullItem = previewFullscreenItem
+    if (fullItem != null) {
         Dialog(
-            onDismissRequest = { previewFullscreenUrl = null },
+            onDismissRequest = { previewFullscreenItem = null },
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
             Box(
@@ -505,10 +752,12 @@ fun ImageStudioScreen(
                     .background(Color.Black.copy(alpha = 0.92f)),
                 contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model = previewFullscreenUrl,
+                Image(
+                    bitmap = fullItem.bitmap.asImageBitmap(),
                     contentDescription = "Fullscreen Preview",
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
                     contentScale = ContentScale.Fit
                 )
 
@@ -521,9 +770,8 @@ fun ImageStudioScreen(
                 ) {
                     IconButton(
                         onClick = {
-                            val url = previewFullscreenUrl ?: return@IconButton
                             coroutineScope.launch {
-                                MediaSaver.saveImageFromUrl(context, url, "OmniArt")
+                                MediaSaver.saveBitmapToGallery(context, fullItem.bitmap, fullItem.prompt)
                             }
                         },
                         modifier = Modifier
@@ -534,9 +782,8 @@ fun ImageStudioScreen(
                     }
 
                     IconButton(
-                        onClick = { previewFullscreenUrl = null },
-                        modifier = Modifier
-                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                        onClick = { previewFullscreenItem = null },
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), CircleShape)
                     ) {
                         Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                     }
@@ -544,4 +791,33 @@ fun ImageStudioScreen(
             }
         }
     }
+}
+
+private suspend fun decodeScaledGalleryBitmap(
+    context: Context,
+    uri: Uri,
+    maxDimension: Int
+): Bitmap? = withContext(Dispatchers.IO) {
+    runCatching {
+        val raw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val source = ImageDecoder.createSource(context.contentResolver, uri)
+            ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                decoder.isMutableRequired = false
+            }
+        } else {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream)
+            }
+        } ?: return@withContext null
+
+        val largest = max(raw.width, raw.height)
+        if (largest <= maxDimension) {
+            raw
+        } else {
+            val scale = maxDimension.toFloat() / largest.toFloat()
+            val w = (raw.width * scale).roundToInt().coerceAtLeast(1)
+            val h = (raw.height * scale).roundToInt().coerceAtLeast(1)
+            Bitmap.createScaledBitmap(raw, w, h, true)
+        }
+    }.getOrNull()
 }

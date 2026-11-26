@@ -321,12 +321,17 @@ fun SettingsDialog(
 
                 HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.4f))
 
-                // Gemini API Key with Copy / Paste
+                // Gemini API Key (Optional custom override; Built-in Gemini works without a key)
+                Text(
+                    text = "Built-in Google Gemini works right away with no key. Add a key below only if you prefer using your own.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 ApiKeyInputField(
-                    title = "Google Gemini API Key",
+                    title = "Custom Gemini Key (Optional)",
                     key = geminiKey,
                     onKeyChange = { geminiKey = it },
-                    placeholder = "AIzaSy...",
+                    placeholder = "Leave blank to use Built-in Gemini",
                     helpUrl = "https://aistudio.google.com/app/apikey",
                     testTagPrefix = "gemini_key"
                 )

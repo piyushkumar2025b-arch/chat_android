@@ -15,15 +15,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Preview
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -51,6 +55,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.remote.AiService
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +69,7 @@ fun MarkdownStudioScreen(
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val coroutineScope = rememberCoroutineScope()
 
     val defaultDoc = """
         # Notes & Writing
@@ -85,6 +92,7 @@ fun MarkdownStudioScreen(
     var markdownText by remember { mutableStateOf(initialContent ?: defaultDoc) }
     var fileName by remember { mutableStateOf(initialFileName ?: "Notes.md") }
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = Editor, 1 = Preview
+    var isAiRewriting by remember { mutableStateOf(false) }
 
     LaunchedEffect(initialContent, initialFileName) {
         if (!initialContent.isNullOrBlank()) {
@@ -162,6 +170,53 @@ fun MarkdownStudioScreen(
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    AssistChip(
+                        onClick = {
+                            if (markdownText.isBlank() || isAiRewriting) return@AssistChip
+                            coroutineScope.launch {
+                                isAiRewriting = true
+                                val res = AiService.quickAssist(
+                                    taskPrompt = "Polish the grammar, clarity, and structure of this Markdown document while keeping its meaning intact:\n\n$markdownText",
+                                    systemInstruction = "Return only the improved Markdown text."
+                                )
+                                isAiRewriting = false
+                                res.onSuccess { markdownText = it }
+                                    .onFailure { err ->
+                                        Toast.makeText(context, err.localizedMessage ?: "AI Polish failed", Toast.LENGTH_SHORT).show()
+                                    }
+                            }
+                        },
+                        enabled = !isAiRewriting && markdownText.isNotBlank(),
+                        leadingIcon = {
+                            if (isAiRewriting) {
+                                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
+                            }
+                        },
+                        label = { Text("AI Polish") },
+                        modifier = Modifier.testTag("md_ai_polish_chip")
+                    )
+                    AssistChip(
+                        onClick = {
+                            if (markdownText.isBlank() || isAiRewriting) return@AssistChip
+                            coroutineScope.launch {
+                                isAiRewriting = true
+                                val res = AiService.quickAssist(
+                                    taskPrompt = "Make this Markdown document shorter and easier to scan while keeping the key points:\n\n$markdownText",
+                                    systemInstruction = "Return only the shortened Markdown text."
+                                )
+                                isAiRewriting = false
+                                res.onSuccess { markdownText = it }
+                                    .onFailure { err ->
+                                        Toast.makeText(context, err.localizedMessage ?: "AI Shorten failed", Toast.LENGTH_SHORT).show()
+                                    }
+                            }
+                        },
+                        enabled = !isAiRewriting && markdownText.isNotBlank(),
+                        label = { Text("Make Shorter") },
+                        modifier = Modifier.testTag("md_ai_shorten_chip")
+                    )
                     AssistChip(onClick = { markdownText += "\n# " }, label = { Text("H1") })
                     AssistChip(onClick = { markdownText += "\n## " }, label = { Text("H2") })
                     AssistChip(onClick = { markdownText += "**bold**" }, label = { Text("Bold") })

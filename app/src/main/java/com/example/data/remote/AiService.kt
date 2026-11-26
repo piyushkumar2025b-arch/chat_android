@@ -1,9 +1,22 @@
 package com.example.data.remote
 
+import android.graphics.Bitmap
+import android.util.Base64
+import android.util.Log
+import com.example.data.model.AvailableModels
 import com.example.data.model.ProviderType
 import com.example.model.ChatMessage
 import com.example.model.MessageRole
+import com.google.firebase.Firebase
+import com.google.firebase.ai.ai
+import com.google.firebase.ai.type.Content
+import com.google.firebase.ai.type.ImagePart
+import com.google.firebase.ai.type.ResponseModality
+import com.google.firebase.ai.type.content
+import com.google.firebase.ai.type.generationConfig
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -11,6 +24,7 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
@@ -20,6 +34,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
@@ -35,6 +50,12 @@ class MissingApiKeyException(providerName: String) :
 
 object AiService {
 
+    private const val TAG = "AiService"
+    private const val AI_TIMEOUT_MS = 60_000L
+    const val DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
+    const val FAST_GEMINI_MODEL = "gemini-3.5-flash-lite"
+    const val IMAGE_GEMINI_MODEL = "gemini-nano-banana-2.1"
+
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
     private val client = OkHttpClient.Builder()
@@ -46,7 +67,7 @@ object AiService {
 
     /**
      * Streams an assistant reply token-by-token from the selected provider.
-     * Providers that do not support SSE (Pollinations free tier) emit a single chunk.
+     * Built-in Google Gemini routes through Firebase AI Logic + App Check with zero API key needed.
      */
     fun streamResponse(
         provider: ProviderType,
@@ -58,7 +79,8 @@ object AiService {
         systemPrompt: String = "",
         temperature: Float = 0.7f,
         maxTokens: Int = 2048,
-        customBaseUrl: String = ""
+        customBaseUrl: String = "",
+        imageBitmaps: List<Bitmap> = emptyList()
     ): Flow<String> {
         if (provider.requiresApiKey && apiKey.isBlank()) {
             return flow { throw MissingApiKeyException(provider.displayName) }
@@ -73,15 +95,33 @@ object AiService {
             ProviderType.POLLINATIONS -> flow {
                 emit(callPollinations(groundedPrompt, modelId, systemPrompt))
             }
-            ProviderType.GEMINI -> streamGemini(
-                apiKey = apiKey,
-                modelId = modelId.ifBlank { "gemini-2.5-flash" },
-                history = turns,
-                prompt = groundedPrompt,
-                systemPrompt = systemPrompt,
-                temperature = temperature,
-                maxTokens = maxTokens
-            )
+            ProviderType.GEMINI -> {
+                val resolvedModel = AvailableModels.normalizeModelId(
+                    modelId.ifBlank { DEFAULT_GEMINI_MODEL }
+                ).ifBlank { DEFAULT_GEMINI_MODEL }
+                if (apiKey.isBlank()) {
+                    streamFirebaseGemini(
+                        modelId = resolvedModel,
+                        history = turns,
+                        prompt = groundedPrompt,
+                        systemPrompt = systemPrompt,
+                        temperature = temperature,
+                        maxTokens = maxTokens,
+                        imageBitmaps = imageBitmaps
+                    )
+                } else {
+                    streamGemini(
+                        apiKey = apiKey,
+                        modelId = resolvedModel,
+                        history = turns,
+                        prompt = groundedPrompt,
+                        systemPrompt = systemPrompt,
+                        temperature = temperature,
+                        maxTokens = maxTokens,
+                        imageBitmaps = imageBitmaps
+                    )
+                }
+            }
             ProviderType.CUSTOM -> {
                 val endpoint = normalizeCustomEndpoint(customBaseUrl)
                 flow {
@@ -128,7 +168,7 @@ object AiService {
         }.flowOn(Dispatchers.IO)
     }
 
-    /** Non-streaming convenience wrapper used by tools such as the persona test-drive. */
+    /** Non-streaming convenience wrapper used by tools such as AI Style try-out. */
     suspend fun sendMessage(
         provider: ProviderType,
         modelId: String,
@@ -137,28 +177,257 @@ object AiService {
         systemPrompt: String = "",
         temperature: Float = 0.7f,
         maxTokens: Int = 2048,
-        customBaseUrl: String = ""
-    ): Result<String> = runCatching {
-        val builder = StringBuilder()
-        streamResponse(
-            provider = provider,
-            modelId = modelId,
-            apiKey = apiKey,
-            history = emptyList(),
-            userPrompt = prompt,
-            systemPrompt = systemPrompt,
-            temperature = temperature,
-            maxTokens = maxTokens,
-            customBaseUrl = customBaseUrl
-        ).collect { builder.append(it) }
-        val text = builder.toString()
-        if (text.isBlank()) throw IOException("${provider.displayName} returned an empty response.")
-        text
+        customBaseUrl: String = "",
+        imageBitmaps: List<Bitmap> = emptyList()
+    ): Result<String> {
+        return try {
+            val builder = StringBuilder()
+            streamResponse(
+                provider = provider,
+                modelId = modelId,
+                apiKey = apiKey,
+                history = emptyList(),
+                userPrompt = prompt,
+                systemPrompt = systemPrompt,
+                temperature = temperature,
+                maxTokens = maxTokens,
+                customBaseUrl = customBaseUrl,
+                imageBitmaps = imageBitmaps
+            ).collect { builder.append(it) }
+            val text = builder.toString().trim()
+            if (text.isBlank()) {
+                Result.failure(IOException("${provider.displayName} returned an empty response."))
+            } else {
+                Result.success(text)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "sendMessage failed for ${provider.id}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Fast, zero-key built-in Gemini helper for inline tool actions (summarize, polish, fix code).
+     */
+    suspend fun quickAssist(
+        taskPrompt: String,
+        systemInstruction: String = "",
+        modelId: String = FAST_GEMINI_MODEL,
+        temperature: Float = 0.4f,
+        customGeminiApiKey: String = ""
+    ): Result<String> = withContext(Dispatchers.IO) {
+        if (customGeminiApiKey.isNotBlank()) {
+            return@withContext sendMessage(
+                provider = ProviderType.GEMINI,
+                modelId = modelId,
+                prompt = taskPrompt,
+                apiKey = customGeminiApiKey,
+                systemPrompt = systemInstruction,
+                temperature = temperature,
+                maxTokens = 2048
+            )
+        }
+
+        try {
+            val resolvedModel = AvailableModels.normalizeModelId(modelId).ifBlank { FAST_GEMINI_MODEL }
+            val config = generationConfig {
+                this.temperature = temperature
+                maxOutputTokens = 2048
+            }
+            val sysContent = systemInstruction.takeIf { it.isNotBlank() }?.let {
+                content { text(it) }
+            }
+            val model = Firebase.ai.generativeModel(
+                modelName = resolvedModel,
+                generationConfig = config,
+                systemInstruction = sysContent
+            )
+            val response = withTimeout(AI_TIMEOUT_MS) {
+                model.generateContent(taskPrompt)
+            }
+            val text = response.text?.trim().orEmpty()
+            if (text.isBlank()) {
+                Result.failure(IOException("Gemini returned an empty response."))
+            } else {
+                Result.success(text)
+            }
+        } catch (e: TimeoutCancellationException) {
+            Log.e(TAG, "quickAssist timed out", e)
+            Result.failure(IOException("AI request timed out after 60 seconds. Please try again."))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "quickAssist failed", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Generates a new image or edits an existing photo via Firebase AI Logic (`gemini-nano-banana-2.1`).
+     * Surfaces genuine failures transparently without fake Canvas/fallback placeholders.
+     */
+    suspend fun generateOrEditImage(
+        prompt: String,
+        inputBitmap: Bitmap? = null,
+        styleHint: String = "",
+        aspectRatio: String = "1:1"
+    ): Result<Bitmap> = withContext(Dispatchers.IO) {
+        try {
+            val cleanedPrompt = prompt.trim()
+            if (cleanedPrompt.isBlank()) {
+                return@withContext Result.failure(IllegalArgumentException("Please enter an image description first."))
+            }
+
+            val composedPrompt = buildString {
+                append(cleanedPrompt)
+                if (styleHint.isNotBlank() && styleHint != "Natural") {
+                    append(". Style: $styleHint")
+                }
+                if (aspectRatio.isNotBlank()) {
+                    append(". Aspect ratio: $aspectRatio")
+                }
+            }
+
+            val config = generationConfig {
+                responseModalities = listOf(ResponseModality.IMAGE)
+            }
+            val model = Firebase.ai.generativeModel(
+                modelName = IMAGE_GEMINI_MODEL,
+                generationConfig = config
+            )
+
+            val response = withTimeout(AI_TIMEOUT_MS) {
+                if (inputBitmap != null) {
+                    model.generateContent(
+                        content {
+                            image(inputBitmap)
+                            text(composedPrompt)
+                        }
+                    )
+                } else {
+                    model.generateContent(composedPrompt)
+                }
+            }
+
+            val bitmap = response.candidates
+                .firstOrNull()
+                ?.content
+                ?.parts
+                ?.filterIsInstance<ImagePart>()
+                ?.firstOrNull()
+                ?.image
+
+            if (bitmap != null) {
+                Result.success(bitmap)
+            } else {
+                val modelFeedback = response.text?.trim()?.take(180)
+                val msg = if (!modelFeedback.isNullOrBlank()) {
+                    "No image was returned: $modelFeedback"
+                } else {
+                    "No image was returned. Try describing the scene more clearly."
+                }
+                Result.failure(IOException(msg))
+            }
+        } catch (e: TimeoutCancellationException) {
+            Log.e(TAG, "Image generation timed out", e)
+            Result.failure(IOException("Image creation timed out after 60 seconds. Please try again."))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "Image generation failed", e)
+            Result.failure(e)
+        }
+    }
+
+    private fun streamFirebaseGemini(
+        modelId: String,
+        history: List<ChatMessage>,
+        prompt: String,
+        systemPrompt: String,
+        temperature: Float,
+        maxTokens: Int,
+        imageBitmaps: List<Bitmap>
+    ): Flow<String> = flow {
+        try {
+            val config = generationConfig {
+                this.temperature = temperature
+                maxOutputTokens = maxTokens
+            }
+            val sysContent = systemPrompt.takeIf { it.isNotBlank() }?.let {
+                content { text(it) }
+            }
+            val model = Firebase.ai.generativeModel(
+                modelName = modelId,
+                generationConfig = config,
+                systemInstruction = sysContent
+            )
+
+            val validHistory = buildAlternatingHistory(history).map { message ->
+                content(role = if (message.role == MessageRole.USER) "user" else "model") {
+                    text(message.content)
+                }
+            }
+
+            val userTurn: Content = content(role = "user") {
+                imageBitmaps.forEach { bitmap -> image(bitmap) }
+                val finalText = prompt.ifBlank {
+                    if (imageBitmaps.isNotEmpty()) "Describe and explain what is in this image." else ""
+                }
+                if (finalText.isNotBlank()) {
+                    text(finalText)
+                }
+            }
+
+            withTimeout(AI_TIMEOUT_MS) {
+                val stream = if (validHistory.isNotEmpty()) {
+                    model.startChat(history = validHistory).sendMessageStream(userTurn)
+                } else {
+                    model.generateContentStream(userTurn)
+                }
+                stream.collect { chunk ->
+                    val token = chunk.text.orEmpty()
+                    if (token.isNotEmpty()) {
+                        emit(token)
+                    }
+                }
+            }
+        } catch (e: TimeoutCancellationException) {
+            Log.e(TAG, "Firebase Gemini stream timed out", e)
+            throw IOException("Gemini timed out after 60 seconds. Please try again.", e)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "Firebase Gemini stream failed for $modelId", e)
+            throw e
+        }
+    }
+
+    private fun buildAlternatingHistory(history: List<ChatMessage>): List<ChatMessage> {
+        val validHistory = mutableListOf<ChatMessage>()
+        var expectUser = true
+        for (message in history) {
+            if (message.content.isBlank()) continue
+            val isUser = message.role == MessageRole.USER
+            if (expectUser && isUser) {
+                validHistory.add(message)
+                expectUser = false
+            } else if (!expectUser && !isUser) {
+                validHistory.add(message)
+                expectUser = true
+            }
+        }
+        // History fed before a new user message should end on a model turn.
+        if (validHistory.lastOrNull()?.role == MessageRole.USER) {
+            validHistory.removeAt(validHistory.lastIndex)
+        }
+        return validHistory
     }
 
     private fun defaultModelFor(provider: ProviderType): String = when (provider) {
         ProviderType.POLLINATIONS -> "openai"
-        ProviderType.GEMINI -> "gemini-2.5-flash"
+        ProviderType.GEMINI -> DEFAULT_GEMINI_MODEL
         ProviderType.GROQ -> "llama-3.3-70b-versatile"
         ProviderType.OPENROUTER -> "meta-llama/llama-3.3-70b-instruct:free"
         ProviderType.CEREBRAS -> "llama3.1-8b"
@@ -294,34 +563,43 @@ object AiService {
         prompt: String,
         systemPrompt: String,
         temperature: Float,
-        maxTokens: Int
+        maxTokens: Int,
+        imageBitmaps: List<Bitmap> = emptyList()
     ): Flow<String> = callbackFlow {
         val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelId" +
                 ":streamGenerateContent?alt=sse&key=${URLEncoder.encode(apiKey, "UTF-8")}"
 
         val contents = JSONArray()
-        // Gemini requires alternating user/model turns that start with a user turn.
-        val validHistory = mutableListOf<ChatMessage>()
-        var expectUser = true
-        for (message in history) {
-            val isUser = message.role == MessageRole.USER
-            if (expectUser && isUser) {
-                validHistory.add(message)
-                expectUser = false
-            } else if (!expectUser && !isUser) {
-                validHistory.add(message)
-                expectUser = true
-            }
-        }
+        val validHistory = buildAlternatingHistory(history)
         for (message in validHistory) {
             contents.put(JSONObject().apply {
                 put("role", if (message.role == MessageRole.USER) "user" else "model")
                 put("parts", JSONArray().put(JSONObject().put("text", message.content)))
             })
         }
+
+        val userParts = JSONArray()
+        for (bitmap in imageBitmaps) {
+            val jpegBytes = ByteArrayOutputStream().use { stream ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 85, stream)
+                stream.toByteArray()
+            }
+            userParts.put(JSONObject().apply {
+                put("inlineData", JSONObject().apply {
+                    put("mimeType", "image/jpeg")
+                    put("data", Base64.encodeToString(jpegBytes, Base64.NO_WRAP))
+                })
+            })
+        }
+        val finalPrompt = prompt.ifBlank {
+            if (imageBitmaps.isNotEmpty()) "Describe and explain what is in this image." else ""
+        }
+        if (finalPrompt.isNotBlank()) {
+            userParts.put(JSONObject().put("text", finalPrompt))
+        }
         contents.put(JSONObject().apply {
             put("role", "user")
-            put("parts", JSONArray().put(JSONObject().put("text", prompt)))
+            put("parts", userParts)
         })
 
         val body = JSONObject().apply {

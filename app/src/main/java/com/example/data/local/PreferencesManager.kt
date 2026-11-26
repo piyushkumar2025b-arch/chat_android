@@ -150,17 +150,7 @@ class PreferencesManager(context: Context) {
     }
 
     var geminiApiKey: String
-        get() {
-            val saved = getSecureString(KEY_GEMINI_API_KEY)
-            if (saved.isNotBlank()) return saved
-            return try {
-                val field = BuildConfig::class.java.getField("GEMINI_API_KEY")
-                val buildConfigKey = field.get(null) as? String ?: ""
-                if (buildConfigKey != "MY_GEMINI_API_KEY") buildConfigKey else ""
-            } catch (e: Exception) {
-                ""
-            }
-        }
+        get() = getSecureString(KEY_GEMINI_API_KEY)
         set(value) = putSecureString(KEY_GEMINI_API_KEY, value)
 
     var groqApiKey: String
@@ -212,11 +202,14 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putFloat(KEY_TEMPERATURE, value).apply()
 
     var lastProviderId: String
-        get() = prefs.getString(KEY_LAST_PROVIDER, "pollinations") ?: "pollinations"
+        get() = prefs.getString(KEY_LAST_PROVIDER, "gemini") ?: "gemini"
         set(value) = prefs.edit().putString(KEY_LAST_PROVIDER, value).apply()
 
     var lastModelId: String
-        get() = prefs.getString(KEY_LAST_MODEL, "openai-fast") ?: "openai-fast"
+        get() {
+            val saved = prefs.getString(KEY_LAST_MODEL, "gemini-3.8-flash") ?: "gemini-3.8-flash"
+            return com.example.data.model.AvailableModels.normalizeModelId(saved)
+        }
         set(value) = prefs.edit().putString(KEY_LAST_MODEL, value).apply()
 
     fun getApiKey(provider: ProviderType): String = when (provider) {

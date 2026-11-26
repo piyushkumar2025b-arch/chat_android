@@ -9,6 +9,15 @@ enum class ProviderType(
     val description: String,
     val knownLimitInfo: String
 ) {
+    GEMINI(
+        id = "gemini",
+        displayName = "Google Gemini (Built-in)",
+        requiresApiKey = false,
+        defaultBaseUrl = "https://generativelanguage.googleapis.com/v1beta/",
+        apiKeyUrl = "https://aistudio.google.com/app/apikey",
+        description = "Ready right away with no key • Fast chat, writing, coding & photos",
+        knownLimitInfo = "Built-in via Firebase AI • Optional custom key in Settings"
+    ),
     POLLINATIONS(
         id = "pollinations",
         displayName = "Pollinations AI (Free)",
@@ -17,15 +26,6 @@ enum class ProviderType(
         apiKeyUrl = "",
         description = "100% Free • No API Key required • Instant anonymous access",
         knownLimitInfo = "Unlimited Fair-Use • No account required"
-    ),
-    GEMINI(
-        id = "gemini",
-        displayName = "Google Gemini",
-        requiresApiKey = true,
-        defaultBaseUrl = "https://generativelanguage.googleapis.com/v1beta/",
-        apiKeyUrl = "https://aistudio.google.com/app/apikey",
-        description = "Official Google Gemini models (Gemini 2.0 Flash, 1.5 Pro)",
-        knownLimitInfo = "Free Tier: 15 RPM • 1,500 Requests/Day"
     ),
     GROQ(
         id = "groq",
@@ -115,60 +115,33 @@ object AvailableModels {
             tag = "🧠 Reasoning"
         ),
 
-        // Google Gemini - Verified production & latest preview models
-        AiModel(
-            id = "gemini-2.5-flash",
-            name = "Gemini 2.5 Flash",
-            provider = ProviderType.GEMINI,
-            description = "Google's ultra-fast flagship multimodal model with superior efficiency",
-            supportsVision = true,
-            isFree = false,
-            tag = "⚡ Recommended"
-        ),
-        AiModel(
-            id = "gemini-2.5-pro",
-            name = "Gemini 2.5 Pro",
-            provider = ProviderType.GEMINI,
-            description = "Google's premier model for coding, STEM, and complex reasoning",
-            supportsVision = true,
-            isFree = false,
-            tag = "🧠 Pro Coding"
-        ),
-        AiModel(
-            id = "gemini-2.0-flash",
-            name = "Gemini 2.0 Flash",
-            provider = ProviderType.GEMINI,
-            description = "Next-generation multimodal performance with ultra-low latency",
-            supportsVision = true,
-            isFree = false,
-            tag = "🚀 Low Latency"
-        ),
+        // Google Gemini (Built-in via Firebase AI Logic)
         AiModel(
             id = "gemini-3.8-flash",
             name = "Gemini 3.8 Flash",
             provider = ProviderType.GEMINI,
-            description = "Google AI Studio 3.8 Flash architecture with high throughput",
+            description = "Smart everyday chat, coding, writing, and photo questions",
             supportsVision = true,
-            isFree = false,
-            tag = "⚡ 3.8 Series"
+            isFree = true,
+            tag = "Default • Vision"
         ),
         AiModel(
-            id = "gemini-3.8-pro",
-            name = "Gemini 3.8 Pro",
+            id = "gemini-3.5-flash-lite",
+            name = "Gemini 3.5 Flash-Lite",
             provider = ProviderType.GEMINI,
-            description = "Extended thinking and advanced multi-turn agent capabilities",
+            description = "Extra fast replies for quick summaries, edits, and drafts",
             supportsVision = true,
-            isFree = false,
-            tag = "🧠 3.8 Pro"
+            isFree = true,
+            tag = "Fast"
         ),
         AiModel(
-            id = "gemini-3.1-flash-lite",
-            name = "Gemini 3.1 Flash Lite",
+            id = "gemini-4-argon",
+            name = "Gemini 4 Argon",
             provider = ProviderType.GEMINI,
-            description = "Compact low latency variant engineered for instant replies",
+            description = "Deep thinking for hard coding, math, and tough questions",
             supportsVision = true,
             isFree = false,
-            tag = "🚀 Flash Lite"
+            tag = "Deep Think"
         ),
 
         // Groq Cloud - Verified live models
@@ -326,10 +299,17 @@ object AvailableModels {
         )
     )
 
-    val defaultModel: AiModel = models.first { it.id == "openai-fast" } // Verified Pollinations default
+    val defaultModel: AiModel = models.first { it.id == "gemini-3.8-flash" }
+
+    fun normalizeModelId(modelId: String): String = when (modelId) {
+        "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro", "gemini-3.8-pro", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro" -> "gemini-3.8-flash"
+        "gemini-3.1-flash-lite", "gemini-2.5-flash-lite" -> "gemini-3.5-flash-lite"
+        else -> modelId
+    }
 
     fun findModel(modelId: String, providerId: String): AiModel {
-        return models.firstOrNull { it.id == modelId && it.provider.id == providerId }
+        val normalized = normalizeModelId(modelId)
+        return models.firstOrNull { it.id == normalized && it.provider.id == providerId }
             ?: models.firstOrNull { it.provider.id == providerId }
             ?: defaultModel
     }

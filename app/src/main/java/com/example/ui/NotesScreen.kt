@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,13 +13,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
@@ -26,11 +32,14 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SuggestionChip
@@ -53,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.data.local.NoteEntity
 import com.example.data.local.ProductivityDao
+import com.example.data.remote.AiService
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -70,6 +80,8 @@ fun NotesScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showDialog by remember { mutableStateOf(false) }
     var editingNote by remember { mutableStateOf<NoteEntity?>(null) }
+    var allNotesSummary by remember { mutableStateOf<String?>(null) }
+    var isSummarizingAll by remember { mutableStateOf(false) }
 
     val filteredNotes = remember(allNotes, searchQuery) {
         if (searchQuery.isBlank()) allNotes
@@ -121,6 +133,72 @@ fun NotesScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
+
+            if (allNotes.isNotEmpty()) {
+                FilledTonalButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            isSummarizingAll = true
+                            val notesDump = allNotes.take(15).joinToString("\n\n") { n ->
+                                "Title: ${n.title}\nContent: ${n.content}"
+                            }
+                            val res = AiService.quickAssist(
+                                taskPrompt = "Summarize the key themes, tasks, and ideas across these notes in plain bullet points:\n\n$notesDump",
+                                systemInstruction = "You write clear, concise plain-language note summaries."
+                            )
+                            isSummarizingAll = false
+                            res.onSuccess { summary ->
+                                allNotesSummary = summary
+                            }.onFailure { err ->
+                                Toast.makeText(
+                                    context,
+                                    err.localizedMessage ?: "Could not summarize notes right now",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    },
+                    enabled = !isSummarizingAll,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("notes_summarize_all_button"),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (isSummarizingAll) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Summarizing Notes…")
+                    } else {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("AI Summary of All Notes")
+                    }
+                }
+            }
+
+            val summaryText = allNotesSummary
+            if (summaryText != null) {
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("AI Notes Overview", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            IconButton(onClick = { allNotesSummary = null }, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Default.Close, contentDescription = "Dismiss summary", modifier = Modifier.size(16.dp))
+                            }
+                        }
+                        Text(summaryText, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
 
             if (filteredNotes.isEmpty()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -207,12 +285,16 @@ fun NotesScreen(
         var title by remember { mutableStateOf(editingNote?.title ?: "") }
         var content by remember { mutableStateOf(editingNote?.content ?: "") }
         var tags by remember { mutableStateOf(editingNote?.tags ?: "") }
+        var isAiHelping by remember { mutableStateOf(false) }
 
         AlertDialog(
             onDismissRequest = { showDialog = false },
             title = { Text(if (isEditing) "Edit Note" else "Create Note") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it },
@@ -233,6 +315,71 @@ fun NotesScreen(
                         minLines = 3,
                         maxLines = 6
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                if (content.isBlank()) {
+                                    Toast.makeText(context, "Write a note first", Toast.LENGTH_SHORT).show()
+                                    return@OutlinedButton
+                                }
+                                coroutineScope.launch {
+                                    isAiHelping = true
+                                    val res = AiService.quickAssist(
+                                        taskPrompt = "Fix spelling, improve clarity, and organize this note cleanly without changing its meaning:\n\n$content",
+                                        systemInstruction = "You polish notes into clear, easy-to-read text. Return only the updated note text."
+                                    )
+                                    isAiHelping = false
+                                    res.onSuccess { content = it }
+                                        .onFailure { err ->
+                                            Toast.makeText(context, err.localizedMessage ?: "AI Polish failed", Toast.LENGTH_SHORT).show()
+                                        }
+                                }
+                            },
+                            enabled = !isAiHelping && content.isNotBlank(),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("note_ai_polish_button")
+                        ) {
+                            if (isAiHelping) {
+                                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("AI Polish", maxLines = 1)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                if (content.isBlank()) {
+                                    Toast.makeText(context, "Write a note first", Toast.LENGTH_SHORT).show()
+                                    return@OutlinedButton
+                                }
+                                coroutineScope.launch {
+                                    isAiHelping = true
+                                    val res = AiService.quickAssist(
+                                        taskPrompt = "Summarize this note into 3–5 clear bullet points:\n\n$content",
+                                        systemInstruction = "Return only a short, clean bullet summary."
+                                    )
+                                    isAiHelping = false
+                                    res.onSuccess { content = it }
+                                        .onFailure { err ->
+                                            Toast.makeText(context, err.localizedMessage ?: "AI Summary failed", Toast.LENGTH_SHORT).show()
+                                        }
+                                }
+                            },
+                            enabled = !isAiHelping && content.isNotBlank(),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("note_ai_summary_button")
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("AI Summary", maxLines = 1)
+                        }
+                    }
                 }
             },
             confirmButton = {

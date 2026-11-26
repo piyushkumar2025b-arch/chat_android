@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -20,13 +21,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +59,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.remote.AiService
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,6 +74,7 @@ fun CodeStudioScreen(
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val coroutineScope = rememberCoroutineScope()
 
     val defaultCode = """
         // OmniChat Code Editor
@@ -79,6 +88,8 @@ fun CodeStudioScreen(
     var selectedLanguage by remember { mutableStateOf(initialLanguage ?: "Kotlin") }
     var consoleOutput by remember { mutableStateOf("") }
     var isRunning by remember { mutableStateOf(false) }
+    var isAiReviewing by remember { mutableStateOf(false) }
+    var aiReviewText by remember { mutableStateOf<String?>(null) }
 
     // Update when initial parameters change (e.g. from chat attachment handoff)
     LaunchedEffect(initialCode, initialFileName, initialLanguage) {
@@ -194,10 +205,10 @@ fun CodeStudioScreen(
                 }
             }
 
-            // Run / Simulate & Console
+            // Run / AI Explain & Fix / Console
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
@@ -213,11 +224,92 @@ fun CodeStudioScreen(
                     Text("Run Sandbox")
                 }
 
-                Text(
-                    text = "${codeText.lines().size} lines | ${codeText.length} chars",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                FilledTonalButton(
+                    onClick = {
+                        if (codeText.isBlank()) {
+                            Toast.makeText(context, "Write or paste code first", Toast.LENGTH_SHORT).show()
+                            return@FilledTonalButton
+                        }
+                        coroutineScope.launch {
+                            isAiReviewing = true
+                            val res = AiService.quickAssist(
+                                taskPrompt = "Explain simply what this $selectedLanguage code ($fileName) does, point out any bugs, and suggest a clean improvement:\n\n```$selectedLanguage\n$codeText\n```",
+                                systemInstruction = "You are a clear, helpful code assistant. Keep explanations simple and practical.",
+                                modelId = AiService.DEFAULT_GEMINI_MODEL
+                            )
+                            isAiReviewing = false
+                            res.onSuccess { aiReviewText = it }
+                                .onFailure { err ->
+                                    Toast.makeText(
+                                        context,
+                                        err.localizedMessage ?: "AI Review failed",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                        }
+                    },
+                    enabled = !isAiReviewing && codeText.isNotBlank(),
+                    modifier = Modifier.testTag("code_ai_assist_button")
+                ) {
+                    if (isAiReviewing) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Checking…")
+                    } else {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("AI Explain & Fix", maxLines = 1)
+                    }
+                }
+            }
+
+            Text(
+                text = "${codeText.lines().size} lines | ${codeText.length} chars",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // AI Review Card
+            val currentAiReview = aiReviewText
+            if (currentAiReview != null) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp)
+                        .testTag("code_ai_review_card"),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(modifier = Modifier.fillMaxSize().padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "AI Code Notes",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            IconButton(
+                                onClick = { aiReviewText = null },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Close AI review", modifier = Modifier.size(16.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                            Text(
+                                text = currentAiReview,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
             }
 
             // Simulated Console Window

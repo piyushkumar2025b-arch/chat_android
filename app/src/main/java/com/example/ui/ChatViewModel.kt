@@ -2,6 +2,7 @@ package com.example.ui
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
@@ -132,6 +133,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val _activeModel = MutableStateFlow(resolveModel(_activeProvider.value))
     val activeModel: StateFlow<AiModel> = _activeModel.asStateFlow()
 
+    private val _quickAiMode = MutableStateFlow(resolveQuickMode(_activeModel.value.id))
+    val quickAiMode: StateFlow<String> = _quickAiMode.asStateFlow()
+
     private val _apiKeys = MutableStateFlow(loadApiKeys())
     val apiKeys: StateFlow<Map<ProviderType, String>> = _apiKeys.asStateFlow()
 
@@ -203,14 +207,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun initialProvider(): ProviderType {
         val savedId = preferencesManager.lastProviderId
-        return ProviderType.entries.firstOrNull { it.id == savedId } ?: ProviderType.POLLINATIONS
+        return ProviderType.entries.firstOrNull { it.id == savedId } ?: ProviderType.GEMINI
     }
 
     private fun resolveModel(provider: ProviderType, preferredId: String? = null): AiModel {
-        val preferred = preferredId ?: preferencesManager.lastModelId
+        val preferred = AvailableModels.normalizeModelId(preferredId ?: preferencesManager.lastModelId)
         return AvailableModels.models.firstOrNull { it.provider == provider && it.id == preferred }
             ?: AvailableModels.models.firstOrNull { it.provider == provider }
             ?: AvailableModels.defaultModel
+    }
+
+    private fun resolveQuickMode(modelId: String): String = when (modelId) {
+        "gemini-3.5-flash-lite" -> "fast"
+        "gemini-4-argon" -> "deep"
+        else -> "balanced"
     }
 
     private fun loadApiKeys(): Map<ProviderType, String> =
@@ -260,6 +270,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         if (provider == _activeProvider.value) return
         _activeProvider.value = provider
         _activeModel.value = resolveModel(provider)
+        _quickAiMode.value = resolveQuickMode(_activeModel.value.id)
         preferencesManager.lastProviderId = provider.id
         preferencesManager.lastModelId = _activeModel.value.id
         persistActiveSessionModel()
@@ -268,9 +279,57 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun setModel(provider: ProviderType, model: AiModel) {
         _activeProvider.value = provider
         _activeModel.value = model
+        _quickAiMode.value = resolveQuickMode(model.id)
         preferencesManager.lastProviderId = provider.id
         preferencesManager.lastModelId = model.id
         persistActiveSessionModel()
+    }
+
+    fun setQuickAiMode(mode: String) {
+        val targetModelId = when (mode) {
+            "fast" -> "gemini-3.5-flash-lite"
+            "deep" -> "gemini-4-argon"
+            else -> "gemini-3.8-flash"
+        }
+        val targetTemp = when (mode) {
+            "fast" -> 0.4f
+            "deep" -> 0.3f
+            else -> 0.7f
+        }
+        preferencesManager.temperature = targetTemp
+        val model = AvailableModels.findModel(targetModelId, ProviderType.GEMINI.id)
+        setModel(ProviderType.GEMINI, model)
+    }
+
+    fun saveNoteFromChat(
+        title: String,
+        content: String,
+        tags: String = "ai-chat",
+        callback: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        val cleanedContent = content.trim()
+        if (cleanedContent.isBlank()) {
+            callback(false, "Nothing to save.")
+            return
+        }
+        val cleanedTitle = title.trim().ifBlank { "AI Note" }.take(60)
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    productivityDao.insertNote(
+                        NoteEntity(
+                            title = cleanedTitle,
+                            content = cleanedContent,
+                            tags = tags,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    )
+                }
+                callback(true, "Saved to Notes")
+            } catch (e: Exception) {
+                callback(false, "Could not save note: ${e.localizedMessage ?: "unknown error"}")
+            }
+        }
     }
 
     private fun persistActiveSessionModel() {
@@ -1157,6 +1216,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }.getOrDefault("")
         } else ""
 
+        val imageBitmaps = withContext(Dispatchers.IO) {
+            loadScaledBitmaps(userMessage.attachments)
+        }
+
         val attachmentSnippets = userMessage.attachments
             .filter { it.content.isNotBlank() && !it.mimeType.startsWith("image/") }
             .joinToString("\n\n") { "Attachment [${it.name}]:\n${it.content}" }
@@ -1194,7 +1257,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 systemPrompt = composedSystemPrompt,
                 temperature = preferencesManager.temperature,
                 maxTokens = preferencesManager.maxOutputTokens,
-                customBaseUrl = preferencesManager.customBaseUrl
+                customBaseUrl = preferencesManager.customBaseUrl,
+                imageBitmaps = imageBitmaps
             ).collect { token ->
                 builder.append(token)
                 val now = SystemClock.elapsedRealtime()
@@ -1310,6 +1374,56 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         } catch (_: Exception) {
             attachment
         }
+    }
+
+    private fun loadScaledBitmaps(attachments: List<ChatAttachment>): List<Bitmap> {
+        val result = mutableListOf<Bitmap>()
+        for (att in attachments) {
+            if (!att.mimeType.startsWith("image/") && att.bitmap == null) continue
+            val decoded = att.bitmap?.let { downscaleBitmap(it, 1280) }
+                ?: decodeAttachmentBitmap(att.localUri, 1280)
+            if (decoded != null) {
+                result.add(decoded)
+            }
+        }
+        return result
+    }
+
+    private fun decodeAttachmentBitmap(localUri: String, maxSide: Int): Bitmap? {
+        if (localUri.isBlank()) return null
+        return try {
+            val raw = if (localUri.startsWith("content://")) {
+                app.contentResolver.openInputStream(Uri.parse(localUri))?.use { stream ->
+                    BitmapFactory.decodeStream(stream)
+                }
+            } else {
+                val file = File(localUri)
+                if (!file.exists()) return null
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(file.absolutePath, bounds)
+                var sampleSize = 1
+                val largest = maxOf(bounds.outWidth, bounds.outHeight)
+                while (largest / sampleSize > maxSide * 2) {
+                    sampleSize *= 2
+                }
+                val opts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+                BitmapFactory.decodeFile(file.absolutePath, opts)
+            }
+            raw?.let { downscaleBitmap(it, maxSide) }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun downscaleBitmap(bitmap: Bitmap, maxSide: Int): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+        val longest = maxOf(width, height)
+        if (longest <= maxSide || width <= 0 || height <= 0) return bitmap
+        val scale = maxSide.toFloat() / longest.toFloat()
+        val targetW = (width * scale).toInt().coerceAtLeast(1)
+        val targetH = (height * scale).toInt().coerceAtLeast(1)
+        return Bitmap.createScaledBitmap(bitmap, targetW, targetH, true)
     }
 
     private fun estimateTokens(prompt: String, response: String): Int =
