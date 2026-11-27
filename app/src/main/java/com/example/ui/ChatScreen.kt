@@ -777,9 +777,13 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                                         putExtra(Intent.EXTRA_SUBJECT, activeSessionTitle)
                                                         putExtra(Intent.EXTRA_TEXT, shareText)
                                                     }
-                                                    context.startActivity(
-                                                        Intent.createChooser(shareIntent, "Share conversation")
-                                                    )
+                                                    runCatching {
+                                                        context.startActivity(
+                                                            Intent.createChooser(shareIntent, "Share conversation")
+                                                        )
+                                                    }.onFailure {
+                                                        toast("No app available to share this conversation.")
+                                                    }
                                                 }
                                             }
                                         )

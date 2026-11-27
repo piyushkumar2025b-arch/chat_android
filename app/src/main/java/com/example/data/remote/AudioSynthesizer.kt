@@ -221,12 +221,18 @@ object AudioSynthesizer {
             return@withContext
         }
 
+        if (track.state != AudioTrack.STATE_INITIALIZED) {
+            runCatching { track.release() }
+            withContext(Dispatchers.Main) { onComplete() }
+            return@withContext
+        }
+
         synchronized(this@AudioSynthesizer) {
             if (currentPlayId != playId) {
                 try { track.release() } catch (_: Exception) {}
                 return@withContext
             }
-            track.setVolume(volume.coerceIn(0.0f, 1.0f))
+            runCatching { track.setVolume(volume.coerceIn(0.0f, 1.0f)) }
             currentTrack = track
             isPlaying = true
         }
@@ -237,6 +243,7 @@ object AudioSynthesizer {
             track.write(samples, 0, samples.size)
             val durationMs = (samples.size.toDouble() / SAMPLE_RATE * 1000).toLong()
             kotlinx.coroutines.delay(durationMs + 100)
+        } catch (_: Exception) {
         } finally {
             synchronized(this@AudioSynthesizer) {
                 if (currentPlayId == playId) {

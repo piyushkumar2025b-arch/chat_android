@@ -1,8 +1,7 @@
 package com.example.ui
 
-import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
+import com.example.util.openExternalUrl
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -284,11 +283,7 @@ fun WebSearchScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable(enabled = item.url.isNotBlank()) {
-                                        runCatching {
-                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.url)))
-                                        }.onFailure {
-                                            Toast.makeText(context, "Unable to open URL", Toast.LENGTH_SHORT).show()
-                                        }
+                                        openExternalUrl(context, item.url, "Unable to open URL")
                                     },
                                 shape = RoundedCornerShape(14.dp),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)

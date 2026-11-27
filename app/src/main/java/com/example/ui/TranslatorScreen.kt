@@ -3,11 +3,9 @@ package com.example.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.graphics.ImageDecoder
-import android.os.Build
-import android.provider.MediaStore
 import android.speech.tts.TextToSpeech
 import android.widget.Toast
+import com.example.util.decodeSampledBitmapFromUri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -177,14 +175,7 @@ fun TranslatorScreen(
         isTranslating = true
         scope.launch {
             val bitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                runCatching {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri))
-                    } else {
-                        @Suppress("DEPRECATION")
-                        MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-                    }
-                }.getOrNull()
+                decodeSampledBitmapFromUri(context, uri, 1600)
             }
             if (bitmap == null) {
                 errorMessage = "Could not load selected photo."

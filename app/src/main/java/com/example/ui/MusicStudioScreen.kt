@@ -1,11 +1,12 @@
 package com.example.ui
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.PlaybackParams
 import android.net.Uri
 import android.provider.OpenableColumns
-import android.widget.Toast
+import com.example.util.showMainToast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -219,9 +220,19 @@ fun MusicStudioScreen(
                                 }
                             }
                         }
-                        val preparedPlayer = MediaPlayer().apply {
-                            setDataSource(context, uri)
-                            prepare()
+                        val preparedPlayer = MediaPlayer()
+                        try {
+                            preparedPlayer.setAudioAttributes(
+                                AudioAttributes.Builder()
+                                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                    .build()
+                            )
+                            preparedPlayer.setDataSource(context, uri)
+                            preparedPlayer.prepare()
+                        } catch (e: Exception) {
+                            runCatching { preparedPlayer.release() }
+                            throw e
                         }
                         val trackTitle = resolvedName?.takeIf { it.isNotBlank() }?.substringBeforeLast('.')
                             ?: uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.')
@@ -246,9 +257,9 @@ fun MusicStudioScreen(
 
                     mp.start()
                     isPlaying = true
-                    Toast.makeText(context, "Playing: $currentSongTitle", Toast.LENGTH_SHORT).show()
+                    showMainToast(context, "Playing: $currentSongTitle")
                 } catch (e: Exception) {
-                    Toast.makeText(context, "Error loading audio: ${e.message ?: "Unsupported file"}", Toast.LENGTH_SHORT).show()
+                    showMainToast(context, "Error loading audio: ${e.message ?: "Unsupported file"}")
                 }
             }
         }
@@ -270,13 +281,13 @@ fun MusicStudioScreen(
     }
 
     // Apply speed and pitch changes to MediaPlayer
-    LaunchedEffect(playbackSpeed, pitchShift) {
+    LaunchedEffect(mediaPlayer, playbackSpeed, pitchShift) {
         val mp = mediaPlayer
-        if (mp != null) {
+        if (mp != null && (playbackSpeed != 1f || pitchShift != 1f)) {
             try {
                 val params = PlaybackParams().apply {
-                    speed = playbackSpeed
-                    pitch = pitchShift
+                    speed = playbackSpeed.coerceIn(0.5f, 2.0f)
+                    pitch = pitchShift.coerceIn(0.5f, 2.0f)
                 }
                 mp.playbackParams = params
             } catch (_: Exception) {}
@@ -284,7 +295,7 @@ fun MusicStudioScreen(
     }
 
     // Apply volume changes
-    LaunchedEffect(volumeBooster) {
+    LaunchedEffect(mediaPlayer, volumeBooster) {
         val mp = mediaPlayer
         if (mp != null) {
             try {

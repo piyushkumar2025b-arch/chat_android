@@ -3,9 +3,8 @@ package com.example.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
+import com.example.util.openExternalUrl
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -92,10 +91,7 @@ fun ApiKeyInputField(
             if (helpUrl.isNotBlank()) {
                 TextButton(
                     onClick = {
-                        try {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(helpUrl))
-                            context.startActivity(intent)
-                        } catch (_: Exception) {}
+                        openExternalUrl(context, helpUrl, "No browser app available to open help page.")
                     },
                     modifier = Modifier.testTag("${testTagPrefix}_help_link")
                 ) {

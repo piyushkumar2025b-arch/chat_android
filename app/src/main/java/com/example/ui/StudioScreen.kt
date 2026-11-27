@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,7 +45,7 @@ fun StudioScreen(
     onSendImageToChat: (android.graphics.Bitmap) -> Unit = { _ -> onSendPromptToChat("[Image Edited from Studio]") },
     modifier: Modifier = Modifier
 ) {
-    var selectedStudioTab by remember { mutableIntStateOf(initialTab) }
+    var selectedStudioTab by rememberSaveable { mutableIntStateOf(initialTab) }
     val tabs = listOf(
         Triple("Images", Icons.Default.Image, 0),
         Triple("Draw", Icons.Default.Tune, 1),

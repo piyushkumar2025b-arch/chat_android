@@ -1,7 +1,6 @@
 package com.example.ui
 
-import android.content.Intent
-import android.net.Uri
+import com.example.util.openExternalUrl
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -342,10 +341,7 @@ fun AiLearningScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        try {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(res.url))
-                            context.startActivity(intent)
-                        } catch (_: Exception) {}
+                        openExternalUrl(context, res.url)
                     }
             ) {
                 Row(
@@ -370,10 +366,7 @@ fun AiLearningScreen(
                     }
                     IconButton(
                         onClick = {
-                            try {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(res.url))
-                                context.startActivity(intent)
-                            } catch (_: Exception) {}
+                            openExternalUrl(context, res.url)
                         }
                     ) {
                         Icon(Icons.Default.OpenInBrowser, contentDescription = "Open Resource")

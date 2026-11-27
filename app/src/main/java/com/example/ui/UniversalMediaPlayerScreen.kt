@@ -1,10 +1,11 @@
 package com.example.ui
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
 import android.provider.OpenableColumns
-import android.widget.Toast
+import com.example.util.showMainToast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -322,9 +323,19 @@ fun UniversalMediaPlayerScreen(
                                 }
                             }
                         }
-                        val preparedPlayer = MediaPlayer().apply {
-                            setDataSource(context, uri)
-                            prepare()
+                        val preparedPlayer = MediaPlayer()
+                        try {
+                            preparedPlayer.setAudioAttributes(
+                                AudioAttributes.Builder()
+                                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                    .build()
+                            )
+                            preparedPlayer.setDataSource(context, uri)
+                            preparedPlayer.prepare()
+                        } catch (e: Exception) {
+                            runCatching { preparedPlayer.release() }
+                            throw e
                         }
                         val displayName = resolvedName?.takeIf { it.isNotBlank() }
                             ?: uri.lastPathSegment?.substringAfterLast('/')
@@ -355,9 +366,9 @@ fun UniversalMediaPlayerScreen(
                     playbackProgress = 0f
                     mp.start()
                     isPlaying = true
-                    Toast.makeText(context, "Playing $name", Toast.LENGTH_SHORT).show()
+                    showMainToast(context, "Playing $name")
                 } catch (e: Exception) {
-                    Toast.makeText(context, "Could not open audio: ${e.localizedMessage ?: "Unsupported file"}", Toast.LENGTH_SHORT).show()
+                    showMainToast(context, "Could not open audio: ${e.localizedMessage ?: "Unsupported file"}")
                 }
             }
         }
@@ -617,7 +628,7 @@ fun UniversalMediaPlayerScreen(
                         IconButton(
                             onClick = {
                                 onSendMediaToChat("Now playing: \"${currentTrack.title}\" by ${currentTrack.artist}. Suggest similar tracks or background study playlists.")
-                                Toast.makeText(context, "Track sent to OmniChat!", Toast.LENGTH_SHORT).show()
+                                showMainToast(context, "Track sent to OmniChat!")
                                 onBack()
                             }
                         ) {

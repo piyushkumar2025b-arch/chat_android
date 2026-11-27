@@ -43,6 +43,7 @@ import com.example.data.remote.ConversationExporter
 import com.example.data.remote.FileUtils
 import com.example.data.remote.InternalKnowledgeSources
 import com.example.data.remote.MediaSaver
+import com.example.util.decodeSampledBitmapFromUri
 import com.example.data.remote.MissingApiKeyException
 import com.example.data.remote.RagEngine
 import com.example.data.seed.StarterPrompts
@@ -1494,9 +1495,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         if (localUri.isBlank()) return null
         return try {
             val raw = if (localUri.startsWith("content://")) {
-                app.contentResolver.openInputStream(Uri.parse(localUri))?.use { stream ->
-                    BitmapFactory.decodeStream(stream)
-                }
+                decodeSampledBitmapFromUri(app, Uri.parse(localUri), maxSide)
             } else {
                 val file = File(localUri)
                 if (!file.exists()) return null

@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -101,37 +102,57 @@ object MediaSaver {
             val cleanName = title.take(30).replace(Regex("[^a-zA-Z0-9_]"), "_").trim('_').ifEmpty { "OmniArt" }
             val fileName = "Omni_${cleanName}_${System.currentTimeMillis()}.png"
 
-            val resolver = context.contentResolver
-            val contentValues = ContentValues().apply {
-                put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
-                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val resolver = context.contentResolver
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+                    put(MediaStore.Images.Media.MIME_TYPE, "image/png")
                     put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/OmniChat")
                     put(MediaStore.Images.Media.IS_PENDING, 1)
                 }
-            }
 
-            val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-            } else {
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-            }
+                val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                val uri = resolver.insert(collection, contentValues)
+                    ?: return@withContext Result.failure(Exception("Could not create MediaStore entry"))
 
-            val uri = resolver.insert(collection, contentValues)
-                ?: return@withContext Result.failure(Exception("Could not create MediaStore entry"))
+                val wrote = try {
+                    resolver.openOutputStream(uri)?.use { stream ->
+                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                    } ?: false
+                } catch (e: Exception) {
+                    runCatching { resolver.delete(uri, null, null) }
+                    throw e
+                }
 
-            resolver.openOutputStream(uri)?.use { stream ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-            }
+                if (!wrote) {
+                    runCatching { resolver.delete(uri, null, null) }
+                    return@withContext Result.failure(Exception("Failed to write image bytes"))
+                }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 contentValues.clear()
                 contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
                 resolver.update(uri, contentValues, null, null)
-            }
 
-            showToast(context, "✅ Photo saved to Gallery (/Pictures/OmniChat)")
-            Result.success(uri)
+                showToast(context, "✅ Photo saved to Gallery (/Pictures/OmniChat)")
+                Result.success(uri)
+            } else {
+                val targetDir = resolveLegacyDirectory(context, Environment.DIRECTORY_PICTURES, "OmniChat")
+                val outFile = File(targetDir, fileName)
+                FileOutputStream(outFile).use { stream ->
+                    if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)) {
+                        throw IllegalStateException("Failed to encode bitmap")
+                    }
+                }
+                val uri = tryInsertLegacyMediaStore(
+                    context = context,
+                    collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    file = outFile,
+                    mimeType = "image/png"
+                ) ?: toShareableUri(context, outFile)
+
+                showToast(context, "✅ Photo saved to OmniChat photos")
+                Result.success(uri)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             showToast(context, "❌ Error saving image: ${e.localizedMessage}")
@@ -254,18 +275,23 @@ object MediaSaver {
                 }
                 val downloadUri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
                 if (downloadUri != null) {
-                    resolver.openOutputStream(downloadUri)?.use { it.write(bytes) }
-                    contentValues.clear()
-                    contentValues.put(MediaStore.Downloads.IS_PENDING, 0)
-                    resolver.update(downloadUri, contentValues, null, null)
+                    try {
+                        resolver.openOutputStream(downloadUri)?.use { it.write(bytes) }
+                            ?: throw IllegalStateException("Could not open Downloads stream")
+                        contentValues.clear()
+                        contentValues.put(MediaStore.Downloads.IS_PENDING, 0)
+                        resolver.update(downloadUri, contentValues, null, null)
+                    } catch (e: Exception) {
+                        runCatching { resolver.delete(downloadUri, null, null) }
+                        throw e
+                    }
                 }
                 downloadUri
             } else {
-                val downloadDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "OmniChat")
-                if (!downloadDir.exists()) downloadDir.mkdirs()
+                val downloadDir = resolveLegacyDirectory(context, Environment.DIRECTORY_DOWNLOADS, "OmniChat")
                 val outFile = File(downloadDir, targetName)
                 FileOutputStream(outFile).use { it.write(bytes) }
-                Uri.fromFile(outFile)
+                toShareableUri(context, outFile)
             }
 
             if (uri != null) {
@@ -300,29 +326,87 @@ object MediaSaver {
             }
 
             val uri = resolver.insert(collection, values) ?: return null
-            resolver.openOutputStream(uri)?.use { stream: OutputStream ->
-                stream.write(bytes)
-                stream.flush()
-            }
+            try {
+                resolver.openOutputStream(uri)?.use { stream: OutputStream ->
+                    stream.write(bytes)
+                    stream.flush()
+                } ?: throw IllegalStateException("Could not open MediaStore stream")
 
-            values.clear()
-            values.put(MediaStore.MediaColumns.IS_PENDING, 0)
-            resolver.update(uri, values, null, null)
+                values.clear()
+                values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                resolver.update(uri, values, null, null)
+            } catch (e: Exception) {
+                runCatching { resolver.delete(uri, null, null) }
+                throw e
+            }
             return uri
         } else {
-            val root = Environment.getExternalStorageDirectory()
-            val dir = File(root, subDirectory)
-            if (!dir.exists()) dir.mkdirs()
+            val topDir = subDirectory.substringBefore('/').ifBlank { Environment.DIRECTORY_DOWNLOADS }
+            val subFolder = subDirectory.substringAfter('/', "OmniChat")
+            val dir = resolveLegacyDirectory(context, topDir, subFolder)
             val file = File(dir, fileName)
             FileOutputStream(file).use { it.write(bytes) }
 
+            return tryInsertLegacyMediaStore(
+                context = context,
+                collection = collection,
+                file = file,
+                mimeType = mimeType
+            ) ?: toShareableUri(context, file)
+        }
+    }
+
+    private fun resolveLegacyDirectory(
+        context: Context,
+        publicDirType: String,
+        subFolder: String
+    ): File {
+        val candidates = listOfNotNull(
+            runCatching {
+                @Suppress("DEPRECATION")
+                File(Environment.getExternalStoragePublicDirectory(publicDirType), subFolder)
+            }.getOrNull(),
+            context.getExternalFilesDir(publicDirType)?.let { File(it, subFolder) },
+            File(context.filesDir, subFolder)
+        )
+        for (dir in candidates) {
+            val prepared = runCatching {
+                if ((dir.exists() || dir.mkdirs()) && dir.canWrite()) dir else null
+            }.getOrNull()
+            if (prepared != null) return prepared
+        }
+        return File(context.filesDir, subFolder).apply { mkdirs() }
+    }
+
+    private fun tryInsertLegacyMediaStore(
+        context: Context,
+        collection: Uri,
+        file: File,
+        mimeType: String
+    ): Uri? {
+        return runCatching {
             val values = ContentValues().apply {
+                @Suppress("DEPRECATION")
                 put(MediaStore.MediaColumns.DATA, file.absolutePath)
-                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.DISPLAY_NAME, file.name)
                 put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
             }
-            return resolver.insert(collection, values) ?: Uri.fromFile(file)
+            context.contentResolver.insert(collection, values)
+        }.getOrNull()
+    }
+
+    fun toShareableUri(context: Context, file: File): Uri {
+        return runCatching {
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        }.getOrElse { Uri.fromFile(file) }
+    }
+
+    fun toShareableUri(context: Context, uri: Uri): Uri {
+        if (uri.scheme == "file") {
+            val path = uri.path ?: return uri
+            return toShareableUri(context, File(path))
         }
+        return uri
     }
 
     /**
@@ -330,8 +414,9 @@ object MediaSaver {
      */
     fun openFile(context: Context, uri: Uri, mimeType: String) {
         try {
+            val safeUri = toShareableUri(context, uri)
             val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, mimeType)
+                setDataAndType(safeUri, mimeType)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }

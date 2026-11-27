@@ -1,8 +1,7 @@
 package com.example.ui
 
-import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
+import com.example.util.openExternalUrl
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -308,11 +307,7 @@ fun NewsScreen(
                                         if (item.link.isNotBlank()) {
                                             OutlinedButton(
                                                 onClick = {
-                                                    runCatching {
-                                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.link)))
-                                                    }.onFailure {
-                                                        Toast.makeText(context, "Unable to open link", Toast.LENGTH_SHORT).show()
-                                                    }
+                                                    openExternalUrl(context, item.link, "Unable to open link")
                                                 }
                                             ) {
                                                 Icon(Icons.Default.OpenInBrowser, contentDescription = "Open article")

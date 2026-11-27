@@ -4,9 +4,8 @@ import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
+import com.example.util.shareTextContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -214,15 +213,12 @@ fun ArtifactViewerDialog(
                     // Share Action
                     IconButton(
                         onClick = {
-                            val sendIntent = Intent().apply {
-                                action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TITLE, artifact.title)
-                                putExtra(Intent.EXTRA_TEXT, artifact.content)
-                                type = "text/plain"
-                            }
-                            try {
-                                context.startActivity(Intent.createChooser(sendIntent, "Share Artifact"))
-                            } catch (_: Exception) {}
+                            shareTextContent(
+                                context = context,
+                                text = artifact.content,
+                                chooserTitle = "Share Artifact",
+                                subject = artifact.title
+                            )
                         },
                         modifier = Modifier.testTag("share_artifact_button")
                     ) {

@@ -59,6 +59,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,7 +78,7 @@ fun CalculatorScreen(
     onBack: () -> Unit,
     onSendResultToChat: (String) -> Unit = {}
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) } // 0 = Standard Calculator, 1 = Unit Converter
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) } // 0 = Standard Calculator, 1 = Unit Converter
 
     Scaffold(
         topBar = {

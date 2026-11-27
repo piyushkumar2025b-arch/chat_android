@@ -3,8 +3,8 @@ package com.example.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
 import android.widget.Toast
+import com.example.util.shareTextContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -289,15 +289,12 @@ fun ArtifactsSheet(
                                 Toast.makeText(context, "Copied ${item.title} to clipboard", Toast.LENGTH_SHORT).show()
                             },
                             onShare = {
-                                val sendIntent = Intent().apply {
-                                    action = Intent.ACTION_SEND
-                                    putExtra(Intent.EXTRA_TITLE, item.title)
-                                    putExtra(Intent.EXTRA_TEXT, item.content)
-                                    type = "text/plain"
-                                }
-                                try {
-                                    context.startActivity(Intent.createChooser(sendIntent, "Share Artifact"))
-                                } catch (_: Exception) {}
+                                shareTextContent(
+                                    context = context,
+                                    text = item.content,
+                                    chooserTitle = "Share Artifact",
+                                    subject = item.title
+                                )
                             }
                         )
                     }
