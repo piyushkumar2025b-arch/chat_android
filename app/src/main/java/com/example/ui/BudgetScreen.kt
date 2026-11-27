@@ -199,7 +199,9 @@ fun BudgetScreen(
                         )
                     }
                     smartAddText = ""
-                    Toast.makeText(context, "Added $title (${currency.format(amount)})", Toast.LENGTH_SHORT).show()
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Added $title (${currency.format(amount)})", Toast.LENGTH_SHORT).show()
+                    }
                 } catch (e: Exception) {
                     aiError = "Could not parse entry: ${e.localizedMessage ?: "format error"}"
                 }

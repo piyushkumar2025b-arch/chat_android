@@ -55,7 +55,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.local.PreferencesManager
 import com.example.data.remote.AiService
+import com.example.util.showMainToast
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,11 +65,13 @@ import kotlinx.coroutines.launch
 fun MarkdownStudioScreen(
     initialContent: String? = null,
     initialFileName: String? = null,
+    preferencesManager: PreferencesManager? = null,
     onBack: () -> Unit,
     onSendMarkdownToChat: (String) -> Unit = {},
     showTopBar: Boolean = true
 ) {
     val context = LocalContext.current
+    val resolvedPrefs = remember(preferencesManager) { preferencesManager ?: PreferencesManager(context) }
     val clipboardManager = LocalClipboardManager.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -177,12 +181,13 @@ fun MarkdownStudioScreen(
                                 isAiRewriting = true
                                 val res = AiService.quickAssist(
                                     taskPrompt = "Polish the grammar, clarity, and structure of this Markdown document while keeping its meaning intact:\n\n$markdownText",
-                                    systemInstruction = "Return only the improved Markdown text."
+                                    systemInstruction = "Return only the improved Markdown text.",
+                                    customGeminiApiKey = resolvedPrefs.geminiApiKey
                                 )
                                 isAiRewriting = false
                                 res.onSuccess { markdownText = it }
                                     .onFailure { err ->
-                                        Toast.makeText(context, err.localizedMessage ?: "AI Polish failed", Toast.LENGTH_SHORT).show()
+                                        showMainToast(context, err.localizedMessage ?: "AI Polish failed")
                                     }
                             }
                         },
@@ -204,12 +209,13 @@ fun MarkdownStudioScreen(
                                 isAiRewriting = true
                                 val res = AiService.quickAssist(
                                     taskPrompt = "Make this Markdown document shorter and easier to scan while keeping the key points:\n\n$markdownText",
-                                    systemInstruction = "Return only the shortened Markdown text."
+                                    systemInstruction = "Return only the shortened Markdown text.",
+                                    customGeminiApiKey = resolvedPrefs.geminiApiKey
                                 )
                                 isAiRewriting = false
                                 res.onSuccess { markdownText = it }
                                     .onFailure { err ->
-                                        Toast.makeText(context, err.localizedMessage ?: "AI Shorten failed", Toast.LENGTH_SHORT).show()
+                                        showMainToast(context, err.localizedMessage ?: "AI Shorten failed")
                                     }
                             }
                         },

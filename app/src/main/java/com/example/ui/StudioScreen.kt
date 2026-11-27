@@ -87,6 +87,7 @@ fun StudioScreen(
         Box(modifier = Modifier.weight(1f)) {
             when (selectedStudioTab) {
                 0 -> ImageStudioScreen(
+                    preferencesManager = preferencesManager,
                     onSendPromptToChat = onSendPromptToChat,
                     onSendImageToChat = onSendImageToChat
                 )
@@ -97,16 +98,21 @@ fun StudioScreen(
                 )
                 2 -> MusicStudioScreen()
                 3 -> CodeStudioScreen(
+                    preferencesManager = preferencesManager,
                     onBack = { selectedStudioTab = 0 },
                     onSendCodeToChat = { code, name -> onSendPromptToChat("Code from Studio ($name):\n$code") },
                     showTopBar = false
                 )
                 4 -> MarkdownStudioScreen(
+                    preferencesManager = preferencesManager,
                     onBack = { selectedStudioTab = 0 },
                     onSendMarkdownToChat = onSendPromptToChat,
                     showTopBar = false
                 )
-                5 -> VideoStudioScreen(onSendPromptToChat = onSendPromptToChat)
+                5 -> VideoStudioScreen(
+                    preferencesManager = preferencesManager,
+                    onSendPromptToChat = onSendPromptToChat
+                )
                 6 -> UniversalMediaPlayerScreen(
                     onBack = { selectedStudioTab = 0 },
                     onSendMediaToChat = onSendPromptToChat,

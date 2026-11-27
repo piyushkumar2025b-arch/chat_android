@@ -81,8 +81,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.data.local.PreferencesManager
 import com.example.data.remote.AiService
 import com.example.data.remote.MediaSaver
+import com.example.util.showMainToast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -109,11 +111,13 @@ sealed interface ImageStudioUiState {
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ImageStudioScreen(
+    preferencesManager: PreferencesManager? = null,
     onSendPromptToChat: (String) -> Unit = {},
     onSendImageToChat: (Bitmap) -> Unit = { _ -> onSendPromptToChat("[Image Created in Studio]") },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val resolvedPrefs = remember(preferencesManager) { preferencesManager ?: PreferencesManager(context) }
     val coroutineScope = rememberCoroutineScope()
 
     var promptText by remember { mutableStateOf("") }
@@ -215,17 +219,17 @@ fun ImageStudioScreen(
             val res = AiService.quickAssist(
                 taskPrompt = task,
                 systemInstruction = "You write concise, clear image prompts. Return only the prompt with no quotes or explanation.",
-                temperature = 0.6f
+                temperature = 0.6f,
+                customGeminiApiKey = resolvedPrefs.geminiApiKey
             )
             isImprovingPrompt = false
             res.onSuccess { improved ->
                 promptText = improved.trim().removeSurrounding("\"")
             }.onFailure { err ->
-                Toast.makeText(
+                showMainToast(
                     context,
-                    err.localizedMessage ?: "Could not improve prompt right now",
-                    Toast.LENGTH_SHORT
-                ).show()
+                    err.localizedMessage ?: "Could not improve prompt right now"
+                )
             }
         }
     }

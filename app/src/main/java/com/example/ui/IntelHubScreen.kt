@@ -109,14 +109,14 @@ fun IntelHubScreen(
 
     val tools = remember {
         listOf(
-            HubToolItem(1, "Notes", "Write and organize your notes", Icons.AutoMirrored.Filled.Note, "Write"),
+            HubToolItem(1, "Notes", "Tags, search & AI action checklists", Icons.AutoMirrored.Filled.Note, "Write"),
             HubToolItem(13, "My Docs", "Save files so AI can answer from them", Icons.AutoMirrored.Filled.MenuBook, "Write"),
-            HubToolItem(21, "Saved Prompts", "Quick reusable message templates", Icons.Default.Bookmarks, "Write"),
+            HubToolItem(21, "Saved Prompts", "Templates with blanks & AI builder", Icons.Default.Bookmarks, "Write"),
             HubToolItem(20, "AI Memory", "Facts the AI remembers for you", Icons.Default.Psychology, "Write"),
             HubToolItem(14, "AI Style", "Choose how the AI talks to you", Icons.Default.Face, "Write"),
-            HubToolItem(22, "Translator", "Translate text and hear speech", Icons.Default.Translate, "Write"),
-            HubToolItem(23, "Writing Helper", "Fix grammar and change writing tone", Icons.Default.EditNote, "Write"),
-            HubToolItem(24, "Flashcards & Quiz", "Study decks made by AI or you", Icons.Default.Style, "Write"),
+            HubToolItem(22, "Translator", "Translate text, photos & speech", Icons.Default.Translate, "Write"),
+            HubToolItem(23, "Writing Helper", "Polish tone, replies & titles", Icons.Default.EditNote, "Write"),
+            HubToolItem(24, "Flashcards & Quiz", "Study filters, flip decks & AI quiz", Icons.Default.Style, "Write"),
             HubToolItem(5, "Web Search", "Search the web and ask AI about it", Icons.Default.Search, "Search"),
             HubToolItem(6, "News", "Today's top tech and AI headlines", Icons.Default.Newspaper, "Search"),
             HubToolItem(16, "YouTube", "Find videos and get fast summaries", Icons.Default.OndemandVideo, "Search"),
@@ -125,11 +125,11 @@ fun IntelHubScreen(
             HubToolItem(12, "Create Studio", "Make images, music, code, and video", Icons.Default.Palette, "Media"),
             HubToolItem(10, "Draw & Edit", "Sketch or edit photos for chat", Icons.Default.Image, "Media"),
             HubToolItem(8, "Media Player", "Play audio files and relaxing tracks", Icons.Default.PlayCircle, "Media"),
-            HubToolItem(9, "Read Aloud", "Listen to text read out loud", Icons.Default.RecordVoiceOver, "Media"),
-            HubToolItem(25, "Budget", "Track daily spending and money goals", Icons.Default.AccountBalanceWallet, "Daily"),
-            HubToolItem(2, "Calendar", "Plan events and daily schedules", Icons.Default.CalendarMonth, "Daily"),
+            HubToolItem(9, "Read Aloud", "Voice reader with AI script cleanup", Icons.Default.RecordVoiceOver, "Media"),
+            HubToolItem(25, "Budget", "Quick presets, breakdown & CSV", Icons.Default.AccountBalanceWallet, "Daily"),
+            HubToolItem(2, "Calendar", "AI quick-schedule & priority filters", Icons.Default.CalendarMonth, "Daily"),
             HubToolItem(19, "Focus & Habits", "Focus timer and daily habit streaks", Icons.Default.Timer, "Daily"),
-            HubToolItem(4, "Calculator", "Math calculator and unit converter", Icons.Default.Calculate, "Daily"),
+            HubToolItem(4, "Calculator", "Math history, units & tip splitter", Icons.Default.Calculate, "Daily"),
             HubToolItem(7, "Step Counter", "Track steps and daily activity", Icons.AutoMirrored.Filled.DirectionsRun, "Daily"),
             HubToolItem(3, "Passwords & Keys", "Keep logins and keys locked safely", Icons.Default.Key, "Daily"),
             HubToolItem(18, "Alerts", "Manage reminders and notifications", Icons.Default.Notifications, "Daily"),
@@ -303,6 +303,7 @@ fun IntelHubScreen(
         }
         1 -> NotesScreen(
             productivityDao = viewModel.productivityDao,
+            preferencesManager = viewModel.preferencesManager,
             onBack = { selectedHubTab = 0 },
             onSendNoteToChat = onSendPromptToChat
         )
@@ -321,10 +322,12 @@ fun IntelHubScreen(
             onSendResultToChat = onSendPromptToChat
         )
         5 -> WebSearchScreen(
+            preferencesManager = viewModel.preferencesManager,
             onBack = { selectedHubTab = 0 },
             onSendResultsToChat = onSendPromptToChat
         )
         6 -> NewsScreen(
+            preferencesManager = viewModel.preferencesManager,
             onBack = { selectedHubTab = 0 },
             onSendNewsToChat = onSendPromptToChat
         )
@@ -337,6 +340,7 @@ fun IntelHubScreen(
             onSendMediaToChat = onSendPromptToChat
         )
         9 -> ReadAloudScreen(
+            preferencesManager = viewModel.preferencesManager,
             onBack = { selectedHubTab = 0 }
         )
         10 -> ImageEditorScreen(

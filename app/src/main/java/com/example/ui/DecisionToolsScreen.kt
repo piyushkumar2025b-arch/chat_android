@@ -69,6 +69,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.data.remote.AiService
+import com.example.util.showMainToast
 import com.google.firebase.ai.type.Schema
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -174,11 +175,11 @@ fun DecisionToolsScreen(
                         aiDilemmaText = ""
                     }
                 } catch (_: Exception) {
-                    Toast.makeText(context, "Could not load suggestions", Toast.LENGTH_SHORT).show()
+                    showMainToast(context, "Could not load suggestions")
                 }
                 isSuggesting = false
             }.onFailure { err ->
-                Toast.makeText(context, err.localizedMessage ?: "AI suggestion failed", Toast.LENGTH_SHORT).show()
+                showMainToast(context, err.localizedMessage ?: "AI suggestion failed")
                 isSuggesting = false
             }
         }

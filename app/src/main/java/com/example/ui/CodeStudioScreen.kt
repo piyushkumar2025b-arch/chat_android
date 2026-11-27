@@ -59,7 +59,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.local.PreferencesManager
 import com.example.data.remote.AiService
+import com.example.util.showMainToast
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,11 +70,13 @@ fun CodeStudioScreen(
     initialCode: String? = null,
     initialFileName: String? = null,
     initialLanguage: String? = null,
+    preferencesManager: PreferencesManager? = null,
     onBack: () -> Unit,
     onSendCodeToChat: (code: String, filename: String) -> Unit = { _, _ -> },
     showTopBar: Boolean = true
 ) {
     val context = LocalContext.current
+    val resolvedPrefs = remember(preferencesManager) { preferencesManager ?: PreferencesManager(context) }
     val clipboardManager = LocalClipboardManager.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -235,16 +239,16 @@ fun CodeStudioScreen(
                             val res = AiService.quickAssist(
                                 taskPrompt = "Explain simply what this $selectedLanguage code ($fileName) does, point out any bugs, and suggest a clean improvement:\n\n```$selectedLanguage\n$codeText\n```",
                                 systemInstruction = "You are a clear, helpful code assistant. Keep explanations simple and practical.",
-                                modelId = AiService.DEFAULT_GEMINI_MODEL
+                                modelId = AiService.DEFAULT_GEMINI_MODEL,
+                                customGeminiApiKey = resolvedPrefs.geminiApiKey
                             )
                             isAiReviewing = false
                             res.onSuccess { aiReviewText = it }
                                 .onFailure { err ->
-                                    Toast.makeText(
+                                    showMainToast(
                                         context,
-                                        err.localizedMessage ?: "AI Review failed",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                        err.localizedMessage ?: "AI Review failed"
+                                    )
                                 }
                         }
                     },

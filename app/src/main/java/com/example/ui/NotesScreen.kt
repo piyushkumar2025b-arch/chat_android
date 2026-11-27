@@ -64,8 +64,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.data.local.NoteEntity
+import com.example.data.local.PreferencesManager
 import com.example.data.local.ProductivityDao
 import com.example.data.remote.AiService
+import com.example.util.showMainToast
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -73,10 +75,12 @@ import java.util.UUID
 @Composable
 fun NotesScreen(
     productivityDao: ProductivityDao,
+    preferencesManager: PreferencesManager? = null,
     onBack: () -> Unit,
     onSendNoteToChat: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val resolvedPrefs = remember(preferencesManager) { preferencesManager ?: PreferencesManager(context) }
     val coroutineScope = rememberCoroutineScope()
     val allNotes by productivityDao.getAllNotes().collectAsState(initial = emptyList())
 
@@ -183,17 +187,17 @@ fun NotesScreen(
                             }
                             val res = AiService.quickAssist(
                                 taskPrompt = "Summarize the key themes, tasks, and ideas across these notes in plain bullet points:\n\n$notesDump",
-                                systemInstruction = "You write clear, concise plain-language note summaries."
+                                systemInstruction = "You write clear, concise plain-language note summaries.",
+                                customGeminiApiKey = resolvedPrefs.geminiApiKey
                             )
                             isSummarizingAll = false
                             res.onSuccess { summary ->
                                 allNotesSummary = summary
                             }.onFailure { err ->
-                                Toast.makeText(
+                                showMainToast(
                                     context,
-                                    err.localizedMessage ?: "Could not summarize notes right now",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                    err.localizedMessage ?: "Could not summarize notes right now"
+                                )
                             }
                         }
                     },
@@ -370,12 +374,13 @@ fun NotesScreen(
                                     isAiHelping = true
                                     val res = AiService.quickAssist(
                                         taskPrompt = "Fix spelling, improve clarity, and organize this note cleanly without changing its meaning:\n\n$content",
-                                        systemInstruction = "You polish notes into clear, easy-to-read text. Return only the updated note text."
+                                        systemInstruction = "You polish notes into clear, easy-to-read text. Return only the updated note text.",
+                                        customGeminiApiKey = resolvedPrefs.geminiApiKey
                                     )
                                     isAiHelping = false
                                     res.onSuccess { content = it }
                                         .onFailure { err ->
-                                            Toast.makeText(context, err.localizedMessage ?: "AI Polish failed", Toast.LENGTH_SHORT).show()
+                                            showMainToast(context, err.localizedMessage ?: "AI Polish failed")
                                         }
                                 }
                             },
@@ -402,12 +407,13 @@ fun NotesScreen(
                                     isAiHelping = true
                                     val res = AiService.quickAssist(
                                         taskPrompt = "Summarize this note into 3–5 clear bullet points:\n\n$content",
-                                        systemInstruction = "Return only a short, clean bullet summary."
+                                        systemInstruction = "Return only a short, clean bullet summary.",
+                                        customGeminiApiKey = resolvedPrefs.geminiApiKey
                                     )
                                     isAiHelping = false
                                     res.onSuccess { content = it }
                                         .onFailure { err ->
-                                            Toast.makeText(context, err.localizedMessage ?: "AI Summary failed", Toast.LENGTH_SHORT).show()
+                                            showMainToast(context, err.localizedMessage ?: "AI Summary failed")
                                         }
                                 }
                             },
@@ -431,12 +437,13 @@ fun NotesScreen(
                                 isAiHelping = true
                                 val res = AiService.quickAssist(
                                     taskPrompt = "Extract clear, actionable checklist items from this note formatted as `- [ ] Task` lines:\n\n$content",
-                                    systemInstruction = "Return only a crisp `- [ ]` markdown checklist."
+                                    systemInstruction = "Return only a crisp `- [ ]` markdown checklist.",
+                                    customGeminiApiKey = resolvedPrefs.geminiApiKey
                                 )
                                 isAiHelping = false
                                 res.onSuccess { content = it }
                                     .onFailure { err ->
-                                        Toast.makeText(context, err.localizedMessage ?: "AI Action List failed", Toast.LENGTH_SHORT).show()
+                                        showMainToast(context, err.localizedMessage ?: "AI Action List failed")
                                     }
                             }
                         },
@@ -464,7 +471,7 @@ fun NotesScreen(
                                     updatedAt = System.currentTimeMillis()
                                 )
                                 productivityDao.insertNote(entity)
-                                Toast.makeText(context, if (isEditing) "Note updated" else "Note saved", Toast.LENGTH_SHORT).show()
+                                showMainToast(context, if (isEditing) "Note updated" else "Note saved")
                                 showDialog = false
                             }
                         }

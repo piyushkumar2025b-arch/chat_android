@@ -355,7 +355,9 @@ fun WritingStudioScreen(
                                                         )
                                                     )
                                                 }
-                                                Toast.makeText(context, "Saved to Notes", Toast.LENGTH_SHORT).show()
+                                                withContext(Dispatchers.Main) {
+                                                    Toast.makeText(context, "Saved to Notes", Toast.LENGTH_SHORT).show()
+                                                }
                                             }
                                         },
                                         modifier = Modifier.testTag("writing_save_note_button")

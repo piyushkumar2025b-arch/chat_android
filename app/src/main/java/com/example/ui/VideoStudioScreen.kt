@@ -76,6 +76,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.data.local.PreferencesManager
 import com.example.data.remote.AiService
 import com.example.data.remote.MediaSaver
 import kotlinx.coroutines.launch
@@ -96,10 +97,12 @@ data class VideoStoryboardItem(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun VideoStudioScreen(
+    preferencesManager: PreferencesManager? = null,
     onSendPromptToChat: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val resolvedPrefs = remember(preferencesManager) { preferencesManager ?: PreferencesManager(context) }
     val coroutineScope = rememberCoroutineScope()
 
     var promptText by remember { mutableStateOf("") }
@@ -185,7 +188,8 @@ fun VideoStudioScreen(
             val scriptResult = AiService.quickAssist(
                 taskPrompt = scriptPrompt,
                 systemInstruction = "You are a helpful video director writing clear, simple shot plans.",
-                temperature = 0.6f
+                temperature = 0.6f,
+                customGeminiApiKey = resolvedPrefs.geminiApiKey
             )
 
             val imagePrompt = "$rawPrompt. Cinematic film keyframe still, camera angle: $motionChoice"

@@ -203,7 +203,14 @@ private fun StandardCalculatorView(onSendResultToChat: (String) -> Unit) {
         // Action: Send to chat
         if (resultText != "0" && resultText != "Error" && resultText != "Cannot divide by 0") {
             OutlinedButton(
-                onClick = { onSendResultToChat("Calculator Result: $expression = $resultText") },
+                onClick = {
+                    val payload = if (expression.isBlank() || expression == resultText) {
+                        "Calculator Result: $resultText"
+                    } else {
+                        "Calculator Result: $expression = $resultText"
+                    }
+                    onSendResultToChat(payload)
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Insert Result into AI Chat", maxLines = 1, overflow = TextOverflow.Ellipsis)

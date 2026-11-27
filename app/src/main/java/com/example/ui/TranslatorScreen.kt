@@ -194,7 +194,8 @@ fun TranslatorScreen(
             AiService.translateImageText(
                 bitmap = bitmap,
                 targetLanguage = targetLanguage,
-                tone = selectedTone
+                tone = selectedTone,
+                customGeminiApiKey = preferencesManager.geminiApiKey
             ).onSuccess { result ->
                 val origLine = result.lines().firstOrNull { it.startsWith("Original:", ignoreCase = true) }
                     ?.substringAfter(":")?.trim()

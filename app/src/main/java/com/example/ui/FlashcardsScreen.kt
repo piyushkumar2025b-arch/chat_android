@@ -80,6 +80,7 @@ import com.example.data.local.FlashcardEntity
 import com.example.data.local.ProductivityDao
 import com.example.data.local.ToolkitDao
 import com.example.data.remote.AiService
+import com.example.util.showMainToast
 import com.google.firebase.ai.type.Schema
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -222,7 +223,7 @@ fun FlashcardsScreen(
                         isFlipped = false
                         isQuizMode = false
                         activeDeckId = deck.id
-                        Toast.makeText(context, "Created ${entities.size} flashcards", Toast.LENGTH_SHORT).show()
+                        showMainToast(context, "Created ${entities.size} flashcards")
                     }
                 } catch (e: Exception) {
                     errorMessage = "Could not read generated flashcards: ${e.localizedMessage ?: "format error"}"
@@ -296,7 +297,7 @@ fun FlashcardsScreen(
                                         }
                                         studyIndex = 0
                                         isFlipped = false
-                                        Toast.makeText(context, "Deck progress reset", Toast.LENGTH_SHORT).show()
+                                        showMainToast(context, "Deck progress reset")
                                     }
                                 },
                                 modifier = Modifier.testTag("flashcards_reset_progress")

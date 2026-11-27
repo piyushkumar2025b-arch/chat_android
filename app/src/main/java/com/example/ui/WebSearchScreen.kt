@@ -59,19 +59,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.data.local.PreferencesManager
 import com.example.data.remote.AiService
 import com.example.data.remote.SearchCategory
 import com.example.data.remote.WebSearchResult
 import com.example.data.remote.WebSearchService
+import com.example.util.showMainToast
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WebSearchScreen(
+    preferencesManager: PreferencesManager? = null,
     onBack: () -> Unit,
     onSendResultsToChat: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val resolvedPrefs = remember(preferencesManager) { preferencesManager ?: PreferencesManager(context) }
     val coroutineScope = rememberCoroutineScope()
 
     var searchQuery by remember { mutableStateOf("Latest Android Jetpack Compose") }
@@ -217,16 +221,16 @@ fun WebSearchScreen(
                                 }
                                 val res = AiService.quickAssist(
                                     taskPrompt = "Answer \"$searchQuery\" simply and clearly using only these search results. Mention the source names when helpful:\n\n$contextText",
-                                    systemInstruction = "Give a short, plain-language answer based on the search results."
+                                    systemInstruction = "Give a short, plain-language answer based on the search results.",
+                                    customGeminiApiKey = resolvedPrefs.geminiApiKey
                                 )
                                 isAiAnswering = false
                                 res.onSuccess { aiAnswer = it }
                                     .onFailure { err ->
-                                        Toast.makeText(
+                                        showMainToast(
                                             context,
-                                            err.localizedMessage ?: "AI Answer failed",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                            err.localizedMessage ?: "AI Answer failed"
+                                        )
                                     }
                             }
                         },

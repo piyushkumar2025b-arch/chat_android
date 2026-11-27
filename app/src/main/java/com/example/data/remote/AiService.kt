@@ -317,7 +317,8 @@ object AiService {
     suspend fun translateImageText(
         bitmap: Bitmap,
         targetLanguage: String,
-        tone: String = "Natural"
+        tone: String = "Natural",
+        customGeminiApiKey: String = ""
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
             val scaled = if (maxOf(bitmap.width, bitmap.height) > 1600) {
@@ -331,15 +332,25 @@ object AiService {
             } else {
                 bitmap
             }
+            val prompt =
+                "Read all visible text in this image and translate it cleanly into $targetLanguage using a $tone tone. " +
+                    "Format briefly as:\nOriginal: <detected text>\nTranslation: <translated text>"
+            if (customGeminiApiKey.isNotBlank()) {
+                return@withContext sendMessage(
+                    provider = ProviderType.GEMINI,
+                    modelId = DEFAULT_GEMINI_MODEL,
+                    prompt = prompt,
+                    apiKey = customGeminiApiKey,
+                    temperature = 0.2f,
+                    imageBitmaps = listOf(scaled)
+                )
+            }
             val model = Firebase.ai.generativeModel(modelName = DEFAULT_GEMINI_MODEL)
             val response = withTimeout(AI_TIMEOUT_MS) {
                 model.generateContent(
                     content {
                         image(scaled)
-                        text(
-                            "Read all visible text in this image and translate it cleanly into $targetLanguage using a $tone tone. " +
-                                "Format briefly as:\nOriginal: <detected text>\nTranslation: <translated text>"
-                        )
+                        text(prompt)
                     }
                 )
             }

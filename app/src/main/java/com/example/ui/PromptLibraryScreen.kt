@@ -1,5 +1,6 @@
 package com.example.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,12 +15,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -33,12 +37,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -52,13 +58,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.data.local.PromptTemplateEntity
+import com.example.data.remote.AiService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val PLACEHOLDER_REGEX = Regex("\\{\\{\\s*([^{}]+?)\\s*}}")
 
@@ -85,6 +98,7 @@ fun PromptLibraryScreen(
     var query by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All") }
     var favoritesOnly by remember { mutableStateOf(false) }
+    var sortMostUsed by remember { mutableStateOf(false) }
     var editorTarget by remember { mutableStateOf<PromptTemplateEntity?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<PromptTemplateEntity?>(null) }
@@ -99,6 +113,8 @@ fun PromptLibraryScreen(
         val matchesCategory = selectedCategory == "All" || prompt.category == selectedCategory
         val matchesFavorite = !favoritesOnly || prompt.isFavorite
         matchesQuery && matchesCategory && matchesFavorite
+    }.let { list ->
+        if (sortMostUsed) list.sortedByDescending { it.usageCount } else list
     }
 
     Scaffold(
@@ -129,7 +145,8 @@ fun PromptLibraryScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
+                .padding(innerPadding)
+                .testTag("prompt_list"),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -179,7 +196,9 @@ fun PromptLibraryScreen(
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("prompt_search_input")
                 )
             }
 
@@ -192,7 +211,8 @@ fun PromptLibraryScreen(
                         FilterChip(
                             selected = selectedCategory == category,
                             onClick = { selectedCategory = category },
-                            label = { Text(category) }
+                            label = { Text(category) },
+                            modifier = Modifier.testTag("prompt_category_$category")
                         )
                     }
                     FilterChip(
@@ -205,7 +225,21 @@ fun PromptLibraryScreen(
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )
-                        }
+                        },
+                        modifier = Modifier.testTag("prompt_filter_favorites")
+                    )
+                    FilterChip(
+                        selected = sortMostUsed,
+                        onClick = { sortMostUsed = !sortMostUsed },
+                        label = { Text("Most Used") },
+                        leadingIcon = {
+                            Icon(
+                                Icons.AutoMirrored.Filled.TrendingUp,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        modifier = Modifier.testTag("prompt_sort_most_used")
                     )
                 }
             }
@@ -279,6 +313,7 @@ fun PromptLibraryScreen(
     if (showEditor) {
         PromptEditorDialog(
             initial = editorTarget,
+            customGeminiApiKey = viewModel.preferencesManager.geminiApiKey,
             onDismiss = { showEditor = false },
             onSave = { title, content, category, favorite ->
                 val existing = editorTarget
@@ -435,13 +470,17 @@ private fun PromptCard(
 @Composable
 private fun PromptEditorDialog(
     initial: PromptTemplateEntity?,
+    customGeminiApiKey: String = "",
     onDismiss: () -> Unit,
     onSave: (title: String, content: String, category: String, favorite: Boolean) -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var title by remember { mutableStateOf(initial?.title.orEmpty()) }
     var content by remember { mutableStateOf(initial?.content.orEmpty()) }
     var category by remember { mutableStateOf(initial?.category ?: "General") }
     var favorite by remember { mutableStateOf(initial?.isFavorite ?: false) }
+    var isAiImproving by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -471,6 +510,42 @@ private fun PromptEditorDialog(
                     maxLines = 8,
                     modifier = Modifier.fillMaxWidth()
                 )
+                OutlinedButton(
+                    onClick = {
+                        val seed = content.ifBlank { title }.trim()
+                        if (seed.isBlank()) return@OutlinedButton
+                        isAiImproving = true
+                        scope.launch {
+                            val res = AiService.quickAssist(
+                                taskPrompt = "Turn this idea into a clear, reusable AI prompt template. Include 1-2 helpful {{variable}} blanks where useful. Return ONLY the prompt text:\n\n$seed",
+                                systemInstruction = "You craft crisp, reusable prompt templates. Return only the prompt.",
+                                customGeminiApiKey = customGeminiApiKey
+                            )
+                            isAiImproving = false
+                            res.onSuccess { improved ->
+                                content = improved.trim()
+                            }.onFailure { err ->
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(context, err.localizedMessage ?: "Could not improve prompt", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    },
+                    enabled = !isAiImproving && (content.isNotBlank() || title.isNotBlank()),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("prompt_ai_improve_button")
+                ) {
+                    if (isAiImproving) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Building Prompt…")
+                    } else {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Improve with AI")
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = favorite, onCheckedChange = { favorite = it })
                     Spacer(Modifier.size(8.dp))

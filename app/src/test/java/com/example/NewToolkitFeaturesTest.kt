@@ -19,6 +19,7 @@ import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.local.AppDatabase
+import com.example.data.local.CalendarEventEntity
 import com.example.data.local.ExpenseEntity
 import com.example.data.local.FlashcardDeckEntity
 import com.example.data.local.FlashcardEntity
@@ -27,9 +28,11 @@ import com.example.data.local.PreferencesManager
 import com.example.data.remote.BackupManager
 import com.example.ui.BudgetScreen
 import com.example.ui.CalculatorScreen
+import com.example.ui.CalendarScreen
 import com.example.ui.DecisionToolsScreen
 import com.example.ui.FlashcardsScreen
 import com.example.ui.NotesScreen
+import com.example.ui.ReadAloudScreen
 import com.example.ui.TranslatorScreen
 import com.example.ui.WritingStudioScreen
 import kotlinx.coroutines.flow.first
@@ -401,4 +404,112 @@ class NewToolkitFeaturesTest {
             composeRule.onNodeWithText("Grocery Run").assertIsDisplayed()
         }
     }
+
+    @Test
+    fun calendarScreen_priorityFilterAndQuickBarRender() {
+        runBlocking {
+            db.productivityDao().insertEvent(
+                CalendarEventEntity(id = "ev1", title = "Board Demo", description = "Slides", location = "Room A", priority = "High", timestamp = 2000L)
+            )
+            db.productivityDao().insertEvent(
+                CalendarEventEntity(id = "ev2", title = "Lunch Break", description = "Tacos", location = "Cafe", priority = "Low", timestamp = 1000L)
+            )
+
+            composeRule.setContent {
+                CalendarScreen(
+                    productivityDao = db.productivityDao(),
+                    onBack = {}
+                )
+            }
+
+            composeRule.onNodeWithTag("calendar_smart_input").assertIsDisplayed()
+            composeRule.waitUntil(timeoutMillis = 3_000) {
+                composeRule.onAllNodesWithText("Lunch Break").fetchSemanticsNodes().isNotEmpty()
+            }
+
+            composeRule.onNodeWithTag("calendar_list").performScrollToNode(
+                androidx.compose.ui.test.hasTestTag("calendar_filter_High")
+            )
+            composeRule.onNodeWithTag("calendar_filter_High").performClick()
+            composeRule.waitUntil(timeoutMillis = 3_000) {
+                composeRule.onAllNodesWithText("Lunch Break").fetchSemanticsNodes().isEmpty()
+            }
+            composeRule.onNodeWithTag("calendar_list").performScrollToNode(hasText("Board Demo"))
+            composeRule.onNodeWithText("Board Demo").assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun readAloudScreen_clearAndStatsUpdateWork() {
+        composeRule.setContent {
+            ReadAloudScreen(
+                initialText = "Hello world from OmniChat",
+                onBack = {}
+            )
+        }
+
+        composeRule.onNodeWithTag("tts_stats_label").assertIsDisplayed()
+        composeRule.onNodeWithText("4 words · ~1m listen").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("tts_clear_button").performClick()
+        composeRule.waitUntil(timeoutMillis = 3_000) {
+            composeRule.onAllNodesWithText("0 words · ~0m listen").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("0 words · ~0m listen").assertIsDisplayed()
+    }
+
+    @Test
+    fun flashcardsScreen_resetProgress_clearsMasterySafely() {
+        runBlocking {
+            val deck = FlashcardDeckEntity(id = "d_reset", title = "Vocabulary", topic = "English")
+            db.toolkitDao().upsertDeck(deck)
+            db.toolkitDao().insertCards(
+                listOf(
+                    FlashcardEntity(id = "r1", deckId = "d_reset", question = "Eloquent", answer = "Fluent and persuasive", mastered = true, createdAt = 1L)
+                )
+            )
+
+            composeRule.setContent {
+                FlashcardsScreen(
+                    toolkitDao = db.toolkitDao(),
+                    productivityDao = db.productivityDao(),
+                    onBack = {}
+                )
+            }
+
+            composeRule.waitUntil(timeoutMillis = 3_000) {
+                composeRule.onAllNodesWithText("Vocabulary").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithText("Vocabulary").performClick()
+            composeRule.waitUntil(timeoutMillis = 3_000) {
+                composeRule.onAllNodesWithText("Card 1 of 1").fetchSemanticsNodes().isNotEmpty()
+            }
+
+            composeRule.onNodeWithTag("flashcards_reset_progress").performClick()
+            val deadline = System.currentTimeMillis() + 3_000
+            while (System.currentTimeMillis() < deadline) {
+                Shadows.shadowOf(Looper.getMainLooper()).idle()
+                if (db.toolkitDao().getAllCardsOnce().firstOrNull()?.mastered == false) break
+                Thread.sleep(20)
+            }
+            assertEquals(false, db.toolkitDao().getAllCardsOnce().single().mastered)
+        }
+    }
+
+    @Test
+    fun writingStudioScreen_subjectLinesModeAndCountsUpdate() {
+        composeRule.setContent {
+            WritingStudioScreen(
+                productivityDao = db.productivityDao(),
+                preferencesManager = prefs,
+                onBack = {}
+            )
+        }
+
+        composeRule.onNodeWithTag("writing_mode_SUBJECT_LINES").performScrollTo().performClick()
+        composeRule.onNodeWithText("Apply Titles & Subjects").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("writing_draft_input").performScrollTo().performTextInput("Launch announcement for OmniChat")
+        composeRule.onNodeWithText("4 words · 32 chars").assertIsDisplayed()
+    }
 }
+

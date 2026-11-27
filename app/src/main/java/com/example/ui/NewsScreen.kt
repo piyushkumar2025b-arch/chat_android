@@ -56,18 +56,22 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.data.local.PreferencesManager
 import com.example.data.remote.AiService
 import com.example.data.remote.NewsArticle
 import com.example.data.remote.NewsFeedService
+import com.example.util.showMainToast
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewsScreen(
+    preferencesManager: PreferencesManager? = null,
     onBack: () -> Unit,
     onSendNewsToChat: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val resolvedPrefs = remember(preferencesManager) { preferencesManager ?: PreferencesManager(context) }
     val coroutineScope = rememberCoroutineScope()
     var selectedCategory by remember { mutableStateOf(NewsFeedService.NewsCategory.AI_RESEARCH) }
     var articles by remember { mutableStateOf<List<NewsArticle>>(emptyList()) }
@@ -192,16 +196,16 @@ fun NewsScreen(
                                     }
                                     val res = AiService.quickAssist(
                                         taskPrompt = "Give a fast, plain-language summary of today's top ${selectedCategory.label} headlines in 4 bullet points:\n\n$headlinesDump",
-                                        systemInstruction = "Summarize news headlines clearly and briefly in everyday language."
+                                        systemInstruction = "Summarize news headlines clearly and briefly in everyday language.",
+                                        customGeminiApiKey = resolvedPrefs.geminiApiKey
                                     )
                                     isSummarizingHeadlines = false
                                     res.onSuccess { headlinesSummary = it }
                                         .onFailure { err ->
-                                            Toast.makeText(
+                                            showMainToast(
                                                 context,
-                                                err.localizedMessage ?: "Could not summarize headlines",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
+                                                err.localizedMessage ?: "Could not summarize headlines"
+                                            )
                                         }
                                 }
                             },

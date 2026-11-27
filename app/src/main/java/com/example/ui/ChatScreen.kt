@@ -455,6 +455,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 initialCode = codeHandoff?.first,
                 initialFileName = codeHandoff?.second,
                 initialLanguage = codeHandoff?.third,
+                preferencesManager = viewModel.preferencesManager,
                 onBack = {
                     viewModel.clearCodeHandoff()
                     viewModel.navigateToSection(AppSection.CHAT)
@@ -477,6 +478,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
             MarkdownStudioScreen(
                 initialContent = markdownHandoff?.first,
                 initialFileName = markdownHandoff?.second,
+                preferencesManager = viewModel.preferencesManager,
                 onBack = {
                     viewModel.clearMarkdownHandoff()
                     viewModel.navigateToSection(AppSection.CHAT)
