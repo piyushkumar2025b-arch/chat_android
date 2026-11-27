@@ -63,6 +63,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -78,6 +79,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -119,6 +121,13 @@ enum class MapTileLayer(
     OPENTOPO("OpenTopo Relief", false, "", "https://tile.opentopomap.org/{z}/{x}/{y}.png", 17)
 }
 
+private val mapExplorerHttpClient: OkHttpClient by lazy {
+    OkHttpClient.Builder()
+        .connectTimeout(12, TimeUnit.SECONDS)
+        .readTimeout(12, TimeUnit.SECONDS)
+        .build()
+}
+
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun InteractiveGoogleMapView(
@@ -128,6 +137,19 @@ fun InteractiveGoogleMapView(
     mapType: String,
     modifier: Modifier = Modifier
 ) {
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            webViewRef?.apply {
+                stopLoading()
+                loadUrl("about:blank")
+                destroy()
+            }
+            webViewRef = null
+        }
+    }
+
     AndroidView(
         factory = { ctx ->
             WebView(ctx).apply {
@@ -141,12 +163,21 @@ fun InteractiveGoogleMapView(
                 settings.useWideViewPort = true
                 webChromeClient = WebChromeClient()
                 webViewClient = WebViewClient()
+                tag = apiKey
 
                 val html = createGoogleMapHtml(apiKey, location.lat, location.lon, zoom, mapType, location.name)
                 loadDataWithBaseURL("https://maps.googleapis.com", html, "text/html", "UTF-8", null)
+                webViewRef = this
             }
         },
         update = { webView ->
+            webViewRef = webView
+            if (webView.tag != apiKey) {
+                webView.tag = apiKey
+                val html = createGoogleMapHtml(apiKey, location.lat, location.lon, zoom, mapType, location.name)
+                webView.loadDataWithBaseURL("https://maps.googleapis.com", html, "text/html", "UTF-8", null)
+                return@AndroidView
+            }
             val script = "if (window.updateGoogleMap) { window.updateGoogleMap(${location.lat}, ${location.lon}, $zoom, '$mapType', '${escapeJs(location.name)}'); }"
             webView.evaluateJavascript(script) { result ->
                 if (result == null || result == "null") {
@@ -289,53 +320,47 @@ fun MapExplorerScreen(
         coroutineScope.launch {
             try {
                 val encoded = URLEncoder.encode(q, "UTF-8")
-                val client = OkHttpClient.Builder()
-                    .connectTimeout(12, TimeUnit.SECONDS)
-                    .readTimeout(12, TimeUnit.SECONDS)
-                    .build()
-
                 var foundItems = emptyList<MapLocation>()
 
                 // 1. If Google Maps API key is configured, query Google Maps Geocoding API first
                 if (hasGoogleMapsKey) {
-                    try {
-                        val googleUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=$encoded"
-                        val req = Request.Builder()
-                            .url(googleUrl)
-                            .addHeader("x-goog-api-key", googleMapsApiKey)
-                            .build()
-                        val res = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                        if (res.isSuccessful) {
-                            val body = res.body?.string().orEmpty()
-                            val json = JSONObject(body)
-                            val status = json.optString("status")
-                            if (status == "OK") {
-                                val results = json.optJSONArray("results")
-                                if (results != null && results.length() > 0) {
-                                    val list = mutableListOf<MapLocation>()
-                                    for (i in 0 until results.length()) {
-                                        val obj = results.getJSONObject(i)
-                                        val formatted = obj.optString("formatted_address")
-                                        val geom = obj.optJSONObject("geometry")
-                                        val loc = geom?.optJSONObject("location")
-                                        val lat = loc?.optDouble("lat", 0.0) ?: 0.0
-                                        val lon = loc?.optDouble("lng", 0.0) ?: 0.0
-                                        val shortName = formatted.substringBefore(",")
-                                        list.add(
-                                            MapLocation(
-                                                name = shortName,
-                                                lat = lat,
-                                                lon = lon,
-                                                displayName = formatted,
-                                                type = "Google Place"
-                                            )
+                    foundItems = withContext(Dispatchers.IO) {
+                        runCatching {
+                            val googleUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=$encoded"
+                            val req = Request.Builder()
+                                .url(googleUrl)
+                                .addHeader("x-goog-api-key", googleMapsApiKey)
+                                .build()
+                            mapExplorerHttpClient.newCall(req).execute().use { res ->
+                                if (!res.isSuccessful) return@runCatching emptyList<MapLocation>()
+                                val body = res.body?.string().orEmpty()
+                                val json = JSONObject(body)
+                                val status = json.optString("status")
+                                if (status != "OK") return@runCatching emptyList<MapLocation>()
+                                val results = json.optJSONArray("results") ?: return@runCatching emptyList<MapLocation>()
+                                val list = mutableListOf<MapLocation>()
+                                for (i in 0 until results.length()) {
+                                    val obj = results.getJSONObject(i)
+                                    val formatted = obj.optString("formatted_address")
+                                    val geom = obj.optJSONObject("geometry")
+                                    val loc = geom?.optJSONObject("location")
+                                    val lat = loc?.optDouble("lat", 0.0) ?: 0.0
+                                    val lon = loc?.optDouble("lng", 0.0) ?: 0.0
+                                    val shortName = formatted.substringBefore(",")
+                                    list.add(
+                                        MapLocation(
+                                            name = shortName,
+                                            lat = lat,
+                                            lon = lon,
+                                            displayName = formatted,
+                                            type = "Google Place"
                                         )
-                                    }
-                                    foundItems = list
+                                    )
                                 }
+                                list
                             }
-                        }
-                    } catch (_: Exception) {}
+                        }.getOrDefault(emptyList())
+                    }
                 }
 
                 // 2. If Google Geocoding returned no results, fallback to OpenStreetMap Nominatim
@@ -347,7 +372,7 @@ fun MapExplorerScreen(
                         .build()
 
                     foundItems = withContext(Dispatchers.IO) {
-                        client.newCall(req).execute().use { res ->
+                        mapExplorerHttpClient.newCall(req).execute().use { res ->
                             if (!res.isSuccessful) return@withContext emptyList<MapLocation>()
                             val body = res.body?.string().orEmpty()
                             if (body.isBlank()) return@withContext emptyList<MapLocation>()
@@ -582,7 +607,13 @@ fun MapExplorerScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(loc.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            Text(loc.displayName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                            Text(
+                                loc.displayName,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
                 }
@@ -847,7 +878,9 @@ fun MapExplorerScreen(
                                         try {
                                             val webUrl = "https://www.google.com/maps/search/?api=1&query=${currentLocation.lat},${currentLocation.lon}"
                                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(webUrl)))
-                                        } catch (_: Exception) {}
+                                        } catch (_: Exception) {
+                                            Toast.makeText(context, "No maps app or browser available.", Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                 }
                             ) {

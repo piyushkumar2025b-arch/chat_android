@@ -159,12 +159,11 @@ fun Game2048Screen(
     }
 
     fun undoMove() {
-        if (previousBoard != null) {
-            board = Array(4) { r -> previousBoard!![r].clone() }
-            currentScore = previousScore
-            previousBoard = null
-            isGameOver = false
-        }
+        val prev = previousBoard ?: return
+        board = Array(4) { r -> prev[r].clone() }
+        currentScore = previousScore
+        previousBoard = null
+        isGameOver = false
     }
 
     var totalDragX by remember { mutableStateOf(0f) }

@@ -242,7 +242,11 @@ fun SettingsDialog(
                             OutlinedButton(
                                 onClick = {
                                     val backupJson = preferencesManager.exportKeysJson()
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                    if (clipboard == null) {
+                                        Toast.makeText(context, "Clipboard service unavailable", Toast.LENGTH_SHORT).show()
+                                        return@OutlinedButton
+                                    }
                                     val clipData = ClipData.newPlainText("OmniChat Keys Backup", backupJson)
                                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                                         clipData.description.extras = android.os.PersistableBundle().apply {
@@ -261,26 +265,28 @@ fun SettingsDialog(
 
                             OutlinedButton(
                                 onClick = {
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    val clip = clipboard.primaryClip
-                                    if (clip != null && clip.itemCount > 0) {
-                                        val pastedText = clip.getItemAt(0).text?.toString().orEmpty()
-                                        if (preferencesManager.importKeysJson(pastedText)) {
-                                            geminiKey = preferencesManager.geminiApiKey
-                                            groqKey = preferencesManager.groqApiKey
-                                            openRouterKey = preferencesManager.openRouterApiKey
-                                            cerebrasKey = preferencesManager.cerebrasApiKey
-                                            huggingFaceKey = preferencesManager.huggingFaceApiKey
-                                            youtubeKey = preferencesManager.youtubeApiKey
-                                            googleMapsKey = preferencesManager.googleMapsApiKey
-                                            customUrl = preferencesManager.customBaseUrl
-                                            customKey = preferencesManager.customApiKey
-                                            customModel = preferencesManager.customModel
-                                            onKeyUpdated?.invoke()
-                                            Toast.makeText(context, "Keys restored from backup successfully!", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(context, "Invalid backup format in clipboard", Toast.LENGTH_SHORT).show()
-                                        }
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                    val clip = clipboard?.primaryClip
+                                    if (clip == null || clip.itemCount == 0) {
+                                        Toast.makeText(context, "Clipboard is empty", Toast.LENGTH_SHORT).show()
+                                        return@OutlinedButton
+                                    }
+                                    val pastedText = clip.getItemAt(0).text?.toString().orEmpty()
+                                    if (preferencesManager.importKeysJson(pastedText)) {
+                                        geminiKey = preferencesManager.geminiApiKey
+                                        groqKey = preferencesManager.groqApiKey
+                                        openRouterKey = preferencesManager.openRouterApiKey
+                                        cerebrasKey = preferencesManager.cerebrasApiKey
+                                        huggingFaceKey = preferencesManager.huggingFaceApiKey
+                                        youtubeKey = preferencesManager.youtubeApiKey
+                                        googleMapsKey = preferencesManager.googleMapsApiKey
+                                        customUrl = preferencesManager.customBaseUrl
+                                        customKey = preferencesManager.customApiKey
+                                        customModel = preferencesManager.customModel
+                                        onKeyUpdated?.invoke()
+                                        Toast.makeText(context, "Keys restored from backup successfully!", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "Invalid backup format in clipboard", Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 modifier = Modifier.weight(1f).testTag("settings_import_keys_button")

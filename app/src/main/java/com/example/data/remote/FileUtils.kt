@@ -65,8 +65,8 @@ object FileUtils {
                 }
             }
 
-            if (displayName.startsWith("file_") && !uri.lastPathSegment.isNullOrBlank()) {
-                val segment = uri.lastPathSegment!!.substringAfterLast('/')
+            if (displayName.startsWith("file_")) {
+                val segment = uri.lastPathSegment?.substringAfterLast('/').orEmpty()
                 if (segment.isNotBlank()) displayName = segment
             }
 
@@ -205,26 +205,27 @@ object FileUtils {
 
     private fun inspectZipType(file: File): DetectedTypeInfo {
         return try {
-            val zip = ZipInputStream(file.inputStream())
-            var entry = zip.nextEntry
             var isDocx = false
             var isXlsx = false
             var isPptx = false
-            var count = 0
 
-            while (entry != null && count < 20) {
-                val name = entry.name
-                if (name.startsWith("word/")) {
-                    isDocx = true; break
-                } else if (name.startsWith("xl/")) {
-                    isXlsx = true; break
-                } else if (name.startsWith("ppt/")) {
-                    isPptx = true; break
+            ZipInputStream(file.inputStream()).use { zip ->
+                var entry = zip.nextEntry
+                var count = 0
+
+                while (entry != null && count < 20) {
+                    val name = entry.name
+                    if (name.startsWith("word/")) {
+                        isDocx = true; break
+                    } else if (name.startsWith("xl/")) {
+                        isXlsx = true; break
+                    } else if (name.startsWith("ppt/")) {
+                        isPptx = true; break
+                    }
+                    entry = zip.nextEntry
+                    count++
                 }
-                entry = zip.nextEntry
-                count++
             }
-            zip.close()
 
             when {
                 isDocx -> DetectedTypeInfo("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Word DOCX")
@@ -392,11 +393,11 @@ object FileUtils {
 
         // Determine page count via native Android PdfRenderer
         try {
-            val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-            val renderer = PdfRenderer(pfd)
-            pageCount = renderer.pageCount
-            renderer.close()
-            pfd.close()
+            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+                PdfRenderer(pfd).use { renderer ->
+                    pageCount = renderer.pageCount
+                }
+            }
         } catch (_: Exception) {}
 
         try {
@@ -565,29 +566,31 @@ object FileUtils {
      */
     fun convertPdfPageToBase64(file: File, pageIndex: Int = 0): String? {
         return try {
-            val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-            val renderer = PdfRenderer(pfd)
-            if (pageIndex < renderer.pageCount) {
-                val page = renderer.openPage(pageIndex)
-                val width = (page.width * 1.5f).toInt().coerceAtMost(1600)
-                val height = (page.height * 1.5f).toInt().coerceAtMost(2200)
+            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+                PdfRenderer(pfd).use { renderer ->
+                    if (pageIndex < renderer.pageCount) {
+                        renderer.openPage(pageIndex).use { page ->
+                            val width = (page.width * 1.5f).toInt().coerceAtMost(1600)
+                            val height = (page.height * 1.5f).toInt().coerceAtMost(2200)
 
-                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                val canvas = Canvas(bitmap)
-                canvas.drawColor(Color.WHITE)
-                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                page.close()
-                renderer.close()
-                pfd.close()
+                            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                            try {
+                                val canvas = Canvas(bitmap)
+                                canvas.drawColor(Color.WHITE)
+                                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
 
-                val outputStream = ByteArrayOutputStream()
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
-                val bytes = outputStream.toByteArray()
-                Base64.encodeToString(bytes, Base64.NO_WRAP)
-            } else {
-                renderer.close()
-                pfd.close()
-                null
+                                val outputStream = ByteArrayOutputStream()
+                                bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
+                                val bytes = outputStream.toByteArray()
+                                Base64.encodeToString(bytes, Base64.NO_WRAP)
+                            } finally {
+                                bitmap.recycle()
+                            }
+                        }
+                    } else {
+                        null
+                    }
+                }
             }
         } catch (_: Exception) {
             null
@@ -618,40 +621,40 @@ object FileUtils {
      */
     fun extractTextFromDocx(file: File): String {
         return try {
-            val zip = ZipInputStream(file.inputStream())
-            var entry = zip.nextEntry
             val sb = StringBuilder()
             var found = false
 
-            while (entry != null) {
-                val name = entry.name
-                if (name == "word/document.xml" || name == "content.xml" || name.startsWith("word/header") || name.startsWith("word/footer")) {
-                    found = true
-                    val xml = readZipEntryText(zip, 250_000)
+            ZipInputStream(file.inputStream()).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    val name = entry.name
+                    if (name == "word/document.xml" || name == "content.xml" || name.startsWith("word/header") || name.startsWith("word/footer")) {
+                        found = true
+                        val xml = readZipEntryText(zip, 250_000)
 
-                    // Parse paragraphs and tables
-                    val paragraphs = Regex("<w:p[ >]([\\s\\S]*?)</w:p>").findAll(xml)
-                    for (p in paragraphs) {
-                        val pXml = p.value
-                        val tMatches = Regex("<w:t[^>]*>([\\s\\S]*?)</w:t>").findAll(pXml)
-                        val pText = tMatches.map { unescapeXml(it.groupValues[1]) }.joinToString("")
-                        if (pText.isNotBlank()) {
-                            sb.append(pText).append("\n\n")
+                        // Parse paragraphs and tables
+                        val paragraphs = Regex("<w:p[ >]([\\s\\S]*?)</w:p>").findAll(xml)
+                        for (p in paragraphs) {
+                            val pXml = p.value
+                            val tMatches = Regex("<w:t[^>]*>([\\s\\S]*?)</w:t>").findAll(pXml)
+                            val pText = tMatches.map { unescapeXml(it.groupValues[1]) }.joinToString("")
+                            if (pText.isNotBlank()) {
+                                sb.append(pText).append("\n\n")
+                            }
+                        }
+
+                        // Fallback for ODT content.xml (<text:p> and <text:h>)
+                        if (name == "content.xml") {
+                            val odtMatches = Regex("<text:[ph][^>]*>([\\s\\S]*?)</text:[ph]>").findAll(xml)
+                            for (m in odtMatches) {
+                                val plain = stripXmlTags(m.groupValues[1])
+                                if (plain.isNotBlank()) sb.append(plain).append("\n\n")
+                            }
                         }
                     }
-
-                    // Fallback for ODT content.xml (<text:p> and <text:h>)
-                    if (name == "content.xml") {
-                        val odtMatches = Regex("<text:[ph][^>]*>([\\s\\S]*?)</text:[ph]>").findAll(xml)
-                        for (m in odtMatches) {
-                            val plain = stripXmlTags(m.groupValues[1])
-                            if (plain.isNotBlank()) sb.append(plain).append("\n\n")
-                        }
-                    }
+                    entry = zip.nextEntry
                 }
-                entry = zip.nextEntry
             }
-            zip.close()
 
             if (found && sb.isNotBlank()) {
                 "[Word Document: ${file.name}]\n\n${sb.toString().trim()}"
@@ -668,27 +671,27 @@ object FileUtils {
      */
     fun extractTextFromXlsx(file: File): String {
         return try {
-            val zip = ZipInputStream(file.inputStream())
-            var entry = zip.nextEntry
             val sharedStrings = mutableListOf<String>()
             val sheetDataMap = mutableMapOf<String, String>()
 
-            while (entry != null) {
-                val name = entry.name
-                if (name == "xl/sharedStrings.xml") {
-                    val xml = readZipEntryText(zip, 250_000)
-                    val tMatches = Regex("<t[^>]*>([\\s\\S]*?)</t>").findAll(xml)
-                    for (m in tMatches) {
-                        sharedStrings.add(unescapeXml(m.groupValues[1]))
+            ZipInputStream(file.inputStream()).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    val name = entry.name
+                    if (name == "xl/sharedStrings.xml") {
+                        val xml = readZipEntryText(zip, 250_000)
+                        val tMatches = Regex("<t[^>]*>([\\s\\S]*?)</t>").findAll(xml)
+                        for (m in tMatches) {
+                            sharedStrings.add(unescapeXml(m.groupValues[1]))
+                        }
+                    } else if (name.startsWith("xl/worksheets/sheet") && name.endsWith(".xml")) {
+                        val sheetName = name.substringAfterLast('/').substringBefore('.')
+                        val xml = readZipEntryText(zip, 250_000)
+                        sheetDataMap[sheetName] = xml
                     }
-                } else if (name.startsWith("xl/worksheets/sheet") && name.endsWith(".xml")) {
-                    val sheetName = name.substringAfterLast('/').substringBefore('.')
-                    val xml = readZipEntryText(zip, 250_000)
-                    sheetDataMap[sheetName] = xml
+                    entry = zip.nextEntry
                 }
-                entry = zip.nextEntry
             }
-            zip.close()
 
             val sb = StringBuilder()
             sb.append("[Excel Spreadsheet: ${file.name}]\n\n")
@@ -754,24 +757,24 @@ object FileUtils {
      */
     fun extractTextFromPptx(file: File): String {
         return try {
-            val zip = ZipInputStream(file.inputStream())
-            var entry = zip.nextEntry
             val slides = mutableMapOf<Int, String>()
 
-            while (entry != null) {
-                val name = entry.name
-                if (name.startsWith("ppt/slides/slide") && name.endsWith(".xml")) {
-                    val slideNum = Regex("slide(\\d+)\\.xml").find(name)?.groupValues?.get(1)?.toIntOrNull() ?: 999
-                    val xml = readZipEntryText(zip, 250_000)
-                    val tMatches = Regex("<a:t[^>]*>([\\s\\S]*?)</a:t>").findAll(xml)
-                    val slideText = tMatches.map { unescapeXml(it.groupValues[1]) }.joinToString(" ")
-                    if (slideText.isNotBlank()) {
-                        slides[slideNum] = slideText
+            ZipInputStream(file.inputStream()).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    val name = entry.name
+                    if (name.startsWith("ppt/slides/slide") && name.endsWith(".xml")) {
+                        val slideNum = Regex("slide(\\d+)\\.xml").find(name)?.groupValues?.get(1)?.toIntOrNull() ?: 999
+                        val xml = readZipEntryText(zip, 250_000)
+                        val tMatches = Regex("<a:t[^>]*>([\\s\\S]*?)</a:t>").findAll(xml)
+                        val slideText = tMatches.map { unescapeXml(it.groupValues[1]) }.joinToString(" ")
+                        if (slideText.isNotBlank()) {
+                            slides[slideNum] = slideText
+                        }
                     }
+                    entry = zip.nextEntry
                 }
-                entry = zip.nextEntry
             }
-            zip.close()
 
             if (slides.isNotEmpty()) {
                 val sb = StringBuilder()
@@ -950,24 +953,24 @@ object FileUtils {
      */
     fun inspectZipArchive(file: File): String {
         return try {
-            val zip = ZipInputStream(file.inputStream())
-            var entry = zip.nextEntry
             val entries = mutableListOf<String>()
             val samples = mutableListOf<String>()
 
-            while (entry != null && entries.size < 100) {
-                val name = entry.name
-                val size = entry.size
-                entries.add("$name (${formatFileSize(size.coerceAtLeast(0))})")
+            ZipInputStream(file.inputStream()).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null && entries.size < 100) {
+                    val name = entry.name
+                    val size = entry.size
+                    entries.add("$name (${formatFileSize(size.coerceAtLeast(0))})")
 
-                val ext = name.substringAfterLast('.', "").lowercase()
-                if (samples.size < 3 && ext in listOf("txt", "md", "json", "py", "kt", "csv", "xml", "js")) {
-                    val sampleText = readZipEntryText(zip, 400)
-                    samples.add("--- File: $name ---\n$sampleText\n")
+                    val ext = name.substringAfterLast('.', "").lowercase()
+                    if (samples.size < 3 && ext in listOf("txt", "md", "json", "py", "kt", "csv", "xml", "js")) {
+                        val sampleText = readZipEntryText(zip, 400)
+                        samples.add("--- File: $name ---\n$sampleText\n")
+                    }
+                    entry = zip.nextEntry
                 }
-                entry = zip.nextEntry
             }
-            zip.close()
 
             val sb = StringBuilder()
             sb.append("[ZIP Archive: ${file.name} • ${entries.size} files]\n\nManifest:\n")
@@ -986,8 +989,8 @@ object FileUtils {
      * Extracts media metadata (audio/video duration, bitrate, resolution) via MediaMetadataRetriever.
      */
     fun extractMediaMetadata(file: File): String {
+        val retriever = MediaMetadataRetriever()
         return try {
-            val retriever = MediaMetadataRetriever()
             retriever.setDataSource(file.absolutePath)
 
             val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
@@ -997,8 +1000,6 @@ object FileUtils {
             val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
             val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
             val mime = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
-
-            retriever.release()
 
             val durationSec = durationMs / 1000
             val min = durationSec / 60
@@ -1014,8 +1015,10 @@ object FileUtils {
             if (bitrate > 0) sb.append("• Bitrate: ${bitrate / 1000} kbps\n")
             if (!width.isNullOrBlank() && !height.isNullOrBlank()) sb.append("• Video Resolution: ${width}x${height}\n")
             sb.toString()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             "[Media File: ${file.name} • Size: ${formatFileSize(file.length())}]"
+        } finally {
+            runCatching { retriever.release() }
         }
     }
 

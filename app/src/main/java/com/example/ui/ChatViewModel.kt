@@ -249,6 +249,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val model = resolveModel(provider, session.modelId)
         _activeProvider.value = provider
         _activeModel.value = model
+        _quickAiMode.value = resolveQuickMode(model.id)
         preferencesManager.lastProviderId = provider.id
         preferencesManager.lastModelId = model.id
         _activeSessionId.value = session.id
@@ -422,6 +423,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun addAttachment(attachment: ChatAttachment) {
         _pendingAttachments.value = _pendingAttachments.value + attachment
+        if (attachment.bitmap != null && (attachment.localUri.isBlank() || attachment.sizeBytes <= 0L)) {
+            viewModelScope.launch {
+                val prepared = withContext(Dispatchers.IO) { prepareAttachment(attachment) }
+                if (prepared != attachment) {
+                    _pendingAttachments.value = _pendingAttachments.value.map {
+                        if (it.id == prepared.id) prepared else it
+                    }
+                }
+            }
+        }
     }
 
     fun removeAttachment(id: String) {
@@ -641,7 +652,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isRagProcessing.value = true
             var count = 0
-            val allNotes = notes.value
+            val allNotes = withContext(Dispatchers.IO) { productivityDao.getAllNotesOnce() }
             for (note in allNotes) {
                 try {
                     ragEngine.ingestDocument(
@@ -1363,14 +1374,24 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun prepareAttachment(attachment: ChatAttachment): ChatAttachment {
-        if (attachment.localUri.isNotBlank() || attachment.bitmap == null) return attachment
+        if (attachment.localUri.isNotBlank()) {
+            if (attachment.sizeBytes > 0L) return attachment
+            val existingFile = File(attachment.localUri)
+            return if (existingFile.exists()) {
+                attachment.copy(sizeBytes = existingFile.length())
+            } else attachment
+        }
+        val bmp = attachment.bitmap ?: return attachment
         return try {
             val directory = File(app.filesDir, "chat_attachments").apply { mkdirs() }
             val file = File(directory, "img_${attachment.id.take(8)}_${System.currentTimeMillis()}.png")
             file.outputStream().use { output ->
-                attachment.bitmap.compress(Bitmap.CompressFormat.PNG, 92, output)
+                bmp.compress(Bitmap.CompressFormat.PNG, 92, output)
             }
-            attachment.copy(localUri = file.absolutePath)
+            attachment.copy(
+                localUri = file.absolutePath,
+                sizeBytes = file.length()
+            )
         } catch (_: Exception) {
             attachment
         }

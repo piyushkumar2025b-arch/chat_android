@@ -4,7 +4,10 @@ import android.content.Context
 import android.media.MediaPlayer
 import android.media.PlaybackParams
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.widget.Toast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
@@ -199,36 +202,54 @@ fun MusicStudioScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            try {
-                AudioSynthesizer.stopSound()
-                mediaPlayer?.release()
-                mediaPlayer = null
-                customAudioUri = uri
+            coroutineScope.launch {
+                try {
+                    AudioSynthesizer.stopSound()
+                    runCatching { mediaPlayer?.release() }
+                    mediaPlayer = null
+                    customAudioUri = uri
 
-                val mp = MediaPlayer().apply {
-                    setDataSource(context, uri)
-                    prepare()
-                    this.isLooping = latestLooping
-                    setOnCompletionListener {
+                    val (mp, title) = withContext(Dispatchers.IO) {
+                        var resolvedName: String? = null
+                        runCatching {
+                            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                                if (cursor.moveToFirst()) {
+                                    val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                                    if (idx >= 0) resolvedName = cursor.getString(idx)
+                                }
+                            }
+                        }
+                        val preparedPlayer = MediaPlayer().apply {
+                            setDataSource(context, uri)
+                            prepare()
+                        }
+                        val trackTitle = resolvedName?.takeIf { it.isNotBlank() }?.substringBeforeLast('.')
+                            ?: uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.')
+                            ?: "My Audio File"
+                        preparedPlayer to trackTitle
+                    }
+
+                    mp.isLooping = latestLooping
+                    mp.setOnCompletionListener {
                         if (!latestLooping) {
                             isPlaying = false
                             currentPositionMs = 0L
                         }
                     }
-                }
-                mediaPlayer = mp
-                isUploadedSong = true
-                currentSongTitle = uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.') ?: "My Audio File"
-                currentSongArtist = "Local Uploaded Track"
-                totalDurationMs = mp.duration.toLong().coerceAtLeast(1000L)
-                currentPositionMs = 0L
-                currentBpm = 120
+                    mediaPlayer = mp
+                    isUploadedSong = true
+                    currentSongTitle = title
+                    currentSongArtist = "Local Uploaded Track"
+                    totalDurationMs = mp.duration.toLong().coerceAtLeast(1000L)
+                    currentPositionMs = 0L
+                    currentBpm = 120
 
-                mp.start()
-                isPlaying = true
-                Toast.makeText(context, "Playing: $currentSongTitle", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Toast.makeText(context, "Error loading audio: ${e.message}", Toast.LENGTH_SHORT).show()
+                    mp.start()
+                    isPlaying = true
+                    Toast.makeText(context, "Playing: $currentSongTitle", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Error loading audio: ${e.message ?: "Unsupported file"}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -237,10 +258,11 @@ fun MusicStudioScreen(
     LaunchedEffect(isPlaying, isUploadedSong, totalDurationMs) {
         while (isActive && isPlaying) {
             delay(80)
-            if (isUploadedSong && mediaPlayer != null) {
-                try {
-                    currentPositionMs = mediaPlayer!!.currentPosition.toLong()
-                } catch (_: Exception) {}
+            val mp = mediaPlayer
+            if (isUploadedSong && mp != null) {
+                runCatching {
+                    currentPositionMs = mp.currentPosition.toLong()
+                }
             } else {
                 currentPositionMs = (currentPositionMs + 80).coerceAtMost(totalDurationMs)
             }
@@ -274,7 +296,7 @@ fun MusicStudioScreen(
 
     DisposableEffect(Unit) {
         onDispose {
-            mediaPlayer?.release()
+            runCatching { mediaPlayer?.release() }
             mediaPlayer = null
             AudioSynthesizer.stopSound()
         }
@@ -638,7 +660,7 @@ fun MusicStudioScreen(
                 // Loop toggle
                 IconButton(onClick = {
                     isLooping = !isLooping
-                    mediaPlayer?.isLooping = isLooping
+                    runCatching { mediaPlayer?.isLooping = isLooping }
                 }) {
                     Icon(
                         Icons.Default.Repeat,
@@ -769,7 +791,7 @@ fun MusicStudioScreen(
                                 FilterChip(
                                     selected = isSelected,
                                     onClick = {
-                                        mediaPlayer?.pause()
+                                        runCatching { if (mediaPlayer?.isPlaying == true) mediaPlayer?.pause() }
                                         isUploadedSong = false
                                         currentSongTitle = track.title
                                         currentSongArtist = track.artist

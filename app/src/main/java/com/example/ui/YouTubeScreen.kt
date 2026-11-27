@@ -83,6 +83,13 @@ import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
+private val youtubeHttpClient: OkHttpClient by lazy {
+    OkHttpClient.Builder()
+        .connectTimeout(12, TimeUnit.SECONDS)
+        .readTimeout(12, TimeUnit.SECONDS)
+        .build()
+}
+
 data class YouTubeVideoItem(
     val videoId: String,
     val title: String,
@@ -246,14 +253,13 @@ fun YouTubeScreen(
             try {
                 val encoded = URLEncoder.encode(q, "UTF-8")
                 val url = "https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=$encoded&type=video"
-                val client = OkHttpClient.Builder().connectTimeout(12, TimeUnit.SECONDS).build()
                 val req = Request.Builder()
                     .url(url)
                     .addHeader("x-goog-api-key", key)
                     .build()
 
                 val (isSuccess, code, body) = withContext(Dispatchers.IO) {
-                    client.newCall(req).execute().use { res ->
+                    youtubeHttpClient.newCall(req).execute().use { res ->
                         Triple(res.isSuccessful, res.code, res.body?.string().orEmpty())
                     }
                 }
@@ -381,8 +387,7 @@ fun YouTubeScreen(
         }
 
         // Active Player Card
-        if (activeVideo != null) {
-            val vid = activeVideo!!
+        activeVideo?.let { vid ->
             item {
                 Card(
                     shape = RoundedCornerShape(16.dp),
@@ -615,8 +620,8 @@ fun YouTubeScreen(
 
                                     IconButton(
                                         onClick = {
-                                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                            cm.setPrimaryClip(android.content.ClipData.newPlainText("YouTube Link", "https://youtube.com/watch?v=${vid.videoId}"))
+                                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                            cm?.setPrimaryClip(android.content.ClipData.newPlainText("YouTube Link", "https://youtube.com/watch?v=${vid.videoId}"))
                                             Toast.makeText(context, "Link copied to clipboard!", Toast.LENGTH_SHORT).show()
                                         }
                                     ) {

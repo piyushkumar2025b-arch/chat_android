@@ -3,6 +3,8 @@ package com.example
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.os.Looper
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.test.assertIsDisplayed
@@ -18,6 +20,7 @@ import com.example.data.local.NoteEntity
 import com.example.data.local.PreferencesManager
 import com.example.data.model.AvailableModels
 import com.example.data.model.ProviderType
+import com.example.model.ChatAttachment
 import com.example.ui.ChatViewModel
 import com.example.ui.CodeStudioScreen
 import com.example.ui.ImageStudioScreen
@@ -30,12 +33,17 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -243,5 +251,95 @@ class AiUsabilityVerificationTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("note_ai_polish_button").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("note_ai_summary_button").performScrollTo().assertIsDisplayed()
+    }
+
+    private fun waitForCondition(timeoutMs: Long = 5_000, condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (!condition()) {
+            Shadows.shadowOf(Looper.getMainLooper()).idle()
+            if (condition() || System.currentTimeMillis() >= deadline) break
+            Thread.sleep(20)
+        }
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    @Test
+    fun chatViewModel_addAttachment_persistsBitmapAndPopulatesSize() {
+        val viewModel = ChatViewModel(app)
+        val bitmap = Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888)
+        viewModel.addAttachment(
+            ChatAttachment(
+                name = "studio_art.png",
+                mimeType = "image/png",
+                bitmap = bitmap
+            )
+        )
+
+        waitForCondition {
+            val att = viewModel.pendingAttachments.value.firstOrNull()
+            att != null && att.localUri.isNotBlank() && att.sizeBytes > 0L
+        }
+
+        val persisted = viewModel.pendingAttachments.value.firstOrNull()
+        assertNotNull(persisted)
+        assertTrue(persisted!!.sizeBytes > 0L)
+        assertTrue(File(persisted.localUri).exists())
+    }
+
+    @Test
+    fun chatViewModel_selectSession_syncsQuickAiMode() {
+        val viewModel = ChatViewModel(app)
+        waitForCondition {
+            viewModel.isSessionReady.value && viewModel.activeSessionId.value != null
+        }
+
+        val firstSessionId = viewModel.activeSessionId.value!!
+        viewModel.setQuickAiMode("deep")
+        assertEquals("deep", viewModel.quickAiMode.value)
+
+        viewModel.newSession()
+        waitForCondition {
+            viewModel.activeSessionId.value != null && viewModel.activeSessionId.value != firstSessionId
+        }
+
+        viewModel.setQuickAiMode("fast")
+        assertEquals("fast", viewModel.quickAiMode.value)
+
+        viewModel.selectSession(firstSessionId)
+        waitForCondition {
+            viewModel.activeSessionId.value == firstSessionId
+        }
+        assertEquals("deep", viewModel.quickAiMode.value)
+        assertEquals("gemini-4-argon", viewModel.activeModel.value.id)
+    }
+
+    @Test
+    fun chatViewModel_ingestAllNotesToRag_readsFromDaoDirectly() {
+        val viewModel = ChatViewModel(app)
+        runBlocking {
+            viewModel.productivityDao.insertNote(
+                NoteEntity(
+                    id = "rag-direct-note",
+                    title = "Offline Sync Check",
+                    content = "RAG ingestion should read notes directly from Room.",
+                    tags = "test",
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+        }
+
+        val latch = CountDownLatch(1)
+        var callbackSuccess = false
+        var callbackMessage = ""
+        viewModel.ingestAllNotesToRag { success, message ->
+            callbackSuccess = success
+            callbackMessage = message
+            latch.countDown()
+        }
+
+        waitForCondition { latch.count == 0L }
+        assertTrue(latch.await(1, TimeUnit.SECONDS))
+        assertTrue(callbackSuccess)
+        assertTrue("Expected at least 1 imported note in '$callbackMessage'", !callbackMessage.contains("Imported 0 notes"))
     }
 }

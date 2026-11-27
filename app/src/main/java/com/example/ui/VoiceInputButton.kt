@@ -44,12 +44,6 @@ fun VoiceInputButton(
     val context = LocalContext.current
     val currentOnResult by rememberUpdatedState(onResult)
     var isListening by remember { mutableStateOf(false) }
-    var hasPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-                PackageManager.PERMISSION_GRANTED
-        )
-    }
     val recognizer = remember {
         if (SpeechRecognizer.isRecognitionAvailable(context)) {
             SpeechRecognizer.createSpeechRecognizer(context)
@@ -94,14 +88,43 @@ fun VoiceInputButton(
 
             override fun onEvent(eventType: Int, params: Bundle?) = Unit
         })
-        onDispose { recognizer?.destroy() }
+        onDispose { runCatching { recognizer?.destroy() } }
+    }
+
+    fun startListening() {
+        val activeRecognizer = recognizer
+        if (activeRecognizer == null) {
+            Toast.makeText(
+                context,
+                "Speech recognition is not available on this device.",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+            )
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        }
+        isListening = true
+        runCatching {
+            activeRecognizer.startListening(intent)
+        }.onFailure {
+            isListening = false
+            Toast.makeText(context, "Could not start voice input.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        hasPermission = granted
-        if (!granted) {
+        if (granted) {
+            startListening()
+        } else {
             Toast.makeText(
                 context,
                 "Microphone permission is needed for voice input.",
@@ -113,7 +136,7 @@ fun VoiceInputButton(
     IconButton(
         onClick = {
             if (isListening) {
-                recognizer?.cancel()
+                runCatching { recognizer?.cancel() }
                 isListening = false
             } else if (recognizer == null) {
                 Toast.makeText(
@@ -121,18 +144,11 @@ fun VoiceInputButton(
                     "Speech recognition is not available on this device.",
                     Toast.LENGTH_SHORT
                 ).show()
-            } else if (hasPermission) {
-                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                    putExtra(
-                        RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                        RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-                    )
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
-                    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-                }
-                isListening = true
-                recognizer.startListening(intent)
+            } else if (
+                ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                startListening()
             } else {
                 permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }

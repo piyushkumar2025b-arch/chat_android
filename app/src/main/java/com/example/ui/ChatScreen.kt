@@ -13,6 +13,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -47,6 +48,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
@@ -64,7 +66,6 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -119,6 +120,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -907,6 +909,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                 pendingAttachments.forEach { attachment ->
                                     AttachmentBadge(
                                         attachment = attachment.toAttachmentInfo(),
+                                        bitmap = attachment.bitmap,
                                         onClick = { inspectingAttachment = attachment },
                                         onRemove = { viewModel.removeAttachment(attachment.id) }
                                     )
@@ -1569,6 +1572,7 @@ private fun ChatMessageBubble(
                             message.attachments.forEach { attachment ->
                                 AttachmentBadge(
                                     attachment = attachment.toAttachmentInfo(),
+                                    bitmap = attachment.bitmap,
                                     onClick = { onAttachmentClick(attachment) }
                                 )
                             }
@@ -1662,7 +1666,7 @@ private fun ChatMessageBubble(
                             active = isSpeaking
                         )
                         if (message.content.isNotBlank() && !isError) {
-                            MessageAction(onSaveToNotes, Icons.Default.NoteAdd, "Save to Notes")
+                            MessageAction(onSaveToNotes, Icons.AutoMirrored.Filled.NoteAdd, "Save to Notes")
                             MessageAction(onOpenInWritingPad, Icons.Default.Description, "Open in Writing Pad")
                         }
                         if (isLastAssistant && !isGenerating) {
@@ -2025,23 +2029,37 @@ private fun AttachmentInspectorDialog(
                 )
 
                 if (isImage) {
-                    val file = File(attachment.localUri)
-                    if (file.exists()) {
-                        AsyncImage(
-                            model = file,
-                            contentDescription = attachment.name,
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 260.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                        )
-                    } else {
-                        Text(
-                            text = "Image preview is unavailable offline.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    val file = attachment.localUri.takeIf { it.isNotBlank() }?.let { File(it) }
+                    when {
+                        file != null && file.exists() -> {
+                            AsyncImage(
+                                model = file,
+                                contentDescription = attachment.name,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 260.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                            )
+                        }
+                        attachment.bitmap != null -> {
+                            Image(
+                                bitmap = attachment.bitmap.asImageBitmap(),
+                                contentDescription = attachment.name,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 260.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                            )
+                        }
+                        else -> {
+                            Text(
+                                text = "Image preview is unavailable offline.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 } else {
                     Card(

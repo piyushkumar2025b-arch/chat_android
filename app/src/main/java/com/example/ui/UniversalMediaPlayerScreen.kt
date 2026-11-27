@@ -3,7 +3,10 @@ package com.example.ui
 import android.content.Context
 import android.media.MediaPlayer
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.widget.Toast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -303,42 +306,59 @@ fun UniversalMediaPlayerScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            try {
-                AudioSynthesizer.stopSound()
-                mediaPlayerInstance?.release()
-                mediaPlayerInstance = null
+            coroutineScope.launch {
+                try {
+                    AudioSynthesizer.stopSound()
+                    runCatching { mediaPlayerInstance?.release() }
+                    mediaPlayerInstance = null
 
-                val mp = MediaPlayer().apply {
-                    setDataSource(context, uri)
-                    prepare()
-                    this.isLooping = latestLooping
-                    setOnCompletionListener {
+                    val (mp, name) = withContext(Dispatchers.IO) {
+                        var resolvedName: String? = null
+                        runCatching {
+                            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                                if (cursor.moveToFirst()) {
+                                    val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                                    if (idx >= 0) resolvedName = cursor.getString(idx)
+                                }
+                            }
+                        }
+                        val preparedPlayer = MediaPlayer().apply {
+                            setDataSource(context, uri)
+                            prepare()
+                        }
+                        val displayName = resolvedName?.takeIf { it.isNotBlank() }
+                            ?: uri.lastPathSegment?.substringAfterLast('/')
+                            ?: "Local Audio"
+                        preparedPlayer to displayName
+                    }
+
+                    mp.isLooping = latestLooping
+                    mp.setOnCompletionListener {
                         if (!latestLooping) {
                             isPlaying = false
                             currentPositionMs = 0L
                             playbackProgress = 0f
                         }
                     }
+                    val durMs = mp.duration.toLong().coerceAtLeast(1000L)
+                    mediaPlayerInstance = mp
+                    isCustomAudio = true
+                    currentTrack = PlayableMediaItem(
+                        id = "local_${uri.hashCode()}",
+                        title = name,
+                        artist = "Device Audio File",
+                        durationText = formatMediaDuration(durMs),
+                        durationMs = durMs
+                    )
+                    totalDurationMs = durMs
+                    currentPositionMs = 0L
+                    playbackProgress = 0f
+                    mp.start()
+                    isPlaying = true
+                    Toast.makeText(context, "Playing $name", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Could not open audio: ${e.localizedMessage ?: "Unsupported file"}", Toast.LENGTH_SHORT).show()
                 }
-                val name = uri.lastPathSegment?.substringAfterLast('/') ?: "Local Audio"
-                val durMs = mp.duration.toLong().coerceAtLeast(1000L)
-                mediaPlayerInstance = mp
-                isCustomAudio = true
-                currentTrack = PlayableMediaItem(
-                    id = "local_${uri.hashCode()}",
-                    title = name,
-                    artist = "Device Audio File",
-                    durationText = formatMediaDuration(durMs),
-                    durationMs = durMs
-                )
-                totalDurationMs = durMs
-                currentPositionMs = 0L
-                playbackProgress = 0f
-                mp.start()
-                isPlaying = true
-                Toast.makeText(context, "Playing $name", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Toast.makeText(context, "Could not open audio: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
             }
         }
     }

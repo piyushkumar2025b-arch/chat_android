@@ -28,9 +28,10 @@ import javax.crypto.spec.SecretKeySpec
  * - Master PIN hashing with cryptographic salt (SHA-256)
  * - Safe clipboard management with Android 13+ sensitive content flag and 30s auto-clear
  */
-class VaultSecurityManager(private val context: Context) {
+class VaultSecurityManager(context: Context) {
 
-    private val prefs = context.getSharedPreferences("omnichat_vault_secure_prefs", Context.MODE_PRIVATE)
+    private val appContext: Context = context.applicationContext
+    private val prefs = appContext.getSharedPreferences("omnichat_vault_secure_prefs", Context.MODE_PRIVATE)
     private val keyAlias = "OmniChatVaultKey_v1"
     private val gcmTagLengthBits = 128
     private val ivLengthBytes = 12
@@ -230,7 +231,7 @@ class VaultSecurityManager(private val context: Context) {
      * 2. Automated memory clearance after 30 seconds
      */
     fun copyPasswordToClipboard(password: String, onAutoCleared: (() -> Unit)? = null) {
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clipboard = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
         val clip = ClipData.newPlainText("Password", password)
 
         // Set IS_SENSITIVE flag on API 33+

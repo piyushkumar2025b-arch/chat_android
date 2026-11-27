@@ -680,8 +680,9 @@ fun VideoStudioScreen(
         item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 
-    if (showPreviewDialog && activeItemOrNull(currentItem) != null) {
-        val active = currentItem!!
+    val activePreview = activeItemOrNull(currentItem)
+    if (showPreviewDialog && activePreview != null) {
+        val active = activePreview
         val bmp = active.keyframeBitmap
         AlertDialog(
             onDismissRequest = { showPreviewDialog = false },
