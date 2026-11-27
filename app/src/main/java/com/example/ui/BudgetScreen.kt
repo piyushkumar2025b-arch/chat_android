@@ -4,6 +4,7 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,9 +30,11 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -75,6 +78,7 @@ import com.example.data.local.ExpenseEntity
 import com.example.data.local.PreferencesManager
 import com.example.data.local.ToolkitDao
 import com.example.data.remote.AiService
+import com.example.data.remote.MediaSaver
 import com.google.firebase.ai.type.Schema
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -132,6 +136,7 @@ fun BudgetScreen(
     var aiError by remember { mutableStateOf<String?>(null) }
 
     var showManualDialog by remember { mutableStateOf(false) }
+    var editingExpense by remember { mutableStateOf<ExpenseEntity?>(null) }
     var manualTitle by remember { mutableStateOf("") }
     var manualAmount by remember { mutableStateOf("") }
     var manualCategory by remember { mutableStateOf("Food") }
@@ -218,6 +223,37 @@ fun BudgetScreen(
                         }
                     },
                     actions = {
+                        if (entries.isNotEmpty()) {
+                            IconButton(
+                                onClick = {
+                                    scope.launch {
+                                        val csvHeader = "Title,Category,Type,Amount,Date\n"
+                                        val rows = entries.joinToString("\n") { item ->
+                                            val safeTitle = item.title.replace("\"", "\"\"")
+                                            val kind = if (item.isIncome) "Income" else "Expense"
+                                            val dateStr = dateFormat.format(Date(item.timestamp))
+                                            "\"$safeTitle\",\"${item.category}\",$kind,${item.amount},\"$dateStr\""
+                                        }
+                                        val res = MediaSaver.saveDocumentToDownloads(
+                                            context,
+                                            "omnichat_budget_${System.currentTimeMillis() / 1000}.csv",
+                                            csvHeader + rows,
+                                            "text/csv"
+                                        )
+                                        withContext(Dispatchers.Main) {
+                                            res.onSuccess {
+                                                Toast.makeText(context, "Saved CSV to Downloads/OmniChat", Toast.LENGTH_SHORT).show()
+                                            }.onFailure { err ->
+                                                Toast.makeText(context, err.localizedMessage ?: "Export failed", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.testTag("budget_export_csv_button")
+                            ) {
+                                Icon(Icons.Default.Download, contentDescription = "Export CSV")
+                            }
+                        }
                         IconButton(
                             onClick = {
                                 limitInput = monthlyLimit.toInt().toString()
@@ -236,6 +272,7 @@ fun BudgetScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
+                    editingExpense = null
                     manualTitle = ""
                     manualAmount = ""
                     manualCategory = "Food"
@@ -372,6 +409,36 @@ fun BudgetScreen(
                                 color = MaterialTheme.colorScheme.error
                             )
                         }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(
+                                Triple("Coffee", 5.0, "Food"),
+                                Triple("Lunch", 15.0, "Food"),
+                                Triple("Groceries", 45.0, "Shopping"),
+                                Triple("Ride", 18.0, "Transport")
+                            ).forEach { (label, amt, cat) ->
+                                AssistChip(
+                                    onClick = {
+                                        scope.launch {
+                                            withContext(Dispatchers.IO) {
+                                                toolkitDao.upsertExpense(
+                                                    ExpenseEntity(title = label, amount = amt, category = cat)
+                                                )
+                                            }
+                                            withContext(Dispatchers.Main) {
+                                                Toast.makeText(context, "Logged $label (${currency.format(amt)})", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    label = { Text("$label ${currency.format(amt)}", maxLines = 1) },
+                                    modifier = Modifier.testTag("budget_quick_$label")
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -498,7 +565,16 @@ fun BudgetScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                        modifier = Modifier.testTag("budget_entry_${item.id}")
+                        modifier = Modifier
+                            .clickable {
+                                editingExpense = item
+                                manualTitle = item.title
+                                manualAmount = item.amount.toString()
+                                manualCategory = item.category
+                                manualIsIncome = item.isIncome
+                                showManualDialog = true
+                            }
+                            .testTag("budget_entry_${item.id}")
                     ) {
                         Row(
                             modifier = Modifier
@@ -550,8 +626,11 @@ fun BudgetScreen(
 
     if (showManualDialog) {
         AlertDialog(
-            onDismissRequest = { showManualDialog = false },
-            title = { Text("Add Transaction") },
+            onDismissRequest = {
+                showManualDialog = false
+                editingExpense = null
+            },
+            title = { Text(if (editingExpense == null) "Add Transaction" else "Edit Transaction") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -610,18 +689,22 @@ fun BudgetScreen(
                         val title = manualTitle.trim()
                         val amount = manualAmount.trim().toDoubleOrNull()
                         if (title.isNotBlank() && amount != null && amount > 0.0) {
+                            val existing = editingExpense
                             scope.launch {
                                 withContext(Dispatchers.IO) {
                                     toolkitDao.upsertExpense(
                                         ExpenseEntity(
+                                            id = existing?.id ?: java.util.UUID.randomUUID().toString(),
                                             title = title,
                                             amount = amount,
                                             category = manualCategory,
-                                            isIncome = manualIsIncome
+                                            isIncome = manualIsIncome,
+                                            timestamp = existing?.timestamp ?: System.currentTimeMillis()
                                         )
                                     )
                                 }
                             }
+                            editingExpense = null
                             showManualDialog = false
                         } else {
                             Toast.makeText(context, "Enter a valid title and positive amount", Toast.LENGTH_SHORT).show()

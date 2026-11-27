@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -133,6 +135,9 @@ fun FlashcardsScreen(
     // Study state
     var studyIndex by remember { mutableIntStateOf(0) }
     var isFlipped by remember { mutableStateOf(false) }
+    var unmasteredOnly by remember { mutableStateOf(false) }
+    var swapFaces by remember { mutableStateOf(false) }
+    var shuffleSeed by remember { mutableIntStateOf(0) }
 
     // Quiz state
     var quizIndex by remember { mutableIntStateOf(0) }
@@ -142,6 +147,10 @@ fun FlashcardsScreen(
     val activeDeck = decks.firstOrNull { it.id == activeDeckId }
     val deckCards = remember(allCards, activeDeckId) {
         allCards.filter { it.deckId == activeDeckId }
+    }
+    val studyCards = remember(deckCards, unmasteredOnly, shuffleSeed) {
+        val base = if (unmasteredOnly) deckCards.filter { !it.mastered } else deckCards
+        if (shuffleSeed == 0) base else base.shuffled(kotlin.random.Random(shuffleSeed))
     }
 
     BackHandler(enabled = activeDeck != null) {
@@ -679,7 +688,6 @@ fun FlashcardsScreen(
             }
         } else {
             // Study Deck & Card List
-            val safeIndex = if (deckCards.isEmpty()) 0 else studyIndex.coerceIn(0, deckCards.lastIndex)
             val masteredCount = deckCards.count { it.mastered }
 
             LazyColumn(
@@ -713,144 +721,225 @@ fun FlashcardsScreen(
                         }
                     }
                 } else {
-                    val activeCard = deckCards[safeIndex]
                     item {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                "Card ${safeIndex + 1} of ${deckCards.size}",
-                                style = MaterialTheme.typography.labelLarge
+                            FilterChip(
+                                selected = unmasteredOnly,
+                                onClick = {
+                                    unmasteredOnly = !unmasteredOnly
+                                    studyIndex = 0
+                                    isFlipped = false
+                                },
+                                label = { Text("Need Practice") },
+                                modifier = Modifier.testTag("flashcards_filter_practice")
                             )
-                            Text(
-                                "$masteredCount/${deckCards.size} mastered",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary
+                            FilterChip(
+                                selected = swapFaces,
+                                onClick = {
+                                    swapFaces = !swapFaces
+                                    isFlipped = false
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
+                                },
+                                label = { Text("Swap Q↔A") },
+                                modifier = Modifier.testTag("flashcards_swap_qa")
+                            )
+                            AssistChip(
+                                onClick = {
+                                    shuffleSeed++
+                                    studyIndex = 0
+                                    isFlipped = false
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(16.dp))
+                                },
+                                label = { Text("Shuffle") },
+                                modifier = Modifier.testTag("flashcards_shuffle")
                             )
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        LinearProgressIndicator(
-                            progress = { masteredCount.toFloat() / deckCards.size.toFloat() },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                        )
                     }
 
-                    item {
-                        val rotation by animateFloatAsState(
-                            targetValue = if (isFlipped) 180f else 0f,
-                            animationSpec = tween(durationMillis = 320),
-                            label = "cardFlip"
-                        )
-                        val showingBack = rotation > 90f
-                        Card(
-                            shape = RoundedCornerShape(18.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (showingBack) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                                else MaterialTheme.colorScheme.surface
-                            ),
-                            border = BorderStroke(
-                                1.5.dp,
-                                if (showingBack) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(220.dp)
-                                .graphicsLayer {
-                                    rotationY = rotation
-                                    cameraDistance = 12f * density
-                                }
-                                .clickable { isFlipped = !isFlipped }
-                                .testTag("flashcard_flip_surface")
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(20.dp)
-                                    .graphicsLayer {
-                                        if (showingBack) rotationY = 180f
-                                    },
-                                contentAlignment = Alignment.Center
+                    if (studyCards.isEmpty()) {
+                        item {
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
                             ) {
                                 Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(24.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    Text(
-                                        text = if (showingBack) "ANSWER" else "QUESTION",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.Bold
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(36.dp)
                                     )
                                     Text(
-                                        text = if (showingBack) activeCard.answer else activeCard.question,
-                                        style = MaterialTheme.typography.titleMedium,
+                                        "All cards in this deck are mastered!",
+                                        style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.SemiBold,
                                         textAlign = TextAlign.Center
                                     )
-                                    Text(
-                                        text = "Tap card to flip",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    Button(onClick = { unmasteredOnly = false }) {
+                                        Text("Show All Cards")
+                                    }
                                 }
                             }
                         }
-                    }
+                    } else {
+                        val safeIndex = studyIndex.coerceIn(0, studyCards.lastIndex)
+                        val activeCard = studyCards[safeIndex]
 
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    scope.launch {
-                                        withContext(Dispatchers.IO) {
-                                            toolkitDao.updateCardMastery(activeCard.id, false)
-                                        }
-                                    }
-                                    isFlipped = false
-                                    studyIndex = (safeIndex + 1) % deckCards.size
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("flashcard_review_again_button")
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Review Again")
+                                Text(
+                                    "Card ${safeIndex + 1} of ${studyCards.size}",
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                                Text(
+                                    "$masteredCount/${deckCards.size} mastered",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             }
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        withContext(Dispatchers.IO) {
-                                            toolkitDao.updateCardMastery(activeCard.id, true)
-                                        }
-                                    }
-                                    isFlipped = false
-                                    studyIndex = (safeIndex + 1) % deckCards.size
-                                },
+                            Spacer(modifier = Modifier.height(6.dp))
+                            LinearProgressIndicator(
+                                progress = { masteredCount.toFloat() / deckCards.size.toFloat() },
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("flashcard_got_it_button")
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                            )
+                        }
+
+                        item {
+                            val rotation by animateFloatAsState(
+                                targetValue = if (isFlipped) 180f else 0f,
+                                animationSpec = tween(durationMillis = 320),
+                                label = "cardFlip"
+                            )
+                            val showingBack = rotation > 90f
+                            val showingAnswer = if (swapFaces) !showingBack else showingBack
+                            Card(
+                                shape = RoundedCornerShape(18.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (showingBack) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                                    else MaterialTheme.colorScheme.surface
+                                ),
+                                border = BorderStroke(
+                                    1.5.dp,
+                                    if (showingBack) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(220.dp)
+                                    .graphicsLayer {
+                                        rotationY = rotation
+                                        cameraDistance = 12f * density
+                                    }
+                                    .clickable { isFlipped = !isFlipped }
+                                    .testTag("flashcard_flip_surface")
                             ) {
-                                Text("Got It!")
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(20.dp)
+                                        .graphicsLayer {
+                                            if (showingBack) rotationY = 180f
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Text(
+                                            text = if (showingAnswer) "ANSWER" else "QUESTION",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = if (showingAnswer) activeCard.answer else activeCard.question,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        Text(
+                                            text = "Tap card to flip",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
                         }
-                    }
 
-                    item {
-                        OutlinedButton(
-                            onClick = {
-                                onSendToChat("Quiz me and explain this flashcard deeper:\nQ: ${activeCard.question}\nA: ${activeCard.answer}")
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Ask AI Tutor About This Card")
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        scope.launch {
+                                            withContext(Dispatchers.IO) {
+                                                toolkitDao.updateCardMastery(activeCard.id, false)
+                                            }
+                                        }
+                                        isFlipped = false
+                                        studyIndex = (safeIndex + 1) % studyCards.size.coerceAtLeast(1)
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("flashcard_review_again_button")
+                                ) {
+                                    Text("Review Again")
+                                }
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            withContext(Dispatchers.IO) {
+                                                toolkitDao.updateCardMastery(activeCard.id, true)
+                                            }
+                                        }
+                                        isFlipped = false
+                                        studyIndex = (safeIndex + 1) % studyCards.size.coerceAtLeast(1)
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("flashcard_got_it_button")
+                                ) {
+                                    Text("Got It!")
+                                }
+                            }
+                        }
+
+                        item {
+                            OutlinedButton(
+                                onClick = {
+                                    onSendToChat("Quiz me and explain this flashcard deeper:\nQ: ${activeCard.question}\nA: ${activeCard.answer}")
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Ask AI Tutor About This Card")
+                            }
                         }
                     }
 

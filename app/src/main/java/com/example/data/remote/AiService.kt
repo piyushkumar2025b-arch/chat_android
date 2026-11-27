@@ -312,6 +312,55 @@ object AiService {
     }
 
     /**
+     * Extracts and translates visible text from a photo using Firebase AI Logic multimodal Gemini.
+     */
+    suspend fun translateImageText(
+        bitmap: Bitmap,
+        targetLanguage: String,
+        tone: String = "Natural"
+    ): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val scaled = if (maxOf(bitmap.width, bitmap.height) > 1600) {
+                val ratio = 1600f / maxOf(bitmap.width, bitmap.height).toFloat()
+                Bitmap.createScaledBitmap(
+                    bitmap,
+                    (bitmap.width * ratio).toInt().coerceAtLeast(1),
+                    (bitmap.height * ratio).toInt().coerceAtLeast(1),
+                    true
+                )
+            } else {
+                bitmap
+            }
+            val model = Firebase.ai.generativeModel(modelName = DEFAULT_GEMINI_MODEL)
+            val response = withTimeout(AI_TIMEOUT_MS) {
+                model.generateContent(
+                    content {
+                        image(scaled)
+                        text(
+                            "Read all visible text in this image and translate it cleanly into $targetLanguage using a $tone tone. " +
+                                "Format briefly as:\nOriginal: <detected text>\nTranslation: <translated text>"
+                        )
+                    }
+                )
+            }
+            val text = response.text?.trim().orEmpty()
+            if (text.isBlank()) {
+                Result.failure(IOException("No readable text was found in this photo."))
+            } else {
+                Result.success(text)
+            }
+        } catch (e: TimeoutCancellationException) {
+            Log.e(TAG, "translateImageText timed out", e)
+            Result.failure(IOException("Photo translation timed out after 60 seconds."))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "translateImageText failed", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Generates a new image or edits an existing photo via Firebase AI Logic (`gemini-nano-banana-2.1`).
      * Surfaces genuine failures transparently without fake Canvas/fallback placeholders.
      */

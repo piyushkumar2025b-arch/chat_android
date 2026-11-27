@@ -76,7 +76,8 @@ private enum class WritingMode(val label: String, val instruction: String) {
     FRIENDLY("Friendly", "Rewrite in a warm, friendly, conversational tone."),
     FORMAL("Formal", "Rewrite in a clear, polite, professional tone."),
     EMAIL_REPLY("Email Reply", "Draft a polite, ready-to-send email reply to this message."),
-    BULLETS("Bullet Points", "Turn this text into crisp, easy-to-scan bullet points.")
+    BULLETS("Bullet Points", "Turn this text into crisp, easy-to-scan bullet points."),
+    SUBJECT_LINES("Titles & Subjects", "Suggest 5 clear, catchy titles or email subject lines for this text, numbered 1 to 5.")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -304,6 +305,15 @@ fun WritingStudioScreen(
                             Text(
                                 text = resultText,
                                 style = MaterialTheme.typography.bodyMedium
+                            )
+
+                            val resultWords = remember(resultText) {
+                                resultText.trim().split(Regex("\\s+")).count { it.isNotBlank() }
+                            }
+                            Text(
+                                text = "$resultWords words · ${resultText.length} chars",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
                             Row(

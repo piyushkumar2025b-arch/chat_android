@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.room.Room
@@ -21,11 +22,14 @@ import com.example.data.local.AppDatabase
 import com.example.data.local.ExpenseEntity
 import com.example.data.local.FlashcardDeckEntity
 import com.example.data.local.FlashcardEntity
+import com.example.data.local.NoteEntity
 import com.example.data.local.PreferencesManager
 import com.example.data.remote.BackupManager
 import com.example.ui.BudgetScreen
+import com.example.ui.CalculatorScreen
 import com.example.ui.DecisionToolsScreen
 import com.example.ui.FlashcardsScreen
+import com.example.ui.NotesScreen
 import com.example.ui.TranslatorScreen
 import com.example.ui.WritingStudioScreen
 import kotlinx.coroutines.flow.first
@@ -177,7 +181,7 @@ class NewToolkitFeaturesTest {
             assertEquals(25.50, saved.first().amount, 0.001)
 
             composeRule.waitUntil(timeoutMillis = 3_000) {
-                composeRule.onAllNodesWithText("Spending Breakdown").fetchSemanticsNodes().isNotEmpty()
+                composeRule.onAllNodesWithText("$25.50").fetchSemanticsNodes().isNotEmpty()
             }
             composeRule.onNodeWithTag("budget_list").performScrollToNode(hasText("Train Ticket"))
             composeRule.onNodeWithText("Train Ticket").assertIsDisplayed()
@@ -192,6 +196,7 @@ class NewToolkitFeaturesTest {
         composeRule.onNodeWithTag("translator_source_lang").assertIsDisplayed()
         composeRule.onNodeWithTag("translator_target_lang").assertIsDisplayed()
         composeRule.onNodeWithTag("translator_run_button").assertIsDisplayed()
+        composeRule.onNodeWithTag("translator_photo_button").assertIsDisplayed()
     }
 
     @Test
@@ -247,6 +252,153 @@ class NewToolkitFeaturesTest {
             } finally {
                 freshDb.close()
             }
+        }
+    }
+
+    @Test
+    fun budgetScreen_quickPresetAndClickToEdit_updatesExistingExpense() {
+        runBlocking {
+            composeRule.setContent {
+                BudgetScreen(
+                    toolkitDao = db.toolkitDao(),
+                    preferencesManager = prefs,
+                    onBack = {}
+                )
+            }
+
+            composeRule.onNodeWithTag("budget_quick_Coffee").performClick()
+            val deadline = System.currentTimeMillis() + 3_000
+            while (System.currentTimeMillis() < deadline) {
+                Shadows.shadowOf(Looper.getMainLooper()).idle()
+                if (db.toolkitDao().getExpensesOnce().isNotEmpty()) break
+                Thread.sleep(20)
+            }
+            val created = db.toolkitDao().getExpensesOnce().single()
+            assertEquals("Coffee", created.title)
+            assertEquals(5.0, created.amount, 0.001)
+
+            composeRule.waitUntil(timeoutMillis = 3_000) {
+                composeRule.onAllNodesWithText("$5.00").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithTag("budget_list").performScrollToNode(
+                androidx.compose.ui.test.hasTestTag("budget_entry_${created.id}")
+            )
+            composeRule.onNodeWithTag("budget_entry_${created.id}").performClick()
+            composeRule.waitForIdle()
+
+            composeRule.onNodeWithTag("budget_manual_title").performTextInput(" Latte")
+            composeRule.onNodeWithTag("budget_manual_save").performClick()
+
+            val editDeadline = System.currentTimeMillis() + 3_000
+            while (System.currentTimeMillis() < editDeadline) {
+                Shadows.shadowOf(Looper.getMainLooper()).idle()
+                if (db.toolkitDao().getExpensesOnce().firstOrNull()?.title?.contains("Latte") == true) break
+                Thread.sleep(20)
+            }
+            val updated = db.toolkitDao().getExpensesOnce()
+            assertEquals(1, updated.size)
+            assertTrue(updated.single().title.contains("Latte"))
+        }
+    }
+
+    @Test
+    fun flashcardsScreen_studyFiltersSwapAndNeedPracticeWork() {
+        runBlocking {
+            val deck = FlashcardDeckEntity(id = "d_study", title = "Science", topic = "Physics")
+            db.toolkitDao().upsertDeck(deck)
+            db.toolkitDao().insertCards(
+                listOf(
+                    FlashcardEntity(id = "c1", deckId = "d_study", question = "Symbol for Water?", answer = "H2O", mastered = true, createdAt = 1L),
+                    FlashcardEntity(id = "c2", deckId = "d_study", question = "Speed of Light unit?", answer = "m/s", mastered = false, createdAt = 2L)
+                )
+            )
+
+            composeRule.setContent {
+                FlashcardsScreen(
+                    toolkitDao = db.toolkitDao(),
+                    productivityDao = db.productivityDao(),
+                    onBack = {}
+                )
+            }
+
+            composeRule.waitUntil(timeoutMillis = 3_000) {
+                composeRule.onAllNodesWithText("Science").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithText("Science").performClick()
+
+            composeRule.waitUntil(timeoutMillis = 3_000) {
+                composeRule.onAllNodesWithText("Card 1 of 2").fetchSemanticsNodes().isNotEmpty()
+            }
+
+            composeRule.onNodeWithTag("flashcards_swap_qa").performClick()
+            composeRule.waitUntil(timeoutMillis = 3_000) {
+                composeRule.onAllNodesWithText("H2O").fetchSemanticsNodes().isNotEmpty()
+            }
+
+            composeRule.onNodeWithTag("flashcards_filter_practice").performClick()
+            composeRule.waitUntil(timeoutMillis = 3_000) {
+                composeRule.onAllNodesWithText("Card 1 of 1").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onAllNodesWithText("m/s").onFirst().assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun calculatorScreen_historyTapeAndTipSplitWorkAccurately() {
+        composeRule.setContent {
+            CalculatorScreen(onBack = {})
+        }
+
+        composeRule.onNodeWithTag("calc_key_2").performClick()
+        composeRule.onNodeWithTag("calc_key_+").performClick()
+        composeRule.onNodeWithTag("calc_key_3").performClick()
+        composeRule.onNodeWithTag("calc_key_=").performClick()
+        composeRule.onNodeWithTag("calc_history_chip_0").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("calc_tab_tip").performClick()
+        composeRule.onNodeWithTag("tip_percent_20").performClick()
+        composeRule.waitUntil(timeoutMillis = 3_000) {
+            composeRule.onAllNodesWithText("$60.00").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("tip_per_person_value").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("$60.00").assertIsDisplayed()
+    }
+
+    @Test
+    fun notesScreen_tagFilterStripFiltersNotes() {
+        runBlocking {
+            db.productivityDao().insertNote(
+                NoteEntity(id = "n1", title = "Exam Review", content = "Chapters 1 to 4", tags = "study", updatedAt = 2L)
+            )
+            db.productivityDao().insertNote(
+                NoteEntity(id = "n2", title = "Grocery Run", content = "Milk and bread", tags = "home", updatedAt = 1L)
+            )
+
+            composeRule.setContent {
+                NotesScreen(
+                    productivityDao = db.productivityDao(),
+                    onBack = {}
+                )
+            }
+
+            composeRule.waitUntil(timeoutMillis = 3_000) {
+                composeRule.onAllNodesWithText("Exam Review").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithTag("notes_list").performScrollToNode(hasText("Grocery Run"))
+            composeRule.onNodeWithText("Grocery Run").assertIsDisplayed()
+
+            composeRule.onNodeWithTag("notes_tag_filter_study").performClick()
+            composeRule.waitUntil(timeoutMillis = 3_000) {
+                composeRule.onAllNodesWithText("Grocery Run").fetchSemanticsNodes().isEmpty()
+            }
+            composeRule.onNodeWithText("Exam Review").assertIsDisplayed()
+
+            composeRule.onNodeWithTag("notes_tag_filter_All").performClick()
+            composeRule.waitUntil(timeoutMillis = 3_000) {
+                composeRule.onAllNodesWithText("Exam Review").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithTag("notes_list").performScrollToNode(hasText("Grocery Run"))
+            composeRule.onNodeWithText("Grocery Run").assertIsDisplayed()
         }
     }
 }

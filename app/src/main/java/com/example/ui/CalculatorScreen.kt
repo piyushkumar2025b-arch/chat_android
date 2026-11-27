@@ -20,19 +20,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Transform
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -50,6 +53,7 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -99,21 +103,30 @@ fun CalculatorScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Calculator") },
-                    icon = { Icon(Icons.Default.Calculate, contentDescription = null) }
+                    text = { Text("Calculator", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    icon = { Icon(Icons.Default.Calculate, contentDescription = null) },
+                    modifier = Modifier.testTag("calc_tab_standard")
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("Unit Converter") },
-                    icon = { Icon(Icons.Default.Transform, contentDescription = null) }
+                    text = { Text("Units", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    icon = { Icon(Icons.Default.Transform, contentDescription = null) },
+                    modifier = Modifier.testTag("calc_tab_units")
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = { Text("Tip & Split", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    icon = { Icon(Icons.Default.Receipt, contentDescription = null) },
+                    modifier = Modifier.testTag("calc_tab_tip")
                 )
             }
 
-            if (selectedTab == 0) {
-                StandardCalculatorView(onSendResultToChat = onSendResultToChat)
-            } else {
-                UnitConverterView()
+            when (selectedTab) {
+                0 -> StandardCalculatorView(onSendResultToChat = onSendResultToChat)
+                1 -> UnitConverterView()
+                else -> TipAndSplitView(onSendResultToChat = onSendResultToChat)
             }
         }
     }
@@ -123,13 +136,14 @@ fun CalculatorScreen(
 private fun StandardCalculatorView(onSendResultToChat: (String) -> Unit) {
     var expression by remember { mutableStateOf("") }
     var resultText by remember { mutableStateOf("0") }
+    var historyTape by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .widthIn(max = 520.dp)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Display Screen
         Card(
@@ -141,21 +155,21 @@ private fun StandardCalculatorView(onSendResultToChat: (String) -> Unit) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
                 horizontalAlignment = Alignment.End
             ) {
                 Text(
                     text = expression.ifEmpty { "0" },
-                    fontSize = 22.sp,
+                    fontSize = 18.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     fontFamily = FontFamily.Monospace,
                     maxLines = 1,
                     modifier = Modifier.horizontalScroll(rememberScrollState())
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = resultText,
-                    fontSize = 36.sp,
+                    fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                     fontFamily = FontFamily.Monospace,
@@ -165,102 +179,134 @@ private fun StandardCalculatorView(onSendResultToChat: (String) -> Unit) {
             }
         }
 
+        if (historyTape.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                historyTape.forEachIndexed { idx, (expr, res) ->
+                    AssistChip(
+                        onClick = {
+                            expression = res
+                            resultText = res
+                        },
+                        label = { Text("$expr = $res", maxLines = 1) },
+                        modifier = Modifier.testTag("calc_history_chip_$idx")
+                    )
+                }
+            }
+        }
+
         // Action: Send to chat
-        if (resultText != "0" && resultText != "Error") {
+        if (resultText != "0" && resultText != "Error" && resultText != "Cannot divide by 0") {
             OutlinedButton(
                 onClick = { onSendResultToChat("Calculator Result: $expression = $resultText") },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Insert Result into AI Chat", maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-        } else {
-            Spacer(modifier = Modifier.weight(1f, fill = false))
         }
 
-        // Keypad Grid - responsive circular/pill cells safe on all viewports
-        val buttons = listOf(
-            "C", "(", ")", "⌫",
-            "7", "8", "9", "÷",
-            "4", "5", "6", "×",
-            "1", "2", "3", "-",
-            "0", ".", "=", "+"
+        // Keypad Grid - responsive 5x4 layout so all 20 keys fit without scrolling
+        val rows = listOf(
+            listOf("C", "(", ")", "⌫"),
+            listOf("7", "8", "9", "÷"),
+            listOf("4", "5", "6", "×"),
+            listOf("1", "2", "3", "-"),
+            listOf("0", ".", "=", "+")
         )
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        Column(
+            verticalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
         ) {
-            items(buttons) { btn ->
-                val isOp = btn in listOf("÷", "×", "-", "+")
-                val isSpecial = btn in listOf("C", "⌫", "(", ")")
-                val bgColor = when {
-                    btn == "=" -> MaterialTheme.colorScheme.primary
-                    isOp -> MaterialTheme.colorScheme.surfaceContainerHigh
-                    isSpecial -> MaterialTheme.colorScheme.surfaceContainerLow
-                    else -> MaterialTheme.colorScheme.surface
-                }
-                val textColor = when {
-                    btn == "=" -> MaterialTheme.colorScheme.onPrimary
-                    isOp -> MaterialTheme.colorScheme.primary
-                    btn == "C" -> MaterialTheme.colorScheme.error
-                    isSpecial -> MaterialTheme.colorScheme.onSurfaceVariant
-                    else -> MaterialTheme.colorScheme.onSurface
-                }
-
-                Box(
+            rows.forEach { rowButtons ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 48.dp, max = 66.dp)
-                        .aspectRatio(1.15f, matchHeightConstraintsFirst = false)
-                        .clip(CircleShape)
-                        .background(bgColor)
-                        .then(
-                            if (btn != "=") Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
-                            else Modifier
-                        )
-                        .clickable {
-                            when (btn) {
-                                "C" -> {
-                                    expression = ""
-                                    resultText = "0"
-                                }
-                                "⌫" -> {
-                                    // FIX BUG-06: Single character backspace
-                                    if (expression.isNotEmpty()) {
-                                        expression = expression.dropLast(1)
-                                        resultText = if (expression.isEmpty()) "0" else evalQuick(expression)
+                        .weight(1f)
+                ) {
+                    rowButtons.forEach { btn ->
+                        val isOp = btn in listOf("÷", "×", "-", "+")
+                        val isSpecial = btn in listOf("C", "⌫", "(", ")")
+                        val bgColor = when {
+                            btn == "=" -> MaterialTheme.colorScheme.primary
+                            isOp -> MaterialTheme.colorScheme.surfaceContainerHigh
+                            isSpecial -> MaterialTheme.colorScheme.surfaceContainerLow
+                            else -> MaterialTheme.colorScheme.surface
+                        }
+                        val textColor = when {
+                            btn == "=" -> MaterialTheme.colorScheme.onPrimary
+                            isOp -> MaterialTheme.colorScheme.primary
+                            btn == "C" -> MaterialTheme.colorScheme.error
+                            isSpecial -> MaterialTheme.colorScheme.onSurfaceVariant
+                            else -> MaterialTheme.colorScheme.onSurface
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .heightIn(max = 64.dp)
+                                .clip(RoundedCornerShape(22.dp))
+                                .background(bgColor)
+                                .then(
+                                    if (btn != "=") Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(22.dp))
+                                    else Modifier
+                                )
+                                .clickable {
+                                    when (btn) {
+                                        "C" -> {
+                                            expression = ""
+                                            resultText = "0"
+                                        }
+                                        "⌫" -> {
+                                            if (expression.isNotEmpty()) {
+                                                expression = expression.dropLast(1)
+                                                resultText = if (expression.isEmpty()) "0" else evalQuick(expression)
+                                            }
+                                        }
+                                        "=" -> {
+                                            val evaluated = evalQuick(expression)
+                                            resultText = evaluated
+                                            if (expression.isNotBlank() && evaluated != "Error" && evaluated != "Cannot divide by 0" && evaluated != expression) {
+                                                val entry = expression to evaluated
+                                                if (historyTape.firstOrNull() != entry) {
+                                                    historyTape = (listOf(entry) + historyTape).take(10)
+                                                }
+                                            }
+                                        }
+                                        else -> {
+                                            expression += btn
+                                            resultText = evalQuick(expression)
+                                        }
                                     }
                                 }
-                                "=" -> {
-                                    resultText = evalQuick(expression)
-                                }
-                                else -> {
-                                    expression += btn
-                                    resultText = evalQuick(expression)
-                                }
+                                .testTag("calc_key_$btn"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (btn == "⌫") {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Backspace,
+                                    contentDescription = "Backspace",
+                                    tint = textColor,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            } else {
+                                Text(
+                                    text = btn,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = textColor
+                                )
                             }
                         }
-                        .testTag("calc_key_$btn"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (btn == "⌫") {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Backspace,
-                            contentDescription = "Backspace",
-                            tint = textColor,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    } else {
-                        Text(
-                            text = btn,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = textColor
-                        )
                     }
                 }
             }
@@ -440,6 +486,144 @@ private fun UnitConverterView() {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun TipAndSplitView(onSendResultToChat: (String) -> Unit) {
+    var billInput by remember { mutableStateOf("100") }
+    var tipPercent by remember { mutableIntStateOf(15) }
+    var splitCount by remember { mutableIntStateOf(2) }
+
+    val bill = (billInput.toDoubleOrNull() ?: 0.0).coerceAtLeast(0.0)
+    val tipAmount = bill * (tipPercent / 100.0)
+    val totalAmount = bill + tipAmount
+    val perPerson = totalAmount / splitCount.coerceAtLeast(1)
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        OutlinedTextField(
+            value = billInput,
+            onValueChange = { billInput = it },
+            label = { Text("Bill Amount ($)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("tip_bill_input")
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Tip Percentage", style = MaterialTheme.typography.labelLarge)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf(10, 15, 18, 20, 25).forEach { pct ->
+                    FilterChip(
+                        selected = tipPercent == pct,
+                        onClick = { tipPercent = pct },
+                        label = { Text("$pct%") },
+                        modifier = Modifier.testTag("tip_percent_$pct")
+                    )
+                }
+            }
+        }
+
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Split Between", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    IconButton(
+                        onClick = { if (splitCount > 1) splitCount-- },
+                        enabled = splitCount > 1,
+                        modifier = Modifier.testTag("tip_split_minus")
+                    ) {
+                        Icon(Icons.Default.Remove, contentDescription = "Fewer people")
+                    }
+                    Text(
+                        text = "$splitCount ${if (splitCount == 1) "person" else "people"}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(
+                        onClick = { if (splitCount < 20) splitCount++ },
+                        enabled = splitCount < 20,
+                        modifier = Modifier.testTag("tip_split_plus")
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "More people")
+                    }
+                }
+            }
+        }
+
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("tip_summary_card")
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Tip ($tipPercent%)", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("$%.2f".format(Locale.US, tipAmount), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Total Bill", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("$%.2f".format(Locale.US, totalAmount), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Per Person", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        "$%.2f".format(Locale.US, perPerson),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.testTag("tip_per_person_value")
+                    )
+                }
+            }
+        }
+
+        OutlinedButton(
+            onClick = {
+                val summary = "Bill Split Summary: $%.2f bill + %d%% tip ($%.2f) = $%.2f total (%d people -> $%.2f each)".format(
+                    Locale.US, bill, tipPercent, tipAmount, totalAmount, splitCount, perPerson
+                )
+                onSendResultToChat(summary)
+            },
+            enabled = bill > 0.0,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("tip_send_to_chat")
+        ) {
+            Text("Send Split Summary to AI Chat", maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

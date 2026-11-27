@@ -3,8 +3,14 @@ package com.example.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.ImageDecoder
+import android.os.Build
+import android.provider.MediaStore
 import android.speech.tts.TextToSpeech
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -33,6 +39,7 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.Button
@@ -160,6 +167,51 @@ fun TranslatorScreen(
     fun persistFavorites(list: List<SavedTranslation>) {
         savedItems = list
         preferencesManager.savedTranslationsJson = serializeSavedTranslations(list)
+    }
+
+    val photoTranslateLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        errorMessage = null
+        isTranslating = true
+        scope.launch {
+            val bitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                    }
+                }.getOrNull()
+            }
+            if (bitmap == null) {
+                errorMessage = "Could not load selected photo."
+                isTranslating = false
+                return@launch
+            }
+            AiService.translateImageText(
+                bitmap = bitmap,
+                targetLanguage = targetLanguage,
+                tone = selectedTone
+            ).onSuccess { result ->
+                val origLine = result.lines().firstOrNull { it.startsWith("Original:", ignoreCase = true) }
+                    ?.substringAfter(":")?.trim()
+                val transLine = result.lines().dropWhile { !it.startsWith("Translation:", ignoreCase = true) }
+                    .joinToString("\n")
+                    .substringAfter(":")
+                    .trim()
+                if (!origLine.isNullOrBlank()) {
+                    sourceText = origLine
+                }
+                translatedText = transLine.ifBlank { result.trim() }
+                isTranslating = false
+            }.onFailure { err ->
+                errorMessage = err.localizedMessage ?: "Photo translation failed."
+                isTranslating = false
+            }
+        }
     }
 
     fun runTranslation(textToTranslate: String = sourceText) {
@@ -372,25 +424,43 @@ fun TranslatorScreen(
                                 .testTag("translator_input")
                         )
 
-                        Button(
-                            onClick = { runTranslation() },
-                            enabled = !isTranslating && sourceText.isNotBlank(),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("translator_run_button")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            if (isTranslating) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Translating…")
-                            } else {
-                                Icon(Icons.Default.Translate, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Translate to $targetLanguage")
+                            Button(
+                                onClick = { runTranslation() },
+                                enabled = !isTranslating && sourceText.isNotBlank(),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("translator_run_button")
+                            ) {
+                                if (isTranslating) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Translating…")
+                                } else {
+                                    Icon(Icons.Default.Translate, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Translate", maxLines = 1)
+                                }
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    photoTranslateLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                },
+                                enabled = !isTranslating,
+                                modifier = Modifier.testTag("translator_photo_button")
+                            ) {
+                                Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Photo", maxLines = 1)
                             }
                         }
                     }

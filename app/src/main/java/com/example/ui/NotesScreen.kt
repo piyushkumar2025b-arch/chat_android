@@ -3,6 +3,7 @@ package com.example.ui
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -35,6 +37,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -78,17 +81,29 @@ fun NotesScreen(
     val allNotes by productivityDao.getAllNotes().collectAsState(initial = emptyList())
 
     var searchQuery by remember { mutableStateOf("") }
+    var selectedTag by remember { mutableStateOf<String?>(null) }
     var showDialog by remember { mutableStateOf(false) }
     var editingNote by remember { mutableStateOf<NoteEntity?>(null) }
     var allNotesSummary by remember { mutableStateOf<String?>(null) }
     var isSummarizingAll by remember { mutableStateOf(false) }
 
-    val filteredNotes = remember(allNotes, searchQuery) {
-        if (searchQuery.isBlank()) allNotes
-        else allNotes.filter {
-            it.title.contains(searchQuery, ignoreCase = true) ||
-                    it.content.contains(searchQuery, ignoreCase = true) ||
-                    it.tags.contains(searchQuery, ignoreCase = true)
+    val availableTags = remember(allNotes) {
+        allNotes.flatMap { it.tags.split(",") }
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sorted()
+    }
+
+    val filteredNotes = remember(allNotes, searchQuery, selectedTag) {
+        allNotes.filter { note ->
+            val matchesTag = selectedTag == null || note.tags.split(",")
+                .any { it.trim().equals(selectedTag, ignoreCase = true) }
+            val matchesSearch = searchQuery.isBlank() ||
+                note.title.contains(searchQuery, ignoreCase = true) ||
+                note.content.contains(searchQuery, ignoreCase = true) ||
+                note.tags.contains(searchQuery, ignoreCase = true)
+            matchesTag && matchesSearch
         }
     }
 
@@ -133,6 +148,30 @@ fun NotesScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
+
+            if (availableTags.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedTag == null,
+                        onClick = { selectedTag = null },
+                        label = { Text("All") },
+                        modifier = Modifier.testTag("notes_tag_filter_All")
+                    )
+                    availableTags.forEach { tag ->
+                        FilterChip(
+                            selected = selectedTag == tag,
+                            onClick = { selectedTag = if (selectedTag == tag) null else tag },
+                            label = { Text("#$tag") },
+                            modifier = Modifier.testTag("notes_tag_filter_$tag")
+                        )
+                    }
+                }
+            }
 
             if (allNotes.isNotEmpty()) {
                 FilledTonalButton(
@@ -203,13 +242,15 @@ fun NotesScreen(
             if (filteredNotes.isEmpty()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(
-                        text = if (searchQuery.isBlank()) "No notes yet. Tap + to create one!" else "No matching notes found.",
+                        text = if (searchQuery.isBlank() && selectedTag == null) "No notes yet. Tap + to create one!" else "No matching notes found.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("notes_list"),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(filteredNotes, key = { it.id }) { note ->
@@ -379,6 +420,34 @@ fun NotesScreen(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("AI Summary", maxLines = 1)
                         }
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            if (content.isBlank()) {
+                                Toast.makeText(context, "Write a note first", Toast.LENGTH_SHORT).show()
+                                return@OutlinedButton
+                            }
+                            coroutineScope.launch {
+                                isAiHelping = true
+                                val res = AiService.quickAssist(
+                                    taskPrompt = "Extract clear, actionable checklist items from this note formatted as `- [ ] Task` lines:\n\n$content",
+                                    systemInstruction = "Return only a crisp `- [ ]` markdown checklist."
+                                )
+                                isAiHelping = false
+                                res.onSuccess { content = it }
+                                    .onFailure { err ->
+                                        Toast.makeText(context, err.localizedMessage ?: "AI Action List failed", Toast.LENGTH_SHORT).show()
+                                    }
+                            }
+                        },
+                        enabled = !isAiHelping && content.isNotBlank(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("note_ai_checklist_button")
+                    ) {
+                        Icon(Icons.Default.Checklist, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Turn Into AI Action List", maxLines = 1)
                     }
                 }
             },
