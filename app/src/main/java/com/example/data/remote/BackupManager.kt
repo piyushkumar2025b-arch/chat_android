@@ -2,6 +2,9 @@ package com.example.data.remote
 
 import com.example.data.local.AppDatabase
 import com.example.data.local.CalendarEventEntity
+import com.example.data.local.ExpenseEntity
+import com.example.data.local.FlashcardDeckEntity
+import com.example.data.local.FlashcardEntity
 import com.example.data.local.FocusSessionEntity
 import com.example.data.local.HabitCheckInEntity
 import com.example.data.local.HabitEntity
@@ -30,10 +33,13 @@ class BackupManager(private val db: AppDatabase) {
         val prompts: Int,
         val habits: Int,
         val checkIns: Int,
-        val focusSessions: Int
+        val focusSessions: Int,
+        val flashcardDecks: Int = 0,
+        val flashcards: Int = 0,
+        val expenses: Int = 0
     ) {
         fun summary(): String =
-            "$sessions chats · $messages messages · $notes notes · $memories memories · $prompts prompts · $habits habits"
+            "$sessions chats · $messages messages · $notes notes · $memories memories · $prompts prompts · $habits habits · $flashcardDecks decks · $expenses budget items"
     }
 
     data class ImportReport(
@@ -45,15 +51,19 @@ class BackupManager(private val db: AppDatabase) {
         val prompts: Int,
         val habits: Int,
         val checkIns: Int,
-        val focusSessions: Int
+        val focusSessions: Int,
+        val flashcardDecks: Int = 0,
+        val flashcards: Int = 0,
+        val expenses: Int = 0
     ) {
         fun summary(): String =
-            "Restored $sessions chats, $messages messages, $notes notes, $memories memories, $prompts prompts, $habits habits, $focusSessions focus sessions."
+            "Restored $sessions chats, $messages messages, $notes notes, $memories memories, $prompts prompts, $habits habits, $focusSessions focus sessions, $flashcardDecks flashcard decks, $expenses budget entries."
     }
 
     suspend fun exportJson(): Pair<String, BackupReport> = withContext(Dispatchers.IO) {
         val chatDao = db.chatDao()
         val productivityDao = db.productivityDao()
+        val toolkitDao = db.toolkitDao()
         val sessions = chatDao.getAllSessionsOnce()
         val messages = chatDao.getAllMessagesOnce()
         val notes = productivityDao.getAllNotesOnce()
@@ -63,6 +73,9 @@ class BackupManager(private val db: AppDatabase) {
         val habits = db.focusDao().getHabitsOnce()
         val checkIns = db.focusDao().getAllCheckInsOnce()
         val focusSessions = db.focusDao().getFocusSessionsOnce()
+        val flashcardDecks = toolkitDao.getDecksOnce()
+        val flashcards = toolkitDao.getAllCardsOnce()
+        val expenses = toolkitDao.getExpensesOnce()
 
         val root = JSONObject().apply {
             put("format", "omnichat-backup")
@@ -160,6 +173,43 @@ class BackupManager(private val db: AppDatabase) {
                     })
                 }
             })
+            put("flashcardDecks", JSONArray().apply {
+                flashcardDecks.forEach { deck ->
+                    put(JSONObject().apply {
+                        put("id", deck.id)
+                        put("title", deck.title)
+                        put("topic", deck.topic)
+                        put("createdAt", deck.createdAt)
+                        put("updatedAt", deck.updatedAt)
+                    })
+                }
+            })
+            put("flashcards", JSONArray().apply {
+                flashcards.forEach { card ->
+                    put(JSONObject().apply {
+                        put("id", card.id)
+                        put("deckId", card.deckId)
+                        put("question", card.question)
+                        put("answer", card.answer)
+                        put("mastered", card.mastered)
+                        put("reviewCount", card.reviewCount)
+                        put("createdAt", card.createdAt)
+                    })
+                }
+            })
+            put("expenses", JSONArray().apply {
+                expenses.forEach { expense ->
+                    put(JSONObject().apply {
+                        put("id", expense.id)
+                        put("title", expense.title)
+                        put("amount", expense.amount)
+                        put("category", expense.category)
+                        put("isIncome", expense.isIncome)
+                        put("note", expense.note)
+                        put("timestamp", expense.timestamp)
+                    })
+                }
+            })
         }
 
         val report = BackupReport(
@@ -171,7 +221,10 @@ class BackupManager(private val db: AppDatabase) {
             prompts = prompts.size,
             habits = habits.size,
             checkIns = checkIns.size,
-            focusSessions = focusSessions.size
+            focusSessions = focusSessions.size,
+            flashcardDecks = flashcardDecks.size,
+            flashcards = flashcards.size,
+            expenses = expenses.size
         )
         root.toString(2) to report
     }
@@ -199,6 +252,9 @@ class BackupManager(private val db: AppDatabase) {
         val habits = root.optJSONArray("habits").toHabits()
         val checkIns = root.optJSONArray("checkIns").toCheckIns()
         val focusSessions = root.optJSONArray("focusSessions").toFocusSessions()
+        val flashcardDecks = root.optJSONArray("flashcardDecks").toFlashcardDecks()
+        val flashcards = root.optJSONArray("flashcards").toFlashcards()
+        val expenses = root.optJSONArray("expenses").toExpenses()
 
         if (sessions.isNotEmpty()) db.chatDao().insertSessions(sessions)
         if (messages.isNotEmpty()) db.chatDao().insertMessages(messages)
@@ -209,6 +265,9 @@ class BackupManager(private val db: AppDatabase) {
         if (habits.isNotEmpty()) db.focusDao().insertHabits(habits)
         if (checkIns.isNotEmpty()) db.focusDao().insertCheckIns(checkIns)
         if (focusSessions.isNotEmpty()) db.focusDao().insertFocusSessions(focusSessions)
+        if (flashcardDecks.isNotEmpty()) db.toolkitDao().insertDecks(flashcardDecks)
+        if (flashcards.isNotEmpty()) db.toolkitDao().insertCards(flashcards)
+        if (expenses.isNotEmpty()) db.toolkitDao().insertExpenses(expenses)
 
         ImportReport(
             sessions = sessions.size,
@@ -219,7 +278,10 @@ class BackupManager(private val db: AppDatabase) {
             prompts = prompts.size,
             habits = habits.size,
             checkIns = checkIns.size,
-            focusSessions = focusSessions.size
+            focusSessions = focusSessions.size,
+            flashcardDecks = flashcardDecks.size,
+            flashcards = flashcards.size,
+            expenses = expenses.size
         )
     }
 
@@ -416,6 +478,65 @@ class BackupManager(private val db: AppDatabase) {
                     minutes = item.optInt("minutes", 25).coerceAtLeast(1),
                     wasCompleted = item.optBoolean("wasCompleted", true),
                     createdAt = item.optLong("createdAt", System.currentTimeMillis())
+                )
+            )
+        }
+    }
+
+    private fun JSONArray?.toFlashcardDecks(): List<FlashcardDeckEntity> = buildList {
+        val array = this@toFlashcardDecks ?: return@buildList
+        for (index in 0 until array.length()) {
+            val item = array.optJSONObject(index) ?: continue
+            val id = item.optString("id")
+            if (id.isBlank()) continue
+            add(
+                FlashcardDeckEntity(
+                    id = id,
+                    title = item.optString("title", "Study Deck"),
+                    topic = item.optString("topic", ""),
+                    createdAt = item.optLong("createdAt", System.currentTimeMillis()),
+                    updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
+                )
+            )
+        }
+    }
+
+    private fun JSONArray?.toFlashcards(): List<FlashcardEntity> = buildList {
+        val array = this@toFlashcards ?: return@buildList
+        for (index in 0 until array.length()) {
+            val item = array.optJSONObject(index) ?: continue
+            val id = item.optString("id")
+            val deckId = item.optString("deckId")
+            if (id.isBlank() || deckId.isBlank()) continue
+            add(
+                FlashcardEntity(
+                    id = id,
+                    deckId = deckId,
+                    question = item.optString("question", ""),
+                    answer = item.optString("answer", ""),
+                    mastered = item.optBoolean("mastered", false),
+                    reviewCount = item.optInt("reviewCount", 0),
+                    createdAt = item.optLong("createdAt", System.currentTimeMillis())
+                )
+            )
+        }
+    }
+
+    private fun JSONArray?.toExpenses(): List<ExpenseEntity> = buildList {
+        val array = this@toExpenses ?: return@buildList
+        for (index in 0 until array.length()) {
+            val item = array.optJSONObject(index) ?: continue
+            val id = item.optString("id")
+            if (id.isBlank()) continue
+            add(
+                ExpenseEntity(
+                    id = id,
+                    title = item.optString("title", "Expense"),
+                    amount = item.optDouble("amount", 0.0).coerceAtLeast(0.0),
+                    category = item.optString("category", "Other"),
+                    isIncome = item.optBoolean("isIncome", false),
+                    note = item.optString("note", ""),
+                    timestamp = item.optLong("timestamp", System.currentTimeMillis())
                 )
             )
         }

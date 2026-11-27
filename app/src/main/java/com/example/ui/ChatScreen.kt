@@ -231,6 +231,9 @@ fun ChatScreen(viewModel: ChatViewModel) {
     var editMessageTarget by remember { mutableStateOf<ChatMessage?>(null) }
     var editMessageText by remember { mutableStateOf("") }
     var deleteMessageTarget by remember { mutableStateOf<ChatMessage?>(null) }
+    var isPolishingPrompt by remember { mutableStateOf(false) }
+    var isSummarizingChat by remember { mutableStateOf(false) }
+    var chatSummaryText by remember { mutableStateOf<String?>(null) }
 
     if (isAppLockEnabled && !isAppUnlocked) {
         AppLockScreen(onUnlock = viewModel::unlockApp)
@@ -709,6 +712,24 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                                 viewModel.navigateToSection(AppSection.BACKUP_RESTORE)
                                             }
                                         )
+                                        DropdownMenuItem(
+                                            text = { Text("Summarize chat to Notes") },
+                                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = null) },
+                                            onClick = {
+                                                showOverflowMenu = false
+                                                isSummarizingChat = true
+                                                viewModel.summarizeCurrentChat(saveAsNote = true) { ok, result ->
+                                                    isSummarizingChat = false
+                                                    if (ok) {
+                                                        chatSummaryText = result
+                                                        toast("Summary saved to Notes")
+                                                    } else {
+                                                        toast(result)
+                                                    }
+                                                }
+                                            },
+                                            modifier = Modifier.testTag("menu_summarize_chat")
+                                        )
                                         HorizontalDivider()
                                         DropdownMenuItem(
                                             text = { Text("Save chat as Text") },
@@ -926,6 +947,42 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         ) {
                             Column {
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                if (inputPrompt.trim().length >= 12 && !isGenerating) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 12.dp, end = 12.dp, top = 6.dp),
+                                        horizontalArrangement = Arrangement.Start
+                                    ) {
+                                        AssistChip(
+                                            onClick = {
+                                                if (!isPolishingPrompt) {
+                                                    isPolishingPrompt = true
+                                                    viewModel.polishComposerPrompt(inputPrompt) { ok, result ->
+                                                        isPolishingPrompt = false
+                                                        if (ok) {
+                                                            inputPrompt = result
+                                                            toast("Prompt polished")
+                                                        } else {
+                                                            toast(result)
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            label = {
+                                                Text(if (isPolishingPrompt) "Polishing…" else "Polish prompt")
+                                            },
+                                            leadingIcon = {
+                                                if (isPolishingPrompt) {
+                                                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                                } else {
+                                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                }
+                                            },
+                                            modifier = Modifier.testTag("polish_prompt_chip")
+                                        )
+                                    }
+                                }
                                 Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1275,6 +1332,35 @@ fun ChatScreen(viewModel: ChatViewModel) {
             },
             dismissButton = {
                 TextButton(onClick = { deleteMessageTarget = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (isSummarizingChat) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Summarizing Chat") },
+            text = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.5.dp)
+                    Text("Creating a concise summary and saving it to Notes…")
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
+    chatSummaryText?.let { summary ->
+        AlertDialog(
+            onDismissRequest = { chatSummaryText = null },
+            title = { Text("Chat Summary (Saved to Notes)") },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text(summary, style = MaterialTheme.typography.bodyMedium)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { chatSummaryText = null }) { Text("Done") }
             }
         )
     }

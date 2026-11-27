@@ -196,7 +196,7 @@ fun BackupRestoreScreen(
                 BackupActionCard(
                     icon = Icons.Default.Download,
                     title = "Create a backup",
-                    description = "Packages chat sessions, messages, notes, calendar events, AI memories, prompt templates, habits and focus sessions into one file.",
+                    description = "Packages chats, notes, calendar events, AI memories, prompts, habits, flashcards, and budget items into one file.",
                     primaryLabel = "Create backup",
                     primaryEnabled = !busy,
                     onPrimary = {

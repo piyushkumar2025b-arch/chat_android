@@ -11,6 +11,9 @@ import com.example.data.ChatRepository
 import com.example.data.local.AppDatabase
 import com.example.data.local.AppLockManager
 import com.example.data.local.CalendarEventEntity
+import com.example.data.local.ExpenseEntity
+import com.example.data.local.FlashcardDeckEntity
+import com.example.data.local.FlashcardEntity
 import com.example.data.local.FocusSessionEntity
 import com.example.data.local.HabitCheckInEntity
 import com.example.data.local.HabitEntity
@@ -75,6 +78,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val memoryDao = db.memoryDao()
     val promptDao = db.promptDao()
     val focusDao = db.focusDao()
+    val toolkitDao = db.toolkitDao()
     val ragEngine = RagEngine(ragDao)
     val backupManager = BackupManager(db)
     val appLockManager = AppLockManager(application)
@@ -107,6 +111,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val focusSessions: StateFlow<List<FocusSessionEntity>> = focusDao.observeFocusSessions()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val flashcardDecks: StateFlow<List<FlashcardDeckEntity>> = toolkitDao.observeDecks()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val allFlashcards: StateFlow<List<FlashcardEntity>> = toolkitDao.observeAllCards()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val expenses: StateFlow<List<ExpenseEntity>> = toolkitDao.observeExpenses()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val ragDocuments: StateFlow<List<KnowledgeDocumentEntity>> = ragDao.getAllDocuments()
@@ -329,6 +342,73 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 callback(true, "Saved to Notes")
             } catch (e: Exception) {
                 callback(false, "Could not save note: ${e.localizedMessage ?: "unknown error"}")
+            }
+        }
+    }
+
+    fun polishComposerPrompt(
+        draft: String,
+        callback: (Boolean, String) -> Unit
+    ) {
+        val cleaned = draft.trim()
+        if (cleaned.isBlank()) {
+            callback(false, "Type a message first.")
+            return
+        }
+        viewModelScope.launch {
+            AiService.quickAssist(
+                taskPrompt = "Rewrite and clarify this message so an AI gives the best possible answer. Keep the user's intent and return ONLY the improved prompt without quotes or extra commentary:\n\n$cleaned",
+                systemInstruction = "You rewrite rough user prompts into clear, concise, effective prompts. Output only the rewritten prompt.",
+                modelId = AiService.FAST_GEMINI_MODEL,
+                temperature = 0.3f,
+                customGeminiApiKey = preferencesManager.geminiApiKey
+            ).onSuccess { improved ->
+                callback(true, improved.trim())
+            }.onFailure { err ->
+                callback(false, err.localizedMessage ?: "Could not polish prompt.")
+            }
+        }
+    }
+
+    fun summarizeCurrentChat(
+        saveAsNote: Boolean = false,
+        callback: (Boolean, String) -> Unit
+    ) {
+        val convo = _messages.value.filter {
+            (it.role == MessageRole.USER || it.role == MessageRole.ASSISTANT) && it.content.isNotBlank()
+        }
+        if (convo.isEmpty()) {
+            callback(false, "Start chatting first so there is something to summarize.")
+            return
+        }
+        val transcript = convo.takeLast(20).joinToString("\n\n") { msg ->
+            val who = if (msg.role == MessageRole.USER) "User" else "Assistant"
+            "$who: ${msg.content.take(1000)}"
+        }
+        viewModelScope.launch {
+            AiService.quickAssist(
+                taskPrompt = "Summarize the key points, decisions, and next steps from this conversation in clear short bullet points:\n\n$transcript",
+                systemInstruction = "Write a clean, brief summary in simple plain language with clear bullet points.",
+                modelId = AiService.FAST_GEMINI_MODEL,
+                temperature = 0.3f,
+                customGeminiApiKey = preferencesManager.geminiApiKey
+            ).onSuccess { summary ->
+                if (saveAsNote) {
+                    val sessionTitle = _sessions.value.firstOrNull { it.id == _activeSessionId.value }?.title ?: "Chat"
+                    withContext(Dispatchers.IO) {
+                        productivityDao.insertNote(
+                            NoteEntity(
+                                title = "Summary: ${sessionTitle.take(40)}",
+                                content = summary,
+                                tags = "chat-summary",
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        )
+                    }
+                }
+                callback(true, summary)
+            }.onFailure { err ->
+                callback(false, err.localizedMessage ?: "Could not summarize chat.")
             }
         }
     }

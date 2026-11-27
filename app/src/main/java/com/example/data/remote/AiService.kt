@@ -12,6 +12,7 @@ import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.Content
 import com.google.firebase.ai.type.ImagePart
 import com.google.firebase.ai.type.ResponseModality
+import com.google.firebase.ai.type.Schema
 import com.google.firebase.ai.type.content
 import com.google.firebase.ai.type.generationConfig
 import kotlinx.coroutines.CancellationException
@@ -260,6 +261,52 @@ object AiService {
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "quickAssist failed", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Generates strict raw JSON guaranteed to conform to [responseSchema] via Firebase AI Logic.
+     */
+    suspend fun generateStructuredJson(
+        taskPrompt: String,
+        responseSchema: Schema,
+        systemInstruction: String = "",
+        modelId: String = DEFAULT_GEMINI_MODEL,
+        temperature: Float = 0.3f
+    ): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val resolvedModel = AvailableModels.normalizeModelId(modelId).ifBlank { DEFAULT_GEMINI_MODEL }
+            val config = generationConfig {
+                this.temperature = temperature
+                maxOutputTokens = 4096
+                responseMimeType = "application/json"
+                this.responseSchema = responseSchema
+            }
+            val sysContent = systemInstruction.takeIf { it.isNotBlank() }?.let {
+                content { text(it) }
+            }
+            val model = Firebase.ai.generativeModel(
+                modelName = resolvedModel,
+                generationConfig = config,
+                systemInstruction = sysContent
+            )
+            val response = withTimeout(AI_TIMEOUT_MS) {
+                model.generateContent(taskPrompt)
+            }
+            val text = response.text?.trim().orEmpty()
+            if (text.isBlank()) {
+                Result.failure(IOException("Gemini returned an empty structured response."))
+            } else {
+                Result.success(text)
+            }
+        } catch (e: TimeoutCancellationException) {
+            Log.e(TAG, "generateStructuredJson timed out", e)
+            Result.failure(IOException("AI request timed out after 60 seconds. Please try again."))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "generateStructuredJson failed", e)
             Result.failure(e)
         }
     }

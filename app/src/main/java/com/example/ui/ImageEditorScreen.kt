@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
@@ -109,8 +110,12 @@ fun ImageEditorScreen(
 
     // Helper to render lines into Bitmap matching actual canvas bounds
     fun generateBitmap(): Bitmap {
-        val width = canvasSize.width.coerceAtLeast(720)
-        val height = canvasSize.height.coerceAtLeast(720)
+        val srcW = canvasSize.width.coerceAtLeast(1)
+        val srcH = canvasSize.height.coerceAtLeast(1)
+        val width = srcW.coerceAtLeast(720)
+        val height = if (srcW < 720) ((srcH.toFloat() / srcW) * width).toInt().coerceAtLeast(720) else srcH.coerceAtLeast(720)
+        val scaleX = width.toFloat() / srcW.toFloat()
+        val scaleY = height.toFloat() / srcH.toFloat()
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = AndroidCanvas(bitmap)
         canvas.drawColor(android.graphics.Color.WHITE)
@@ -122,8 +127,14 @@ fun ImageEditorScreen(
 
         for (line in lines) {
             paint.color = line.color.toArgb()
-            paint.strokeWidth = line.strokeWidth
-            canvas.drawLine(line.start.x, line.start.y, line.end.x, line.end.y, paint)
+            paint.strokeWidth = line.strokeWidth * ((scaleX + scaleY) / 2f)
+            canvas.drawLine(
+                line.start.x * scaleX,
+                line.start.y * scaleY,
+                line.end.x * scaleX,
+                line.end.y * scaleY,
+                paint
+            )
         }
         return bitmap
     }
@@ -204,7 +215,12 @@ fun ImageEditorScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .onSizeChanged { canvasSize = it }
-                        .pointerInput(true) {
+                        .pointerInput(Unit) {
+                            detectTapGestures { offset ->
+                                lines.add(DrawnLine(offset, Offset(offset.x + 0.5f, offset.y + 0.5f), currentColor, strokeWidth))
+                            }
+                        }
+                        .pointerInput(Unit) {
                             detectDragGestures { change, dragAmount ->
                                 change.consume()
                                 val start = change.position - dragAmount
@@ -244,7 +260,7 @@ fun ImageEditorScreen(
                             val isSelected = currentColor == color
                             Box(
                                 modifier = Modifier
-                                    .size(44.dp)
+                                    .size(48.dp)
                                     .clip(CircleShape)
                                     .clickable { currentColor = color },
                                 contentAlignment = Alignment.Center

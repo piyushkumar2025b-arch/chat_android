@@ -46,6 +46,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_MAX_OUTPUT_TOKENS = "max_output_tokens"
         private const val KEY_MEMORY_ENABLED = "assistant_memory_enabled"
         private const val KEY_CONTEXT_BUDGET = "context_budget_tokens"
+        private const val KEY_MONTHLY_BUDGET_LIMIT = "monthly_budget_limit"
+        private const val KEY_SAVED_TRANSLATIONS = "saved_translations_json"
 
         const val DEFAULT_SYSTEM_PROMPT =
             "You are a friendly, highly intelligent AI assistant. Provide helpful, accurate, well-formatted, and concise answers with markdown and code snippets when needed."
@@ -111,6 +113,14 @@ class PreferencesManager(context: Context) {
     var contextBudgetTokens: Int
         get() = prefs.getInt(KEY_CONTEXT_BUDGET, 6000)
         set(value) = prefs.edit().putInt(KEY_CONTEXT_BUDGET, value.coerceIn(1_000, 32_000)).apply()
+
+    var monthlyBudgetLimit: Float
+        get() = prefs.getFloat(KEY_MONTHLY_BUDGET_LIMIT, 1000f)
+        set(value) = prefs.edit().putFloat(KEY_MONTHLY_BUDGET_LIMIT, value.coerceAtLeast(10f)).apply()
+
+    var savedTranslationsJson: String
+        get() = prefs.getString(KEY_SAVED_TRANSLATIONS, "[]") ?: "[]"
+        set(value) = prefs.edit().putString(KEY_SAVED_TRANSLATIONS, value).apply()
 
     fun exportKeysJson(): String {
         val obj = org.json.JSONObject().apply {
